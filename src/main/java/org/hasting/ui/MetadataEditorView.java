@@ -5,10 +5,13 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
 
+import java.awt.Desktop;
+import java.io.File;
 import java.util.List;
 
 public class MetadataEditorView extends BorderPane {
@@ -113,6 +116,9 @@ public class MetadataEditorView extends BorderPane {
         
         table.getColumns().addAll(artistCol, titleCol, albumCol, genreCol, yearCol);
         table.setPrefHeight(250);
+        
+        // Add context menu
+        setupTableContextMenu(table);
         
         return table;
     }
@@ -401,5 +407,191 @@ public class MetadataEditorView extends BorderPane {
         fileSizeLabel.setText("");
         bitrateLabel.setText("");
         durationLabel.setText("");
+    }
+    
+    /**
+     * Sets up context menu for the results table.
+     */
+    private void setupTableContextMenu(TableView<MusicFile> table) {
+        ContextMenu contextMenu = new ContextMenu();
+        
+        // Edit Metadata menu item (loads the file for editing)
+        MenuItem editMetadataItem = new MenuItem("✏️ Edit Metadata");
+        editMetadataItem.setOnAction(e -> {
+            MusicFile selectedFile = table.getSelectionModel().getSelectedItem();
+            if (selectedFile != null) {
+                loadFileForEditing(selectedFile);
+            }
+        });
+        
+        // Delete File menu item
+        MenuItem deleteItem = new MenuItem("🗑️ Delete File");
+        deleteItem.setOnAction(e -> {
+            MusicFile selectedFile = table.getSelectionModel().getSelectedItem();
+            if (selectedFile != null) {
+                deleteFile(selectedFile);
+            }
+        });
+        
+        // Add separator
+        SeparatorMenuItem separator1 = new SeparatorMenuItem();
+        
+        // Open File Location menu item
+        MenuItem openLocationItem = new MenuItem("📂 Open File Location");
+        openLocationItem.setOnAction(e -> {
+            MusicFile selectedFile = table.getSelectionModel().getSelectedItem();
+            if (selectedFile != null) {
+                openFileLocation(selectedFile);
+            }
+        });
+        
+        // Copy File Path menu item
+        MenuItem copyPathItem = new MenuItem("📋 Copy File Path");
+        copyPathItem.setOnAction(e -> {
+            MusicFile selectedFile = table.getSelectionModel().getSelectedItem();
+            if (selectedFile != null) {
+                copyFilePathToClipboard(selectedFile);
+            }
+        });
+        
+        // Show File Info menu item
+        MenuItem fileInfoItem = new MenuItem("ℹ️ Show File Info");
+        fileInfoItem.setOnAction(e -> {
+            MusicFile selectedFile = table.getSelectionModel().getSelectedItem();
+            if (selectedFile != null) {
+                showFileInfo(selectedFile);
+            }
+        });
+        
+        // Add all items to context menu
+        contextMenu.getItems().addAll(
+            editMetadataItem,
+            deleteItem,
+            separator1,
+            openLocationItem,
+            copyPathItem,
+            fileInfoItem
+        );
+        
+        // Show context menu only when right-clicking on a row with data
+        table.setRowFactory(tv -> {
+            TableRow<MusicFile> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.SECONDARY && !row.isEmpty()) {
+                    contextMenu.show(row, event.getScreenX(), event.getScreenY());
+                }
+            });
+            return row;
+        });
+    }
+    
+    /**
+     * Deletes a specific file with confirmation.
+     */
+    private void deleteFile(MusicFile file) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Delete");
+        alert.setHeaderText("Delete Music File");
+        alert.setContentText("Are you sure you want to delete: " + file.getTitle() + " by " + file.getArtist() + "?");
+        
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                try {
+                    if (file.deleteFile()) {
+                        DatabaseManager.deleteMusicFile(file);
+                        resultsData.remove(file);
+                        
+                        // Clear form if this was the selected file
+                        if (currentFile != null && currentFile.equals(file)) {
+                            currentFile = null;
+                            ((VBox) getBottom()).getChildren().get(0).setDisable(true);
+                            clearForm();
+                        }
+                        
+                        statusLabel.setText("File deleted successfully");
+                    } else {
+                        statusLabel.setText("Failed to delete file");
+                    }
+                } catch (Exception e) {
+                    statusLabel.setText("Error deleting file: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+    
+    /**
+     * Opens the file location in the system file manager.
+     */
+    private void openFileLocation(MusicFile file) {
+        try {
+            File fileLocation = new File(file.getFilePath());
+            if (fileLocation.exists()) {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(fileLocation.getParentFile());
+                    statusLabel.setText("Opened file location");
+                } else {
+                    statusLabel.setText("Desktop operations not supported");
+                }
+            } else {
+                statusLabel.setText("File does not exist: " + file.getFilePath());
+            }
+        } catch (Exception e) {
+            statusLabel.setText("Error opening file location: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Copies the file path to the system clipboard.
+     */
+    private void copyFilePathToClipboard(MusicFile file) {
+        try {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(file.getFilePath());
+            clipboard.setContent(content);
+            statusLabel.setText("File path copied to clipboard");
+        } catch (Exception e) {
+            statusLabel.setText("Error copying to clipboard: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Shows detailed information about the selected file.
+     */
+    private void showFileInfo(MusicFile file) {
+        Alert info = new Alert(Alert.AlertType.INFORMATION);
+        info.setTitle("File Information");
+        info.setHeaderText(file.getTitle() + " by " + file.getArtist());
+        
+        StringBuilder details = new StringBuilder();
+        details.append("Album: ").append(file.getAlbum()).append("\n");
+        details.append("Genre: ").append(file.getGenre()).append("\n");
+        details.append("Year: ").append(file.getYear()).append("\n");
+        details.append("Track: ").append(file.getTrackNumber()).append("\n");
+        details.append("Duration: ");
+        if (file.getDurationSeconds() != null) {
+            int duration = file.getDurationSeconds();
+            details.append(String.format("%d:%02d", duration / 60, duration % 60));
+        }
+        details.append("\n");
+        details.append("Bitrate: ").append(file.getBitRate()).append(" kbps\n");
+        details.append("Sample Rate: ").append(file.getSampleRate()).append(" Hz\n");
+        details.append("File Size: ");
+        if (file.getFileSizeBytes() != null) {
+            long size = file.getFileSizeBytes();
+            if (size > 1024 * 1024) {
+                details.append(String.format("%.1f MB", size / (1024.0 * 1024.0)));
+            } else {
+                details.append(String.format("%.1f KB", size / 1024.0));
+            }
+        }
+        details.append("\n");
+        details.append("File Type: ").append(file.getFileType()).append("\n");
+        details.append("File Path: ").append(file.getFilePath());
+        
+        info.setContentText(details.toString());
+        info.showAndWait();
     }
 }
