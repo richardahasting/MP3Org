@@ -2,10 +2,11 @@ plugins {
     id("java")
     id("application")
     id("org.openjfx.javafxplugin") version "0.1.0"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "org.hasting"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -70,14 +71,101 @@ tasks.test {
     jvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 }
 
+// Configure Shadow JAR for distribution
+tasks.shadowJar {
+    archiveBaseName.set("mp3org")
+    archiveVersion.set(version.toString())
+    archiveClassifier.set("")
+    
+    manifest {
+        attributes(
+            "Main-Class" to "org.hasting.MP3OrgApplication",
+            "Implementation-Title" to "MP3Org Music Collection Manager",
+            "Implementation-Version" to project.version,
+            "Implementation-Vendor" to "Richard Hasting"
+        )
+    }
+    
+    // Merge service files properly
+    mergeServiceFiles()
+    
+    // Exclude signature files that can cause issues
+    exclude("META-INF/*.RSA", "META-INF/*.SF", "META-INF/*.DSA")
+    
+    // Handle JavaFX native libraries
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Set the final JAR name
+    destinationDirectory.set(file("$buildDir/distributions"))
+}
+
+// Make shadowJar the default build artifact
+tasks.build {
+    dependsOn(tasks.shadowJar)
+}
+
+// Configure regular jar to be executable too (lightweight version)
 tasks.jar {
     manifest {
         attributes["Main-Class"] = "org.hasting.MP3OrgApplication"
     }
+    archiveClassifier.set("slim")
+}
 
-    // Include dependencies in the JAR
-    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+// Task to run the shadow JAR for testing
+tasks.register<JavaExec>("runShadowJar") {
+    group = "application"
+    description = "Run the application from the shadow JAR"
+    dependsOn(tasks.shadowJar)
+    
+    classpath = files(tasks.shadowJar.get().archiveFile)
+    jvmArgs = listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "--add-opens", "javafx.graphics/com.sun.glass.ui=ALL-UNNAMED"
+    )
+}
 
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+// Task to create a distribution ZIP with documentation
+tasks.register<Zip>("distributionZip") {
+    group = "distribution"
+    description = "Create a distribution ZIP with JAR and documentation"
+    dependsOn(tasks.shadowJar)
+    
+    archiveBaseName.set("mp3org")
+    archiveVersion.set(version.toString())
+    destinationDirectory.set(file("$buildDir/distributions"))
+    
+    from(tasks.shadowJar.get().archiveFile) {
+        rename { "mp3org-${version}.jar" }
+    }
+    from("README.md")
+    from("LICENSE")
+    from("MP3Org_User_Guide.md")
+    
+    // Add a simple run script
+    from(file("scripts")) {
+        include("**")
+        into("scripts")
+    }
+}
+
+// Task to verify the shadow JAR
+tasks.register<JavaExec>("verifyShadowJar") {
+    group = "verification"
+    description = "Verify that the shadow JAR can start successfully"
+    dependsOn(tasks.shadowJar)
+    
+    classpath = files(tasks.shadowJar.get().archiveFile)
+    mainClass.set("org.hasting.MP3OrgApplication")
+    jvmArgs = listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "--add-opens", "javafx.graphics/com.sun.glass.ui=ALL-UNNAMED",
+        "-Djava.awt.headless=true"  // For CI environments
+    )
+    args = listOf("--version")  // Add version flag if you implement it
+    
+    doFirst {
+        println("Verifying shadow JAR: ${tasks.shadowJar.get().archiveFile.get()}")
+    }
 }
 

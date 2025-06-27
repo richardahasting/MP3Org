@@ -4,7 +4,8 @@
       "Bash(./gradlew:*)",
       "Bash(git --version)",
       "Bash(git config:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(git remote add:*)"
     ],
     "deny": []
   }
