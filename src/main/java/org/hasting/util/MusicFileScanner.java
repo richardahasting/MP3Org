@@ -1,0 +1,186 @@
+package org.hasting.util;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.hasting.model.MusicFile;
+
+import java.io.File;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
+public class MusicFileScanner {
+    private static final Logger logger = Logger.getLogger(MusicFileScanner.class.getName());
+    // create a javafx UI that allows the user to select one or more  directories, and then calls
+    // List of supported music file extensions
+    private static final String[] SUPPORTED_EXTENSIONS = {
+        "mp3", "flac", "ogg", "wav", "aac", "m4a", "wma", "aiff", "ape", "opus"
+    };
+
+    private HashMap<String, MusicFile> musicFileCache = new HashMap<>(); // Add this line to create a cache for music files
+    private Consumer<String> statusCallback;
+    private Consumer<Integer> progressCallback;
+    private boolean stopRequested = false;
+    private int totalFilesScanned = 0; // Add this line to declare a counter for total files scanned
+    
+    
+    public List<MusicFile> scanMusicFiles(List<String> directoryPaths) {
+        List<MusicFile> musicFiles = new ArrayList<>();
+        musicFiles = DatabaseManager.getAllMusicFiles();   // Add this line to load music files from the database
+        if (musicFiles.isEmpty()) {
+            logger.info("No music files found in the database.");
+        }
+        else {
+            for (var musicFile: musicFiles) {
+                musicFileCache.put(musicFile.getFilePath(), musicFile); // Replace backslashes with forward slashes
+            }
+        }
+        musicFiles.clear(); // Clear the List before scanning new directories
+        directoryPaths.stream()
+            .map(this::findAllMusicFiles)
+            .forEach(musicFiles::addAll);
+        
+        return musicFiles;
+    }
+    
+    /**
+     * Finds all music files in the given directory and its subdirectories.
+     * 
+     * @param directoryPath The path to the directory to scan
+     * @return A list of MusicFile objects representing music files
+     */
+    public List<MusicFile> findAllMusicFiles(String directoryPath) {
+        File directory = new File(directoryPath);
+        List<MusicFile> musicFiles = new ArrayList<>();
+        
+        if (!directory.exists() || !directory.isDirectory()) {
+            logger.warning("Invalid directory: " + directoryPath);
+            if (statusCallback != null) {
+                statusCallback.accept("Invalid directory: " + directoryPath);
+            }
+            return musicFiles;
+        }
+        
+        if (statusCallback != null) {
+            String filesScanned = String.format("%8d files", totalFilesScanned);
+            statusCallback.accept("Scanned " + filesScanned +"\nScanning for music files in: " + directoryPath);
+        }
+        
+        try {
+            // Get all files with enabled extensions
+            String[] enabledExtensions = getEnabledExtensions();
+            Collection<File> files = FileUtils.listFiles(
+                directory, 
+                enabledExtensions, 
+                true // Include subdirectories
+            );
+            
+            for (File file : files) {
+                if (!musicFileCache.containsKey(file.getPath())) {
+                    MusicFile newMusicFile = new MusicFile(file);
+                    musicFileCache.put(file.getPath(), newMusicFile); // Replace backslashes with forward slashes
+                    musicFiles.add(new MusicFile(file));
+                    totalFilesScanned++; // Increment the counter for each file processed
+                }
+            }
+            
+            if (statusCallback != null) {
+                statusCallback.accept("Found " + musicFiles.size() + " music files in " + directoryPath);
+            }
+            
+        } catch (Exception e) {
+            logger.severe("Error scanning directory: " + e.getMessage());
+            if (statusCallback != null) {
+                statusCallback.accept("Error scanning directory: " + e.getMessage());
+            }
+        }
+        
+        return musicFiles;
+    }
+    
+    /**
+     * Checks if a file is a supported music file based on its extension.
+     * 
+     * @param file The file to check
+     * @return true if the file is a supported music file, false otherwise
+     */
+    public static boolean isMusicFile(File file) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        
+        String extension = FilenameUtils.getExtension(file.getName()).toLowerCase();
+        
+        // Check if extension is supported
+        if (!Arrays.asList(SUPPORTED_EXTENSIONS).contains(extension)) {
+            return false;
+        }
+        
+        // Check if file type is enabled in configuration
+        try {
+            DatabaseConfig config = DatabaseConfig.getInstance();
+            return config.isFileTypeEnabled(extension);
+        } catch (Exception e) {
+            // If there's an error accessing config, fall back to checking supported extensions
+            return Arrays.asList(SUPPORTED_EXTENSIONS).contains(extension);
+        }
+    }
+    
+    /**
+     * Gets the list of currently enabled file extensions based on configuration.
+     */
+    public static String[] getEnabledExtensions() {
+        try {
+            DatabaseConfig config = DatabaseConfig.getInstance();
+            return config.getEnabledFileTypes().toArray(new String[0]);
+        } catch (Exception e) {
+            // Fall back to all supported extensions if config is not available
+            return SUPPORTED_EXTENSIONS.clone();
+        }
+    }
+    
+    /**
+     * Sets a callback to receive status updates during scanning.
+     * 
+     * @param statusCallback A consumer that accepts status messages
+     */
+    public void setStatusCallback(Consumer<String> statusCallback) {
+        this.statusCallback = statusCallback;
+    }
+    
+    /**
+     * Sets a callback to receive progress updates during scanning.
+     * 
+     * @param progressCallback A consumer that accepts progress percentage (0-100)
+     */
+    public void setProgressCallback(Consumer<Integer> progressCallback) {
+        this.progressCallback = progressCallback;
+    }
+    
+    /**
+     * Requests the scanner to stop any ongoing operations.
+     */
+    public void requestStop() {
+        this.stopRequested = true;
+    }
+
+    public static void main(String[] args) {
+        MusicFileScanner scanner = new MusicFileScanner();
+
+        // Set status callback to print status messages
+        scanner.setStatusCallback(System.out::println);
+
+        // Test with a single directory
+        List<String> singleDirectory = Arrays.asList("/Users/richard/Music");
+        List<MusicFile> singleDirMusicFiles = scanner.scanMusicFiles(singleDirectory);
+        System.out.println("Music files found in single directory: " + singleDirMusicFiles.size());
+
+        // Test with multiple directories
+        List<String> multipleDirectories = Arrays.asList(
+            "smb://HastingNASty._smb._tcp.local/Music/flac",
+            "/Users/richard/Music/Music/Media"
+        );
+        List<MusicFile> multipleDirMusicFiles = scanner.scanMusicFiles(multipleDirectories);
+        System.out.println("Music files found in multiple directories: " + multipleDirMusicFiles.size());
+    }
+}

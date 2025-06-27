@@ -1,0 +1,264 @@
+package org.hasting.ui;
+
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import org.hasting.model.MusicFile;
+import org.hasting.util.DatabaseManager;
+import org.hasting.util.HelpSystem;
+
+import java.util.List;
+
+public class DuplicateManagerView extends BorderPane {
+    
+    private TableView<MusicFile> duplicatesTable;
+    private TableView<MusicFile> comparisonTable;
+    private ObservableList<MusicFile> duplicatesData;
+    private ObservableList<MusicFile> comparisonData;
+    private Label statusLabel;
+    private ProgressIndicator progressIndicator;
+    
+    public DuplicateManagerView() {
+        initializeComponents();
+        layoutComponents();
+        loadDuplicates();
+    }
+    
+    private void initializeComponents() {
+        // Initialize data lists
+        duplicatesData = FXCollections.observableArrayList();
+        comparisonData = FXCollections.observableArrayList();
+        
+        // Create main duplicates table
+        duplicatesTable = createMusicFileTable();
+        duplicatesTable.setItems(duplicatesData);
+        
+        // Create comparison table
+        comparisonTable = createMusicFileTable();
+        comparisonTable.setItems(comparisonData);
+        
+        // Add selection listener to load similar files
+        duplicatesTable.getSelectionModel().selectedItemProperty().addListener(
+            (obs, oldSelection, newSelection) -> {
+                if (newSelection != null) {
+                    loadSimilarFiles(newSelection);
+                }
+            }
+        );
+        
+        // Status label and progress indicator
+        statusLabel = new Label("Ready");
+        progressIndicator = new ProgressIndicator();
+        progressIndicator.setVisible(false);
+        progressIndicator.setPrefSize(20, 20);
+    }
+    
+    private TableView<MusicFile> createMusicFileTable() {
+        TableView<MusicFile> table = new TableView<>();
+        
+        // Artist column
+        TableColumn<MusicFile, String> artistCol = new TableColumn<>("Artist");
+        artistCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getArtist()));
+        artistCol.setPrefWidth(150);
+        
+        // Title column
+        TableColumn<MusicFile, String> titleCol = new TableColumn<>("Title");
+        titleCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getTitle()));
+        titleCol.setPrefWidth(200);
+        
+        // Album column
+        TableColumn<MusicFile, String> albumCol = new TableColumn<>("Album");
+        albumCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getAlbum()));
+        albumCol.setPrefWidth(150);
+        
+        // Duration column
+        TableColumn<MusicFile, String> durationCol = new TableColumn<>("Duration");
+        durationCol.setCellValueFactory(data -> {
+            Integer duration = data.getValue().getDurationSeconds();
+            if (duration != null) {
+                int minutes = duration / 60;
+                int seconds = duration % 60;
+                return new SimpleStringProperty(String.format("%d:%02d", minutes, seconds));
+            }
+            return new SimpleStringProperty("");
+        });
+        durationCol.setPrefWidth(80);
+        
+        // Bitrate column
+        TableColumn<MusicFile, String> bitrateCol = new TableColumn<>("Bitrate");
+        bitrateCol.setCellValueFactory(data -> {
+            Long bitrate = data.getValue().getBitRate();
+            return new SimpleStringProperty(bitrate != null ? bitrate + " kbps" : "");
+        });
+        bitrateCol.setPrefWidth(80);
+        
+        // File path column
+        TableColumn<MusicFile, String> pathCol = new TableColumn<>("File Path");
+        pathCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getFilePath()));
+        pathCol.setPrefWidth(300);
+        
+        table.getColumns().addAll(artistCol, titleCol, albumCol, durationCol, bitrateCol, pathCol);
+        return table;
+    }
+    
+    private void layoutComponents() {
+        // Create top controls
+        HBox topControls = new HBox(10);
+        topControls.setPadding(new Insets(5));
+        
+        Button refreshButton = new Button("Refresh Duplicates");
+        refreshButton.setOnAction(e -> loadDuplicates());
+        HelpSystem.setTooltip(refreshButton, "duplicates.refresh");
+        
+        Button deleteSelectedButton = new Button("Delete Selected");
+        deleteSelectedButton.setOnAction(e -> deleteSelectedFile());
+        HelpSystem.setTooltip(deleteSelectedButton, "duplicates.delete.selected");
+        
+        Button keepBetterQualityButton = new Button("Keep Better Quality");
+        keepBetterQualityButton.setOnAction(e -> keepBetterQuality());
+        HelpSystem.setTooltip(keepBetterQualityButton, "duplicates.keep.better");
+        
+        Button helpButton = new Button("?");
+        helpButton.setPrefSize(25, 25);
+        helpButton.setOnAction(e -> HelpSystem.showHelpDialog("duplicates.help", "Duplicate Management Help", getScene().getWindow()));
+        
+        topControls.getChildren().addAll(refreshButton, deleteSelectedButton, keepBetterQualityButton, helpButton);
+        
+        // Create main content area with split pane
+        SplitPane splitPane = new SplitPane();
+        splitPane.setOrientation(Orientation.HORIZONTAL);
+        
+        // Left side - potential duplicates
+        VBox leftSide = new VBox(5);
+        leftSide.setPadding(new Insets(5));
+        Label duplicatesLabel = new Label("Potential Duplicates:");
+        duplicatesLabel.setStyle("-fx-font-weight: bold;");
+        HelpSystem.setTooltip(duplicatesTable, "duplicates.potential.table");
+        leftSide.getChildren().addAll(duplicatesLabel, duplicatesTable);
+        
+        // Right side - similar files
+        VBox rightSide = new VBox(5);
+        rightSide.setPadding(new Insets(5));
+        Label similarLabel = new Label("Similar Files:");
+        similarLabel.setStyle("-fx-font-weight: bold;");
+        HelpSystem.setTooltip(comparisonTable, "duplicates.similar.table");
+        rightSide.getChildren().addAll(similarLabel, comparisonTable);
+        
+        splitPane.getItems().addAll(leftSide, rightSide);
+        splitPane.setDividerPositions(0.5);
+        
+        // Bottom status bar
+        HBox statusBar = new HBox(10);
+        statusBar.setPadding(new Insets(5));
+        statusBar.getChildren().addAll(statusLabel, progressIndicator);
+        
+        // Layout main components
+        setTop(topControls);
+        setCenter(splitPane);
+        setBottom(statusBar);
+        
+        // Make tables grow to fill space
+        VBox.setVgrow(duplicatesTable, Priority.ALWAYS);
+        VBox.setVgrow(comparisonTable, Priority.ALWAYS);
+    }
+    
+    private void loadDuplicates() {
+        statusLabel.setText("Loading potential duplicates...");
+        progressIndicator.setVisible(true);
+        
+        // TODO: This should be done on a background thread
+        try {
+            List<MusicFile> potentialDuplicates = DatabaseManager.findPotentialDuplicates();
+            
+            duplicatesData.setAll(potentialDuplicates);
+            statusLabel.setText("Found " + potentialDuplicates.size() + " potential duplicates");
+        } catch (Exception e) {
+            statusLabel.setText("Error loading duplicates: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            progressIndicator.setVisible(false);
+        }
+    }
+    
+    private void loadSimilarFiles(MusicFile selectedFile) {
+        try {
+            List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+            List<MusicFile> similarFiles = selectedFile.findMostSimilarFiles(allFiles, 10);
+            comparisonData.setAll(similarFiles);
+        } catch (Exception e) {
+            statusLabel.setText("Error loading similar files: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void deleteSelectedFile() {
+        MusicFile selected = duplicatesTable.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Confirm Delete");
+            alert.setHeaderText("Delete Music File");
+            alert.setContentText("Are you sure you want to delete: " + selected.getTitle() + " by " + selected.getArtist() + "?");
+            
+            alert.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    try {
+                        if (selected.deleteFile()) {
+                            DatabaseManager.deleteMusicFile(selected);
+                            duplicatesData.remove(selected);
+                            statusLabel.setText("File deleted successfully");
+                        } else {
+                            statusLabel.setText("Failed to delete file");
+                        }
+                    } catch (Exception e) {
+                        statusLabel.setText("Error deleting file: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+    
+    private void keepBetterQuality() {
+        MusicFile duplicate = duplicatesTable.getSelectionModel().getSelectedItem();
+        MusicFile similar = comparisonTable.getSelectionModel().getSelectedItem();
+        
+        if (duplicate != null && similar != null) {
+            // Determine which has better quality (higher bitrate)
+            Long duplicateBitrate = duplicate.getBitRate() != null ? duplicate.getBitRate() : 0L;
+            Long similarBitrate = similar.getBitRate() != null ? similar.getBitRate() : 0L;
+            
+            MusicFile toDelete = duplicateBitrate > similarBitrate ? similar : duplicate;
+            MusicFile toKeep = duplicateBitrate > similarBitrate ? duplicate : similar;
+            
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Keep Better Quality");
+            alert.setHeaderText("Delete Lower Quality File");
+            alert.setContentText("Keep: " + toKeep.getTitle() + " (" + toKeep.getBitRate() + " kbps)\n" +
+                               "Delete: " + toDelete.getTitle() + " (" + toDelete.getBitRate() + " kbps)");
+            
+            alert.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    try {
+                        if (toDelete.deleteFile()) {
+                            DatabaseManager.deleteMusicFile(toDelete);
+                            duplicatesData.remove(toDelete);
+                            comparisonData.remove(toDelete);
+                            statusLabel.setText("Lower quality file deleted");
+                        } else {
+                            statusLabel.setText("Failed to delete file");
+                        }
+                    } catch (Exception e) {
+                        statusLabel.setText("Error deleting file: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            });
+        } else {
+            statusLabel.setText("Please select files from both tables");
+        }
+    }
+}

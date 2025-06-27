@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Parks Road Trip Route</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 15px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c5530 0%, #1a3d1f 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 2.2em;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        #map {
+            height: 650px;
+            width: 100%;
+            border: none;
+        }
+        .info-panel {
+            padding: 25px;
+            background: white;
+        }
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .legend-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #2c5530;
+        }
+        .legend-section h3 {
+            margin: 0 0 15px 0;
+            color: #2c5530;
+            font-size: 1.1em;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .legend-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .start-icon { background-color: #ff4444; }
+        .park-icon { background-color: #228B22; }
+        .end-icon { background-color: #4444ff; }
+        .route-stats {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #228B22;
+        }
+        .route-stats h3 {
+            margin: 0 0 15px 0;
+            color: #2c5530;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(44, 85, 48, 0.1);
+        }
+        .stat-label {
+            font-weight: 600;
+            color: #2c5530;
+        }
+        .stat-value {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🏔️ Texas to NYC National Parks Road Trip</h1>
+        <p>Canyon Lake, TX → New York City, NY via America's Greatest Parks</p>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="info-panel">
+        <div class="legend">
+            <div class="legend-section">
+                <h3>📍 Route Markers</h3>
+                <div class="legend-item">
+                    <div class="legend-icon start-icon"></div>
+                    <span>Start: Canyon Lake, Texas</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon park-icon"></div>
+                    <span>National Parks & Historic Sites</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon end-icon"></div>
+                    <span>End: New York City, New York</span>
+                </div>
+            </div>
+
+            <div class="route-stats">
+                <h3>📊 Route Summary</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Distance:</span>
+                        <span class="stat-value">~1,450 miles</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Driving Time:</span>
+                        <span class="stat-value">7-9 days</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Parks Visited:</span>
+                        <span class="stat-value">7 locations</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Best Season:</span>
+                        <span class="stat-value">Spring/Fall</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+    // Initialize the map
+    const map = L.map('map', {
+        zoomControl: true,
+        scrollWheelZoom: true
+    }).setView([36.0, -88.0], 5);
+
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 18
+    }).addTo(map);
+
+    // Define locations with coordinates
+    const locations = [
+        {
+            name: "Canyon Lake, Texas",
+            coords: [29.8713, -98.2614],
+            type: "start",
+            description: "🏁 Starting Point - Beautiful lake community in the Texas Hill Country",
+            order: 1
+        },
+        {
+            name: "Hot Springs National Park",
+            coords: [34.5117, -93.0432],
+            type: "park",
+            description: "♨️ Arkansas - Historic thermal springs and elegant bathhouses from the early 1900s",
+            order: 2
+        },
+        {
+            name: "Buffalo National River",
+            coords: [36.1187, -92.9282],
+            type: "park",
+            description: "🏞️ Arkansas - America's first National River with crystal-clear spring-fed waters",
+            order: 3
+        },
+        {
+            name: "Mammoth Cave National Park",
+            coords: [37.1862, -86.1003],
+            type: "park",
+            description: "🕳️ Kentucky - World's longest known cave system with over 400 mapped miles",
+            order: 4
+        },
+        {
+            name: "Great Smoky Mountains National Park",
+            coords: [35.6118, -83.4895],
+            type: "park",
+            description: "🏔️ Tennessee/North Carolina - Most visited national park with stunning mountain vistas",
+            order: 5
+        },
+        {
+            name: "Shenandoah National Park",
+            coords: [38.5324, -78.3594],
+            type: "park",
+            description: "🍂 Virginia - Blue Ridge Mountains and the famous 105-mile Skyline Drive",
+            order: 6
+        },
+        {
+            name: "Harpers Ferry National Historical Park",
+            coords: [39.3209, -77.7319],
+            type: "park",
+            description: "⚔️ West Virginia - Historic Civil War site where three states meet",
+            order: 7
+        },
+        {
+            name: "Gettysburg National Military Park",
+            coords: [39.8309, -77.2311],
+            type: "park",
+            description: "🎖️ Pennsylvania - Site of the pivotal Civil War battle and Lincoln's famous address",
+            order: 8
+        },
+        {
+            name: "New York City, New York",
+            coords: [40.7128, -74.0060],
+            type: "end",
+            description: "🗽 Final Destination - The Big Apple awaits!",
+            order: 9
+        }
+    ];
+
+    // Create custom markers for each location
+    locations.forEach((location) => {
+        let markerColor, markerSize;
+
+        switch (location.type) {
+            case 'start':
+                markerColor = '#ff4444';
+                markerSize = 12;
+                break;
+            case 'park':
+                markerColor = '#228B22';
+                markerSize = 10;
+                break;
+            case 'end':
+                markerColor = '#4444ff';
+                markerSize = 12;
+                break;
+        }
+
+        // Create marker
+        const marker = L.circleMarker(location.coords, {
+            radius: markerSize,
+            fillColor: markerColor,
+            color: '#ffffff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.8
+        }).addTo(map);
+
+        // Create popup content
+        const popupContent = `
+                <div style="font-family: 'Segoe UI', sans-serif; max-width: 280px;">
+                    <div style="background: linear-gradient(135deg, ${markerColor}, ${markerColor}dd); color: white; padding: 12px; margin: -9px -12px 12px -12px; border-radius: 4px 4px 0 0;">
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Stop ${location.order}: ${location.name}</h3>
+                    </div>
+                    <p style="margin: 0 0 8px 0; font-size: 14px; line-height: 1.4;">${location.description}</p>
+                    ${location.type === 'park' ? '<p style="margin: 0; font-size: 12px; color: #666; font-style: italic;">💡 Click marker for park details</p>' : ''}
+                </div>
+            `;
+
+        marker.bindPopup(popupContent, {
+            maxWidth: 300,
+            className: 'custom-popup'
+        });
+    });
+
+    // Create the route line
+    const routeCoords = locations.map(loc => loc.coords);
+
+    const routeLine = L.polyline(routeCoords, {
+        color: '#ff6b6b',
+        weight: 4,
+        opacity: 0.8,
+        smoothFactor: 1,
+        dashArray: '8, 4'
+    }).addTo(map);
+
+    // Add route direction arrows
+    const arrowIcon = L.divIcon({
+        html: '→',
+        iconSize: [20, 20],
+        className: 'route-arrow',
+        iconAnchor: [10, 10]
+    });
+
+    // Add some directional indicators along the route
+    for (let i = 0; i < locations.length - 1; i++) {
+        const start = locations[i].coords;
+        const end = locations[i + 1].coords;
+        const midLat = (start[0] + end[0]) / 2;
+        const midLng = (start[1] + end[1]) / 2;
+
+        L.marker([midLat, midLng], {
+            icon: L.divIcon({
+                html: '<div style="color: #ff6b6b; font-size: 16px; font-weight: bold;">→</div>',
+                iconSize: [20, 20],
+                className: 'route-arrow',
+                iconAnchor: [10, 10]
+            })
+        }).addTo(map);
+    }
+
+    // Fit the map to show all locations with padding
+    const group = new L.featureGroup(locations.map(loc => L.circleMarker(loc.coords)));
+    map.fitBounds(group.getBounds().pad(0.05));
+
+    // Add some custom CSS for popups
+    const style = document.createElement('style');
+    style.textContent = `
+            .custom-popup .leaflet-popup-content-wrapper {
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+            .custom-popup .leaflet-popup-tip {
+                background: white;
+            }
+            .route-arrow {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+        `;
+    document.head.appendChild(style);
+
+    // Add map controls info
+    const info = L.control({position: 'topright'});
+    info.onAdd = function() {
+        const div = L.DomUtil.create('div', 'info-control');
+        div.innerHTML = `
+                <div style="background: rgba(255,255,255,0.9); padding: 10px; border-radius: 5px; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <strong>💡 Map Tips:</strong><br>
+                    • Click markers for details<br>
+                    • Zoom in/out with mouse wheel<br>
+                    • Drag to pan around
+                </div>
+            `;
+        return div;
+    };
+    info.addTo(map);
+</script>
+</body>
+</html>
+
+
