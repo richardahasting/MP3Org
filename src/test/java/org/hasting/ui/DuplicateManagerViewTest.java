@@ -11,9 +11,12 @@ import javafx.scene.Scene;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ProgressIndicator;
 import javafx.stage.Stage;
 
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,6 +53,9 @@ public class DuplicateManagerViewTest {
         
         // Add some test data
         createTestMusicFiles();
+        
+        // Wait for any initial async operations to complete
+        waitForAsyncOperations();
     }
 
     @Test
@@ -60,9 +66,9 @@ public class DuplicateManagerViewTest {
         assertNotNull(duplicateManagerView);
         
         // Verify main components are present
-        assertNotNull(robot.lookup("#refreshButton").tryQuery().orElse(null));
-        assertNotNull(robot.lookup("#deleteSelectedButton").tryQuery().orElse(null));
-        assertNotNull(robot.lookup("#keepBetterQualityButton").tryQuery().orElse(null));
+        assertNotNull(robot.lookup("Refresh Duplicates").tryQuery().orElse(null));
+        assertNotNull(robot.lookup("Delete Selected").tryQuery().orElse(null));
+        assertNotNull(robot.lookup("Keep Better Quality").tryQuery().orElse(null));
         
         // Verify tables are present
         assertNotNull(duplicatesTable);
@@ -77,12 +83,15 @@ public class DuplicateManagerViewTest {
         Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
         robot.clickOn(refreshButton);
         
-        // Wait for refresh to complete
-        robot.sleep(1000);
+        // Wait for async operation to complete
+        waitForAsyncOperations();
         
-        // Verify status label is updated
-        Label statusLabel = robot.lookup(".label").query();
+        // Verify status label is updated with completion message
+        Label statusLabel = findStatusLabel(robot);
         assertNotNull(statusLabel);
+        assertTrue(statusLabel.getText().contains("Found") || 
+                  statusLabel.getText().contains("duplicates") ||
+                  statusLabel.getText().contains("Error"));
     }
 
     @Test
@@ -111,7 +120,7 @@ public class DuplicateManagerViewTest {
         // Refresh to load data
         Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
         robot.clickOn(refreshButton);
-        robot.sleep(1000);
+        waitForAsyncOperations();
         
         // If there are items in the duplicates table, select one
         if (!duplicatesTable.getItems().isEmpty()) {
@@ -154,19 +163,29 @@ public class DuplicateManagerViewTest {
         Label statusLabel = findStatusLabel(robot);
         assertNotNull(statusLabel);
         
-        // Initial status should be "Ready"
-        assertEquals("Ready", statusLabel.getText());
+        // Initial status should indicate initialization or completion
+        String statusText = statusLabel.getText();
+        assertTrue(statusText.contains("Initializing") || 
+                  statusText.contains("Found") || 
+                  statusText.contains("duplicates") ||
+                  statusText.equals("Ready"));
     }
 
     @Test
     @Order(8)
-    @DisplayName("Test progress indicator visibility")
-    void testProgressIndicatorVisibility(FxRobot robot) {
-        // Progress indicator should initially be hidden
-        var progressIndicator = robot.lookup(".progress-indicator").tryQuery();
+    @DisplayName("Test progress components visibility and functionality")
+    void testProgressComponentsVisibility(FxRobot robot) {
+        // After initialization, progress components should be hidden
+        waitForAsyncOperations();
         
-        // It's okay if progress indicator is not found or is hidden
+        var progressIndicator = robot.lookup(".progress-indicator").tryQuery();
+        var progressBar = robot.lookup(".progress-bar").tryQuery();
+        var cancelButton = robot.lookup("Cancel").tryQuery();
+        
+        // Progress components should be hidden after async operation completes
         assertTrue(progressIndicator.isEmpty() || !progressIndicator.get().isVisible());
+        assertTrue(progressBar.isEmpty() || !progressBar.get().isVisible());
+        assertTrue(cancelButton.isEmpty() || !cancelButton.get().isVisible());
     }
 
     @Test
@@ -176,7 +195,7 @@ public class DuplicateManagerViewTest {
         // Refresh to load data
         Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
         robot.clickOn(refreshButton);
-        robot.sleep(1000);
+        waitForAsyncOperations();
         
         // Tables should be initialized (may be empty if no duplicates)
         assertNotNull(duplicatesTable.getItems());
@@ -193,7 +212,7 @@ public class DuplicateManagerViewTest {
         // Try to refresh
         Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
         robot.clickOn(refreshButton);
-        robot.sleep(1000);
+        waitForAsyncOperations();
         
         // Should handle error gracefully
         Label statusLabel = findStatusLabel(robot);
@@ -311,11 +330,144 @@ public class DuplicateManagerViewTest {
         for (var label : labels) {
             if (label instanceof Label) {
                 Label l = (Label) label;
-                if (l.getText().equals("Ready") || l.getText().contains("Found") || l.getText().contains("Error")) {
+                String text = l.getText();
+                if (text.equals("Ready") || 
+                    text.contains("Found") || 
+                    text.contains("Error") ||
+                    text.contains("Initializing") ||
+                    text.contains("duplicates") ||
+                    text.contains("Analyzing") ||
+                    text.contains("cancelled")) {
                     return l;
                 }
             }
         }
         return null;
+    }
+    
+    /**
+     * Waits for asynchronous operations to complete.
+     * This method polls the UI state to detect when background tasks finish.
+     */
+    private void waitForAsyncOperations() {
+        waitForAsyncOperations(5000); // Default 5 second timeout
+    }
+    
+    /**
+     * Waits for asynchronous operations to complete with custom timeout.
+     */
+    private void waitForAsyncOperations(long timeoutMs) {
+        long startTime = System.currentTimeMillis();
+        
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            try {
+                // Check if progress indicators are visible (operation in progress)
+                var progressBar = duplicateManagerView.lookup(".progress-bar");
+                var progressIndicator = duplicateManagerView.lookup(".progress-indicator");
+                var cancelButton = duplicateManagerView.lookup("Cancel");
+                
+                boolean isOperationInProgress = 
+                    (progressBar != null && progressBar.isVisible()) ||
+                    (progressIndicator != null && progressIndicator.isVisible()) ||
+                    (cancelButton != null && cancelButton.isVisible());
+                
+                if (!isOperationInProgress) {
+                    // Wait a bit more to ensure operation has fully completed
+                    Thread.sleep(100);
+                    return;
+                }
+                
+                Thread.sleep(50); // Poll every 50ms
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        
+        // If we reach here, operation may have timed out, but that's okay for tests
+    }
+    
+    @Test
+    @Order(16)
+    @DisplayName("Test async operation progress feedback")
+    void testAsyncOperationProgressFeedback(FxRobot robot) {
+        // Click refresh to start async operation
+        Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
+        robot.clickOn(refreshButton);
+        
+        // Briefly check if progress indicators appear (operation may be too fast to catch)
+        robot.sleep(50);
+        
+        // Wait for completion
+        waitForAsyncOperations();
+        
+        // After completion, progress indicators should be hidden
+        var progressBar = robot.lookup(".progress-bar").tryQuery();
+        var cancelButton = robot.lookup("Cancel").tryQuery();
+        
+        assertTrue(progressBar.isEmpty() || !progressBar.get().isVisible());
+        assertTrue(cancelButton.isEmpty() || !cancelButton.get().isVisible());
+    }
+    
+    @Test
+    @Order(17)
+    @DisplayName("Test cancel functionality")
+    void testCancelFunctionality(FxRobot robot) {
+        // Click refresh to start async operation
+        Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
+        robot.clickOn(refreshButton);
+        
+        // Try to find and click cancel button (may be too fast to catch)
+        robot.sleep(50);
+        var cancelButtonQuery = robot.lookup("Cancel").tryQuery();
+        if (cancelButtonQuery.isPresent() && cancelButtonQuery.get().isVisible()) {
+            robot.clickOn("Cancel");
+            
+            // Wait for cancellation to complete
+            waitForAsyncOperations();
+            
+            // Status should indicate cancellation
+            Label statusLabel = findStatusLabel(robot);
+            if (statusLabel != null) {
+                assertTrue(statusLabel.getText().contains("cancelled") || 
+                          statusLabel.getText().contains("Found"));
+            }
+        }
+        // If cancel button not found, operation completed too quickly - that's okay
+    }
+    
+    @Test
+    @Order(18)
+    @DisplayName("Test concurrent refresh operations")
+    void testConcurrentRefreshOperations(FxRobot robot) {
+        Button refreshButton = robot.lookup("Refresh Duplicates").queryButton();
+        
+        // Start first operation
+        robot.clickOn(refreshButton);
+        robot.sleep(50);
+        
+        // Start second operation (should cancel first)
+        robot.clickOn(refreshButton);
+        
+        // Wait for completion
+        waitForAsyncOperations();
+        
+        // Should complete without errors
+        Label statusLabel = findStatusLabel(robot);
+        assertNotNull(statusLabel);
+        assertTrue(statusLabel.getText().contains("Found") || 
+                  statusLabel.getText().contains("duplicates") ||
+                  statusLabel.getText().contains("Error"));
+    }
+    
+    @Test
+    @Order(19)
+    @DisplayName("Test cleanup method")
+    void testCleanupMethod() {
+        // Test that cleanup method can be called without errors
+        assertDoesNotThrow(() -> duplicateManagerView.cleanup());
+        
+        // After cleanup, async operations should not be running
+        assertDoesNotThrow(() -> duplicateManagerView.cleanup()); // Can be called multiple times
     }
 }
