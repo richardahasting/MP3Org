@@ -21,7 +21,7 @@ import java.util.Optional;
 /**
  * UI component for configuring application settings including database location and file type filters.
  */
-public class ConfigurationView extends VBox {
+public class ConfigurationView extends BorderPane {
     
     private TextField currentPathField;
     private TextArea configInfoArea;
@@ -72,7 +72,10 @@ public class ConfigurationView extends VBox {
         // Current database path display
         currentPathField = new TextField();
         currentPathField.setEditable(false);
+        currentPathField.setFocusTraversable(false);  // Prevent focus
+        currentPathField.setMouseTransparent(true);   // Prevent mouse interaction
         currentPathField.setPrefWidth(400);
+        currentPathField.setStyle("-fx-background-color: #f4f4f4; -fx-border-color: #cccccc;"); // Visual indication it's read-only
         HelpSystem.setTooltip(currentPathField, "config.current.path");
         
         // Configuration information display
@@ -256,8 +259,9 @@ public class ConfigurationView extends VBox {
     }
     
     private void layoutComponents() {
-        setPadding(new Insets(20));
-        setSpacing(15);
+        // Create main content container
+        VBox mainContent = new VBox(15);
+        mainContent.setPadding(new Insets(20));
         
         // Title
         Label titleLabel = new Label("Configuration");
@@ -352,12 +356,8 @@ public class ConfigurationView extends VBox {
         // Fuzzy search configuration section
         VBox fuzzySearchSection = createFuzzySearchSection();
         
-        // Status section
-        HBox statusSection = new HBox();
-        statusSection.getChildren().add(statusLabel);
-        
-        // Add all sections
-        getChildren().addAll(
+        // Add all sections to main content
+        mainContent.getChildren().addAll(
             titleLabel,
             new Separator(),
             profileSection,
@@ -372,11 +372,31 @@ public class ConfigurationView extends VBox {
             new Separator(),
             actionsSection,
             new Separator(),
-            instructionsSection,
-            statusSection
+            instructionsSection
         );
         
-        // Make text areas grow
+        // Create scroll pane for main content
+        ScrollPane scrollPane = new ScrollPane(mainContent);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setPannable(true);
+        scrollPane.setStyle("-fx-background-color: white;");
+        
+        // Set minimum height for scroll pane to ensure it takes available space
+        scrollPane.setMinHeight(400);
+        
+        // Add status section to bottom (always visible)
+        HBox statusSection = new HBox();
+        statusSection.setPadding(new Insets(10));
+        statusSection.getChildren().add(statusLabel);
+        statusSection.setStyle("-fx-background-color: #f8f8f8; -fx-border-color: #cccccc; -fx-border-width: 1 0 0 0;");
+        
+        // Layout in BorderPane
+        setCenter(scrollPane);
+        setBottom(statusSection);
+        
+        // Make text areas grow within their containers
         VBox.setVgrow(configInfoArea, Priority.ALWAYS);
         VBox.setVgrow(instructionsArea, Priority.NEVER);
     }
@@ -868,6 +888,8 @@ public class ConfigurationView extends VBox {
         GridPane similarityGrid = new GridPane();
         similarityGrid.setHgap(10);
         similarityGrid.setVgap(8);
+        similarityGrid.setPadding(new Insets(10));
+        similarityGrid.setStyle("-fx-background-color: #f9f9f9; -fx-border-color: #dddddd; -fx-border-radius: 5;");
         
         // Row 0: Title similarity
         similarityGrid.add(new Label("Title Similarity:"), 0, 0);
@@ -911,20 +933,25 @@ public class ConfigurationView extends VBox {
         
         // Options checkboxes
         VBox optionsBox = new VBox(5);
+        optionsBox.setPadding(new Insets(10));
+        optionsBox.setStyle("-fx-background-color: #f9f9f9; -fx-border-color: #dddddd; -fx-border-radius: 5;");
+        
         Label optionsLabel = new Label("Options:");
         optionsLabel.setStyle("-fx-font-weight: bold;");
         
-        VBox checkBoxes = new VBox(3);
-        checkBoxes.getChildren().addAll(
-            ignoreCaseCheckBox,
-            ignorePunctuationCheckBox,
-            trackNumberMatchCheckBox,
-            ignoreArtistPrefixesCheckBox,
-            ignoreFeaturingCheckBox,
-            ignoreAlbumEditionsCheckBox
-        );
+        // Organize checkboxes in two columns for better space utilization
+        GridPane checkBoxGrid = new GridPane();
+        checkBoxGrid.setHgap(15);
+        checkBoxGrid.setVgap(5);
         
-        optionsBox.getChildren().addAll(optionsLabel, checkBoxes);
+        checkBoxGrid.add(ignoreCaseCheckBox, 0, 0);
+        checkBoxGrid.add(ignorePunctuationCheckBox, 1, 0);
+        checkBoxGrid.add(trackNumberMatchCheckBox, 0, 1);
+        checkBoxGrid.add(ignoreArtistPrefixesCheckBox, 1, 1);
+        checkBoxGrid.add(ignoreFeaturingCheckBox, 0, 2);
+        checkBoxGrid.add(ignoreAlbumEditionsCheckBox, 1, 2);
+        
+        optionsBox.getChildren().addAll(optionsLabel, checkBoxGrid);
         
         // Buttons
         HBox fuzzyButtonBox = new HBox(10);
