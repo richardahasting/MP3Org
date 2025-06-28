@@ -1,8 +1,10 @@
 package org.hasting.ui;
 
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
@@ -10,14 +12,18 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
+import org.hasting.util.DatabaseProfile;
 import org.hasting.util.HelpSystem;
+import org.hasting.util.ProfileChangeListener;
+import org.hasting.util.ProfileChangeNotifier;
 
 import java.awt.Desktop;
 import java.io.File;
-
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class DuplicateManagerView extends BorderPane {
+public class DuplicateManagerView extends BorderPane implements ProfileChangeListener {
     
     private TableView<MusicFile> duplicatesTable;
     private TableView<MusicFile> comparisonTable;
@@ -25,11 +31,20 @@ public class DuplicateManagerView extends BorderPane {
     private ObservableList<MusicFile> comparisonData;
     private Label statusLabel;
     private ProgressIndicator progressIndicator;
+    private ProgressBar progressBar;
+    private Button cancelButton;
+    private ExecutorService executorService;
+    private Task<List<MusicFile>> currentDuplicateTask;
     
     public DuplicateManagerView() {
         initializeComponents();
         layoutComponents();
-        loadDuplicates();
+        
+        // Register for profile change notifications
+        ProfileChangeNotifier.getInstance().addListener(this);
+        
+        // Start loading duplicates asynchronously - UI shows immediately
+        loadDuplicatesAsync();
     }
     
     private void initializeComponents() {
@@ -54,11 +69,28 @@ public class DuplicateManagerView extends BorderPane {
             }
         );
         
-        // Status label and progress indicator
-        statusLabel = new Label("Ready");
+        // Status label and progress components
+        statusLabel = new Label("Initializing duplicate detection...");
         progressIndicator = new ProgressIndicator();
         progressIndicator.setVisible(false);
         progressIndicator.setPrefSize(20, 20);
+        
+        // Progress bar for background operations
+        progressBar = new ProgressBar();
+        progressBar.setPrefWidth(200);
+        progressBar.setVisible(false);
+        
+        // Cancel button for long operations
+        cancelButton = new Button("Cancel");
+        cancelButton.setVisible(false);
+        cancelButton.setOnAction(e -> cancelCurrentOperation());
+        
+        // Initialize thread pool for background operations
+        executorService = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "DuplicateDetection");
+            t.setDaemon(true);
+            return t;
+        });
     }
     
     private TableView<MusicFile> createMusicFileTable() {
@@ -119,7 +151,7 @@ public class DuplicateManagerView extends BorderPane {
         topControls.setPadding(new Insets(5));
         
         Button refreshButton = new Button("Refresh Duplicates");
-        refreshButton.setOnAction(e -> loadDuplicates());
+        refreshButton.setOnAction(e -> loadDuplicatesAsync());
         HelpSystem.setTooltip(refreshButton, "duplicates.refresh");
         
         Button deleteSelectedButton = new Button("Delete Selected");
@@ -159,10 +191,11 @@ public class DuplicateManagerView extends BorderPane {
         splitPane.getItems().addAll(leftSide, rightSide);
         splitPane.setDividerPositions(0.5);
         
-        // Bottom status bar
+        // Bottom status bar with enhanced progress indicators
         HBox statusBar = new HBox(10);
         statusBar.setPadding(new Insets(5));
-        statusBar.getChildren().addAll(statusLabel, progressIndicator);
+        statusBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        statusBar.getChildren().addAll(statusLabel, progressIndicator, progressBar, cancelButton);
         
         // Layout main components
         setTop(topControls);
@@ -174,22 +207,129 @@ public class DuplicateManagerView extends BorderPane {
         VBox.setVgrow(comparisonTable, Priority.ALWAYS);
     }
     
-    private void loadDuplicates() {
-        statusLabel.setText("Loading potential duplicates...");
+    /**
+     * Loads duplicates asynchronously to prevent UI blocking.
+     * This method returns immediately, allowing the UI to remain responsive.
+     */
+    private void loadDuplicatesAsync() {
+        // Cancel any existing operation
+        if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
+            currentDuplicateTask.cancel(true);
+        }
+        
+        // Clear existing data and show loading state
+        duplicatesData.clear();
+        comparisonData.clear();
+        
+        // Update UI to show loading state
+        statusLabel.setText("Analyzing music collection for duplicates...");
+        progressBar.setProgress(-1); // Indeterminate progress
+        progressBar.setVisible(true);
+        cancelButton.setVisible(true);
         progressIndicator.setVisible(true);
         
-        // TODO: This should be done on a background thread
-        try {
-            List<MusicFile> potentialDuplicates = DatabaseManager.findPotentialDuplicates();
+        // Create background task for duplicate detection
+        currentDuplicateTask = new Task<List<MusicFile>>() {
+            @Override
+            protected List<MusicFile> call() throws Exception {
+                // Get total file count for progress tracking
+                int totalFiles = DatabaseManager.getAllMusicFiles().size();
+                updateMessage("Loading " + totalFiles + " music files...");
+                
+                if (isCancelled()) return null;
+                
+                // Use the optimized duplicate detection if available
+                updateMessage("Detecting potential duplicates...");
+                updateProgress(0, 100);
+                
+                List<MusicFile> duplicates;
+                try {
+                    // Try optimized version first for better performance
+                    duplicates = DatabaseManager.findPotentialDuplicatesOptimized();
+                    updateProgress(100, 100);
+                } catch (Exception e) {
+                    if (isCancelled()) return null;
+                    // Fall back to standard detection
+                    updateMessage("Using comprehensive duplicate detection...");
+                    duplicates = DatabaseManager.findPotentialDuplicates();
+                    updateProgress(100, 100);
+                }
+                
+                return duplicates;
+            }
             
-            duplicatesData.setAll(potentialDuplicates);
-            statusLabel.setText("Found " + potentialDuplicates.size() + " potential duplicates");
-        } catch (Exception e) {
-            statusLabel.setText("Error loading duplicates: " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            progressIndicator.setVisible(false);
+            @Override
+            protected void succeeded() {
+                List<MusicFile> duplicates = getValue();
+                if (duplicates != null && !isCancelled()) {
+                    Platform.runLater(() -> {
+                        duplicatesData.setAll(duplicates);
+                        updateUIAfterLoad(duplicates.size(), false);
+                    });
+                }
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    Throwable exception = getException();
+                    String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
+                    statusLabel.setText("Error loading duplicates: " + errorMsg);
+                    updateUIAfterLoad(0, true);
+                    exception.printStackTrace();
+                });
+            }
+            
+            @Override
+            protected void cancelled() {
+                Platform.runLater(() -> {
+                    statusLabel.setText("Duplicate detection cancelled");
+                    updateUIAfterLoad(0, true);
+                });
+            }
+        };
+        
+        // Bind progress indicators to task
+        progressBar.progressProperty().bind(currentDuplicateTask.progressProperty());
+        statusLabel.textProperty().bind(currentDuplicateTask.messageProperty());
+        
+        // Execute task on background thread
+        executorService.submit(currentDuplicateTask);
+    }
+    
+    /**
+     * Updates UI elements after duplicate loading completes, fails, or is cancelled.
+     */
+    private void updateUIAfterLoad(int duplicateCount, boolean isError) {
+        progressBar.setVisible(false);
+        cancelButton.setVisible(false);
+        progressIndicator.setVisible(false);
+        
+        // Unbind properties
+        progressBar.progressProperty().unbind();
+        statusLabel.textProperty().unbind();
+        
+        if (!isError) {
+            statusLabel.setText("Found " + duplicateCount + " potential duplicates");
         }
+    }
+    
+    /**
+     * Cancels the current duplicate detection operation.
+     */
+    private void cancelCurrentOperation() {
+        if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
+            currentDuplicateTask.cancel(true);
+        }
+    }
+    
+    /**
+     * Legacy synchronous method - kept for compatibility but now calls async version.
+     * @deprecated Use loadDuplicatesAsync() instead for better performance.
+     */
+    @Deprecated
+    private void loadDuplicates() {
+        loadDuplicatesAsync();
     }
     
     private void loadSimilarFiles(MusicFile selectedFile) {
@@ -508,5 +648,81 @@ public class DuplicateManagerView extends BorderPane {
         
         info.setContentText(details.toString());
         info.showAndWait();
+    }
+    
+    /**
+     * Cleanup method to properly shutdown background threads.
+     * Should be called when the view is being disposed.
+     */
+    public void cleanup() {
+        if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
+            currentDuplicateTask.cancel(true);
+        }
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
+        }
+        
+        // Unregister from profile change notifications
+        ProfileChangeNotifier.getInstance().removeListener(this);
+    }
+    
+    // ProfileChangeListener implementation
+    @Override
+    public void onProfileChanged(String oldProfileId, String newProfileId, DatabaseProfile newProfile) {
+        Platform.runLater(() -> {
+            statusLabel.setText("Profile changed to: " + newProfile.getName() + " - Reloading duplicates...");
+            
+            // Cancel current duplicate detection if running
+            if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
+                currentDuplicateTask.cancel(true);
+            }
+        });
+    }
+    
+    @Override
+    public void onDatabaseChanged(String oldDatabasePath, String newDatabasePath, boolean isNewDatabase) {
+        Platform.runLater(() -> {
+            // Reset all data
+            resetAllData();
+            
+            if (isNewDatabase) {
+                statusLabel.setText("New database detected - no duplicates to show yet");
+                showEmptyDatabaseMessage();
+            } else {
+                statusLabel.setText("Database changed - reloading duplicates...");
+                // Start loading duplicates from the new database
+                loadDuplicatesAsync();
+            }
+        });
+    }
+    
+    /**
+     * Resets all data in the duplicate manager.
+     */
+    private void resetAllData() {
+        // Cancel any running tasks
+        if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
+            currentDuplicateTask.cancel(true);
+        }
+        
+        // Clear data lists
+        duplicatesData.clear();
+        comparisonData.clear();
+        
+        // Hide progress indicators
+        progressIndicator.setVisible(false);
+        progressBar.setVisible(false);
+        cancelButton.setVisible(false);
+        
+        System.out.println("DuplicateManagerView: All data reset due to database change");
+    }
+    
+    /**
+     * Shows a message when the database is empty.
+     */
+    private void showEmptyDatabaseMessage() {
+        Platform.runLater(() -> {
+            statusLabel.setText("No music files in database yet - import files to detect duplicates");
+        });
     }
 }

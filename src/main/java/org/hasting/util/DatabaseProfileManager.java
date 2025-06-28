@@ -265,6 +265,9 @@ public class DatabaseProfileManager {
         }
         
         String oldActiveId = activeProfileId;
+        DatabaseProfile oldProfile = oldActiveId != null ? profiles.get(oldActiveId) : null;
+        String oldDatabasePath = oldProfile != null ? oldProfile.getDatabasePath() : null;
+        
         activeProfileId = profileId;
         
         // Update last used date
@@ -274,7 +277,33 @@ public class DatabaseProfileManager {
         saveProfiles();
         
         System.out.println("Switched from profile " + oldActiveId + " to " + profileId);
+        
+        // Notify listeners of profile change
+        ProfileChangeNotifier.getInstance().notifyProfileChanged(oldActiveId, profileId, activeProfile);
+        
+        // Check if database path changed and notify accordingly
+        String newDatabasePath = activeProfile.getDatabasePath();
+        if (oldDatabasePath == null || !oldDatabasePath.equals(newDatabasePath)) {
+            // Check if the new database is empty/new
+            boolean isNewDatabase = isDatabaseEmpty(newDatabasePath);
+            ProfileChangeNotifier.getInstance().notifyDatabaseChanged(oldDatabasePath, newDatabasePath, isNewDatabase);
+        }
+        
         return true;
+    }
+    
+    /**
+     * Checks if a database is empty or new.
+     */
+    private boolean isDatabaseEmpty(String databasePath) {
+        try {
+            // Temporarily switch to check the database
+            List<org.hasting.model.MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+            return allFiles == null || allFiles.isEmpty();
+        } catch (Exception e) {
+            // If we can't read the database, assume it's new
+            return true;
+        }
     }
     
     /**

@@ -20,9 +20,19 @@ public class MusicFile {
     final private static int DEFAULT_NUM_OF_SIMILAR_FILES = 10;
 
     private static Set<String> artistNames = new HashSet<>(Arrays.asList("Unknown"));
-    private static HashMap<String, Integer> artistMap = new HashMap<>();
-    private static int totalArtistNamesWithAlphaNames = 0;
+    private static Set<String> albumNames = new HashSet<>(Arrays.asList("Unknown"));
+    private static Set<String> genreNames = new HashSet<>(Arrays.asList("Unknown"));
+
+    private static HashMap<String, Integer> firstFieldMap = new HashMap<>();
+    private static HashMap<String, Integer> albumMap = new HashMap<>();
+    private static HashMap<String, Integer> genreMap = new HashMap<>();
+    private static HashMap<String, Integer> initialsMap = new HashMap<>();
+    private static int totalFirstFieldWithAlphaNames = 0;
+    private static int totalAlbumNamesWithAlphaNames = 0;
+    private static int totalGenreNamesWithAlphaNames = 0;
+
     private static HashMap<String, String> initials = new HashMap<>();
+
     private Long id;
     private String filePath;
     private String title;
@@ -39,6 +49,66 @@ public class MusicFile {
     private Date lastModified;
     private Date dateAdded;
     private boolean isModified = false;
+    
+    // Field for testing file organization paths without actual file copying
+    private String organizationalPath;
+
+    public enum Fields {
+        TITLE, ARTIST, ALBUM, GENRE, TRACK_NUMBER, YEAR, BIT_RATE, SAMPLE_RATE;
+    }
+    public static int getNumberOfSubdirectorys() {
+        return numberOfSubdirectorys;
+    }
+
+    public static void setNumberOfSubdirectorys(int numberOfSubdirectorys) {
+        MusicFile.numberOfSubdirectorys = numberOfSubdirectorys;
+    }
+
+    private static int numberOfSubdirectorys = 7;
+
+    public String getField (Fields field) {
+        String value = null;
+        switch (field) {
+            case TITLE:
+                value = title;
+                break;
+            case ARTIST:
+                value = artist;
+                break;
+            case ALBUM:
+                value = album;
+                break;
+            case GENRE:
+                value = genre;
+                break;
+            case TRACK_NUMBER:
+                value = trackNumber == null? "" : trackNumber.toString();
+                break;
+            case YEAR:
+                value = year == null? "" : year.toString();
+                break;
+            case BIT_RATE:
+                value = bitRate == null? "" : bitRate.toString();
+                break;
+            case SAMPLE_RATE:
+                value = sampleRate == null? "" : sampleRate.toString();
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid field: " + field);
+        }
+        return value;
+    }
+
+    private static Fields firstFileNameField = Fields.ARTIST;
+
+    private static void setFirstFileNameField(Fields field) {
+        firstFileNameField = field;
+    }
+
+    private String firstFileNameField(){
+        return getField(firstFileNameField);
+    }
+
 
     // Default constructor required by JPA
     public MusicFile() {
@@ -80,7 +150,11 @@ public class MusicFile {
                 if (this.artist != null)
                     artistNames.add(this.artist);  // Add artist to set of known artists
                 this.album = getTagField(tag, FieldKey.ALBUM);
+                if (this.album!= null)
+                    albumNames.add(this.album);  // Add album to set of known albums
                 this.genre = getTagField(tag, FieldKey.GENRE);
+                if (this.genre!= null)
+                    genreNames.add(this.genre);  // Add genre to set of known genres
 
                 // Extract track number
                 String trackNumberStr = getTagField(tag, FieldKey.TRACK);
@@ -204,37 +278,50 @@ public class MusicFile {
                 .collect(Collectors.toList());
     }
 
-    private static void countArtistByLetters() {
+    public static void resetArtistCounts() {
+        firstFieldMap.clear();
+        totalFirstFieldWithAlphaNames = 0;
+        totalAlbumNamesWithAlphaNames = 0;
+        totalGenreNamesWithAlphaNames = 0;
+        artistNames.clear();
+        albumNames.clear();
+        genreNames.clear();
+        initials.clear();
+        albumMap.clear();
+        genreMap.clear();
+    }
+
+    private static void countFirstFieldByLetters() {
         List<String> artists = new ArrayList<>(artistNames.stream().toList());
-        totalArtistNamesWithAlphaNames = 0;
+        totalFirstFieldWithAlphaNames = 0;
         for (String artist : artists) {
             String artistInitial = artist.substring(0, 1).toUpperCase();
             if (artistInitial.matches("[A-Z]")) {// only count artists with at least alpha names
-                Integer count = artistMap.getOrDefault(artistInitial, 0);
-                totalArtistNamesWithAlphaNames++;
+                Integer count = firstFieldMap.getOrDefault(artistInitial, 0);
+                totalFirstFieldWithAlphaNames++;
                 System.out.println(String.format("%s: %d", artistInitial, count));
                 count++;
-                artistMap.put(artistInitial, count); // Reset the count for the artist
+                firstFieldMap.put(artistInitial, count); // Reset the count for the artist
             }
         }
     }
 
     private static synchronized HashMap<String, String> whatInitials() {
-        if (artistMap.isEmpty()) {
-            countArtistByLetters();
+        if (firstFieldMap.isEmpty()) {
+            countFirstFieldByLetters();
         }
         int totalDirsCreated = 0;
         initials = new HashMap<>();
-        final int targetTally = totalArtistNamesWithAlphaNames / 8 -5; // 8 directories for artists
+        final int targetTally = totalFirstFieldWithAlphaNames / 8 -5; // 8 directories for artists
 
         // we want 8 directories for artists, format a-c, d-f ... and misc artists go to "misc" so 9 total directories
 
         for (char currentChar = 'A'; currentChar <= 'Z'; ) {
             char startingChar = currentChar;
             int currentTally = 0;
-            while ((totalDirsCreated >= 7 || currentTally < targetTally) && currentChar <= 'Z') {
-                Integer artistCounterAtCurrentChar = artistMap.getOrDefault(Character.toString(currentChar), 0);
-                if (totalDirsCreated < 7 && artistCounterAtCurrentChar / 2 + currentTally > targetTally)
+            while ((totalDirsCreated >= numberOfSubdirectorys || currentTally < targetTally) && currentChar <= 'Z') {
+                Integer artistCounterAtCurrentChar = firstFieldMap.getOrDefault(Character.toString(currentChar), 0);
+                if (totalDirsCreated < numberOfSubdirectorys && artistCounterAtCurrentChar / 2 + currentTally > targetTally)
                     currentTally = targetTally + 1;
                 else {
                     currentTally += artistCounterAtCurrentChar;
@@ -550,7 +637,7 @@ public class MusicFile {
     }
 
     /**
-     * Generates a new file name and location for the music file.
+     * Generates a new file name and location for the music file using the default template.
      * The format is "startingPath/artistName/AlbumName/trackNumber-title.fileType"
      * where all whitespace is converted to underscores, and the trackNumber is 2 digits.
      *
@@ -558,20 +645,29 @@ public class MusicFile {
      * @return A string representing the new file name and location.
      */
     public String newFileNameAndLocation(String startingPath) {
-        if (initials == null || initials.isEmpty()) {
+        // Use default template for backward compatibility
+        PathTemplate defaultTemplate = new PathTemplate();
+        return newFileNameAndLocation(startingPath, defaultTemplate);
+    }
+
+    /**
+     * Generates a new file name and location for the music file using a custom template.
+     *
+     * @param startingPath The starting path to prepend to the file name.
+     * @param template The PathTemplate to use for generating the path.
+     * @return A string representing the new file name and location.
+     */
+    public String newFileNameAndLocation(String startingPath, PathTemplate template) {
+        if (template == null) {
+            template = new PathTemplate(); // Use default if null
+        }
+        
+        // Ensure initials are calculated if subdirectory grouping is enabled
+        if (template.isUseSubdirectoryGrouping() && (initials == null || initials.isEmpty())) {
             whatInitials();
         }
-
-        String artistName = (artist != null) ? artist.replaceAll("\\s+", "_") : "Unknown_Artist";
-        String firstLetterOfArtist = artistName.substring(0, 1).toUpperCase();
-        String initialsForArtist = initials.getOrDefault(firstLetterOfArtist, "misc");
-        String albumName = (album != null) ? album.replaceAll("\\s+", "_") : "Unknown_Album";
-        String trackNum = (trackNumber != null) ? String.format("%02d", trackNumber) : "00";
-        String titleName = (title != null) ? title.replaceAll("\\s+", "_") : "Unknown_Title";
-        String fileTypeExtension = (fileType != null) ? fileType : "unknown";
-
-        return String.format("%s/%s/%s/%s/%s-%s.%s", startingPath, initialsForArtist,
-                artistName, albumName, trackNum, titleName, fileTypeExtension);
+        
+        return template.generatePath(startingPath, this);
     }
 
     /**
@@ -594,5 +690,51 @@ public class MusicFile {
         System.out.println("Copying file..." + sourcePath + " -> " + destinationPath);
 
         // System.out.println("File copied to: " + newFilePath);
+    }
+    
+    /**
+     * Gets the organizational path for testing purposes.
+     * This field stores the computed organization path without actually copying files.
+     */
+    public String getOrganizationalPath() {
+        return organizationalPath;
+    }
+    
+    /**
+     * Sets the organizational path for testing purposes.
+     * This allows us to test path generation without file system operations.
+     */
+    public void setOrganizationalPath(String organizationalPath) {
+        this.organizationalPath = organizationalPath;
+    }
+    
+    /**
+     * Generates and stores the organizational path without copying the file.
+     * This is useful for testing path templates and organization logic.
+     * 
+     * @param basePath The base path for organization
+     * @param template The path template to use (if null, uses default)
+     * @return The generated organizational path
+     */
+    public String generateOrganizationalPath(String basePath, PathTemplate template) {
+        if (template == null) {
+            template = new PathTemplate(); // Use default if null
+        }
+        
+        // Ensure initials are calculated if subdirectory grouping is enabled
+        if (template.isUseSubdirectoryGrouping()) {
+            try {
+                java.lang.reflect.Method whatInitialsMethod = MusicFile.class.getDeclaredMethod("whatInitials");
+                whatInitialsMethod.setAccessible(true);
+                whatInitialsMethod.invoke(null);
+            } catch (Exception e) {
+                // If reflection fails, continue without subdirectory grouping
+                System.err.println("Warning: Could not initialize subdirectory grouping: " + e.getMessage());
+            }
+        }
+        
+        String path = template.generatePath(basePath, this);
+        this.organizationalPath = path;
+        return path;
     }
 }

@@ -120,6 +120,8 @@ public class DatabaseManager {
      * This will close the current connection and create a new one at the specified location.
      */
     public static synchronized void changeDatabaseLocation(String newPath) {
+        String oldPath = config.getDatabasePath();
+        
         // Close current connection
         shutdown();
         
@@ -130,6 +132,18 @@ public class DatabaseManager {
         initialize();
         
         System.out.println("Database location changed to: " + config.getDatabasePath());
+        
+        // Check if the new database is empty
+        boolean isNewDatabase = false;
+        try {
+            List<org.hasting.model.MusicFile> allFiles = getAllMusicFiles();
+            isNewDatabase = allFiles == null || allFiles.isEmpty();
+        } catch (Exception e) {
+            isNewDatabase = true;
+        }
+        
+        // Notify listeners of database change
+        ProfileChangeNotifier.getInstance().notifyDatabaseChanged(oldPath, newPath, isNewDatabase);
     }
 
     /**

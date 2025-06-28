@@ -1,20 +1,28 @@
 package org.hasting.ui;
 
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.control.SelectionMode;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
+import org.hasting.util.DatabaseProfile;
+import org.hasting.util.ProfileChangeListener;
+import org.hasting.util.ProfileChangeNotifier;
 
 import java.awt.Desktop;
 import java.io.File;
 import java.util.List;
 
-public class MetadataEditorView extends BorderPane {
+public class MetadataEditorView extends BorderPane implements ProfileChangeListener {
     
     private TextField searchField;
     private ComboBox<String> searchTypeCombo;
@@ -36,9 +44,20 @@ public class MetadataEditorView extends BorderPane {
     private MusicFile currentFile;
     private Label statusLabel;
     
+    // Bulk editing components
+    private CheckBox bulkEditModeCheckBox;
+    private VBox bulkEditSection;
+    private TextField bulkArtistField;
+    private TextField bulkAlbumField;
+    private TextField bulkGenreField;
+    private Label bulkSelectionLabel;
+    
     public MetadataEditorView() {
         initializeComponents();
         layoutComponents();
+        
+        // Register for profile change notifications
+        ProfileChangeNotifier.getInstance().addListener(this);
     }
     
     private void initializeComponents() {
@@ -56,12 +75,13 @@ public class MetadataEditorView extends BorderPane {
         resultsTable = createResultsTable();
         resultsTable.setItems(resultsData);
         
+        // Enable multiple selection
+        resultsTable.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        
         // Add selection listener
         resultsTable.getSelectionModel().selectedItemProperty().addListener(
             (obs, oldSelection, newSelection) -> {
-                if (newSelection != null) {
-                    loadFileForEditing(newSelection);
-                }
+                updateSelectionUI();
             }
         );
         
@@ -80,12 +100,18 @@ public class MetadataEditorView extends BorderPane {
         
         statusLabel = new Label("Ready");
         
+        // Initialize bulk editing components
+        initializeBulkEditingComponents();
+        
         // Add search functionality
         Button searchButton = new Button("Search");
         searchButton.setOnAction(e -> performSearch());
         
         // Enter key search
         searchField.setOnAction(e -> performSearch());
+        
+        // Add keyboard shortcuts
+        setupKeyboardShortcuts();
     }
     
     private TableView<MusicFile> createResultsTable() {
@@ -123,6 +149,76 @@ public class MetadataEditorView extends BorderPane {
         return table;
     }
     
+    private void initializeBulkEditingComponents() {
+        bulkEditModeCheckBox = new CheckBox("Bulk Edit Mode");
+        bulkEditModeCheckBox.setOnAction(e -> toggleBulkEditMode());
+        
+        Tooltip bulkEditTooltip = new Tooltip(
+            "Enable bulk editing to change artist, album, or genre for multiple selected files at once.\n" +
+            "Keyboard shortcuts: Ctrl+A (Select All), Ctrl+B (Toggle Bulk Mode), Esc (Clear Selection)"
+        );
+        bulkEditModeCheckBox.setTooltip(bulkEditTooltip);
+        
+        bulkSelectionLabel = new Label("No files selected");
+        bulkSelectionLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #666666;");
+        
+        bulkArtistField = new TextField();
+        bulkArtistField.setPromptText("Leave empty to keep current values");
+        
+        bulkAlbumField = new TextField();
+        bulkAlbumField.setPromptText("Leave empty to keep current values");
+        
+        bulkGenreField = new TextField();
+        bulkGenreField.setPromptText("Leave empty to keep current values");
+    }
+    
+    private void updateSelectionUI() {
+        ObservableList<MusicFile> selectedFiles = resultsTable.getSelectionModel().getSelectedItems();
+        int selectionCount = selectedFiles.size();
+        
+        if (bulkEditModeCheckBox.isSelected()) {
+            // Bulk edit mode
+            if (selectionCount == 0) {
+                bulkSelectionLabel.setText("No files selected");
+                if (bulkEditSection != null) {
+                    bulkEditSection.setDisable(true);
+                }
+            } else {
+                bulkSelectionLabel.setText(selectionCount + " file(s) selected for bulk editing");
+                if (bulkEditSection != null) {
+                    bulkEditSection.setDisable(false);
+                }
+            }
+        } else {
+            // Single edit mode
+            if (selectionCount == 1) {
+                loadFileForEditing(selectedFiles.get(0));
+            } else if (selectionCount == 0) {
+                currentFile = null;
+                ((VBox) getBottom()).getChildren().get(0).setDisable(true);
+                clearForm();
+            } else {
+                // Multiple files selected but not in bulk mode
+                statusLabel.setText("Multiple files selected. Enable Bulk Edit Mode to edit them together.");
+                currentFile = null;
+                ((VBox) getBottom()).getChildren().get(0).setDisable(true);
+                clearForm();
+            }
+        }
+    }
+    
+    private void toggleBulkEditMode() {
+        updateSelectionUI();
+        
+        // Force layout update
+        if (getBottom() instanceof VBox) {
+            VBox bottomContainer = (VBox) getBottom();
+            // The edit section should be rebuilt to show appropriate UI
+            bottomContainer.getChildren().set(0, bulkEditModeCheckBox.isSelected() ? 
+                createBulkEditSection() : createEditSection());
+        }
+    }
+    
     private void layoutComponents() {
         // Top search section
         HBox searchBox = new HBox(10);
@@ -143,7 +239,28 @@ public class MetadataEditorView extends BorderPane {
         
         Label resultsLabel = new Label("Search Results:");
         resultsLabel.setStyle("-fx-font-weight: bold;");
-        resultsSection.getChildren().addAll(resultsLabel, resultsTable);
+        
+        HBox tableHeaderBox = new HBox(10);
+        tableHeaderBox.setStyle("-fx-alignment: center-left;");
+        
+        // Add selection utilities
+        Button selectAllButton = new Button("Select All");
+        selectAllButton.setOnAction(e -> resultsTable.getSelectionModel().selectAll());
+        selectAllButton.setStyle("-fx-font-size: 10px;");
+        
+        Button selectNoneButton = new Button("Clear Selection");
+        selectNoneButton.setOnAction(e -> resultsTable.getSelectionModel().clearSelection());
+        selectNoneButton.setStyle("-fx-font-size: 10px;");
+        
+        HBox selectionButtons = new HBox(5);
+        selectionButtons.getChildren().addAll(selectAllButton, selectNoneButton);
+        
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        tableHeaderBox.getChildren().addAll(resultsLabel, spacer, selectionButtons, bulkEditModeCheckBox);
+        
+        resultsSection.getChildren().addAll(tableHeaderBox, resultsTable);
         
         // Bottom edit section
         VBox editSection = createEditSection();
@@ -236,6 +353,68 @@ public class MetadataEditorView extends BorderPane {
         editSection.setDisable(true);
         
         return editSection;
+    }
+    
+    private VBox createBulkEditSection() {
+        bulkEditSection = new VBox(10);
+        bulkEditSection.setPadding(new Insets(10));
+        
+        Label editLabel = new Label("Bulk Edit Metadata:");
+        editLabel.setStyle("-fx-font-weight: bold;");
+        
+        // Selection info
+        bulkEditSection.getChildren().add(bulkSelectionLabel);
+        
+        // Create form grid for bulk editing
+        GridPane form = new GridPane();
+        form.setHgap(10);
+        form.setVgap(8);
+        
+        // Only show the editable fields specified in the issue: artist, album, genre
+        form.add(new Label("Artist:"), 0, 0);
+        form.add(bulkArtistField, 1, 0);
+        
+        form.add(new Label("Album:"), 0, 1);
+        form.add(bulkAlbumField, 1, 1);
+        
+        form.add(new Label("Genre:"), 0, 2);
+        form.add(bulkGenreField, 1, 2);
+        
+        // Make text fields grow
+        bulkArtistField.setPrefWidth(300);
+        bulkAlbumField.setPrefWidth(300);
+        bulkGenreField.setPrefWidth(300);
+        
+        // Instructions
+        Label instructionsLabel = new Label("Instructions:");
+        instructionsLabel.setStyle("-fx-font-weight: bold;");
+        Label instructions = new Label(
+            "• Only fill in fields you want to change for ALL selected files\n" +
+            "• Leave fields empty to keep each file's current value\n" +
+            "• Changes will be applied to all selected files"
+        );
+        instructions.setStyle("-fx-text-fill: #666666;");
+        
+        VBox instructionsBox = new VBox(5);
+        instructionsBox.getChildren().addAll(instructionsLabel, instructions);
+        
+        // Buttons
+        HBox buttonBox = new HBox(10);
+        Button bulkSaveButton = new Button("Apply to Selected Files");
+        bulkSaveButton.setOnAction(e -> saveBulkChanges());
+        bulkSaveButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+        
+        Button clearBulkButton = new Button("Clear Fields");
+        clearBulkButton.setOnAction(e -> clearBulkFields());
+        
+        buttonBox.getChildren().addAll(bulkSaveButton, clearBulkButton);
+        
+        bulkEditSection.getChildren().addAll(editLabel, form, instructionsBox, buttonBox);
+        
+        // Initially disable if no selection
+        bulkEditSection.setDisable(true);
+        
+        return bulkEditSection;
     }
     
     private void performSearch() {
@@ -409,18 +588,173 @@ public class MetadataEditorView extends BorderPane {
         durationLabel.setText("");
     }
     
+    private void saveBulkChanges() {
+        ObservableList<MusicFile> selectedFiles = resultsTable.getSelectionModel().getSelectedItems();
+        if (selectedFiles.isEmpty()) {
+            statusLabel.setText("No files selected for bulk editing");
+            return;
+        }
+        
+        // Get values from bulk edit fields
+        String newArtist = bulkArtistField.getText().trim();
+        String newAlbum = bulkAlbumField.getText().trim();
+        String newGenre = bulkGenreField.getText().trim();
+        
+        // Check if at least one field has a value
+        if (newArtist.isEmpty() && newAlbum.isEmpty() && newGenre.isEmpty()) {
+            statusLabel.setText("Please enter at least one value to update");
+            return;
+        }
+        
+        // Show confirmation dialog
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Confirm Bulk Edit");
+        confirmAlert.setHeaderText("Apply Changes to Multiple Files");
+        
+        StringBuilder message = new StringBuilder();
+        message.append("You are about to apply the following changes to ")
+               .append(selectedFiles.size()).append(" file(s):\n\n");
+        
+        if (!newArtist.isEmpty()) {
+            message.append("• Artist: ").append(newArtist).append("\n");
+        }
+        if (!newAlbum.isEmpty()) {
+            message.append("• Album: ").append(newAlbum).append("\n");
+        }
+        if (!newGenre.isEmpty()) {
+            message.append("• Genre: ").append(newGenre).append("\n");
+        }
+        
+        message.append("\nThis action cannot be easily undone. Continue?");
+        confirmAlert.setContentText(message.toString());
+        
+        confirmAlert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                performBulkUpdate(selectedFiles, newArtist, newAlbum, newGenre);
+            }
+        });
+    }
+    
+    private void performBulkUpdate(ObservableList<MusicFile> files, String newArtist, String newAlbum, String newGenre) {
+        int successCount = 0;
+        int errorCount = 0;
+        
+        for (MusicFile file : files) {
+            try {
+                // Only update fields that have values
+                boolean hasChanges = false;
+                
+                if (!newArtist.isEmpty()) {
+                    file.setArtist(newArtist);
+                    hasChanges = true;
+                }
+                if (!newAlbum.isEmpty()) {
+                    file.setAlbum(newAlbum);
+                    hasChanges = true;
+                }
+                if (!newGenre.isEmpty()) {
+                    file.setGenre(newGenre);
+                    hasChanges = true;
+                }
+                
+                if (hasChanges) {
+                    DatabaseManager.updateMusicFile(file);
+                    successCount++;
+                }
+                
+            } catch (Exception e) {
+                errorCount++;
+                System.err.println("Error updating file: " + file.getTitle() + " - " + e.getMessage());
+            }
+        }
+        
+        // Refresh table to show changes
+        resultsTable.refresh();
+        
+        // Update status
+        if (errorCount == 0) {
+            statusLabel.setText("Successfully updated " + successCount + " file(s)");
+            statusLabel.setStyle("-fx-text-fill: green;");
+            
+            // Clear bulk fields after successful update
+            clearBulkFields();
+        } else {
+            statusLabel.setText("Updated " + successCount + " file(s), " + errorCount + " failed");
+            statusLabel.setStyle("-fx-text-fill: orange;");
+        }
+    }
+    
+    private void clearBulkFields() {
+        bulkArtistField.clear();
+        bulkAlbumField.clear();
+        bulkGenreField.clear();
+    }
+    
+    private void setupKeyboardShortcuts() {
+        // Ctrl+A - Select All
+        KeyCodeCombination selectAllShortcut = new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN);
+        this.setOnKeyPressed(e -> {
+            if (selectAllShortcut.match(e)) {
+                resultsTable.getSelectionModel().selectAll();
+                e.consume();
+            }
+        });
+        
+        // Ctrl+B - Toggle Bulk Edit Mode
+        KeyCodeCombination bulkEditShortcut = new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN);
+        this.setOnKeyPressed(e -> {
+            if (bulkEditShortcut.match(e)) {
+                bulkEditModeCheckBox.setSelected(!bulkEditModeCheckBox.isSelected());
+                toggleBulkEditMode();
+                e.consume();
+            }
+        });
+        
+        // Escape - Clear Selection
+        this.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) {
+                resultsTable.getSelectionModel().clearSelection();
+                e.consume();
+            }
+        });
+        
+        // Make this node focusable to receive key events
+        this.setFocusTraversable(true);
+    }
+    
     /**
      * Sets up context menu for the results table.
      */
     private void setupTableContextMenu(TableView<MusicFile> table) {
         ContextMenu contextMenu = new ContextMenu();
         
-        // Edit Metadata menu item (loads the file for editing)
+        // Edit Metadata menu item (loads the file for editing or enables bulk mode)
         MenuItem editMetadataItem = new MenuItem("✏️ Edit Metadata");
         editMetadataItem.setOnAction(e -> {
-            MusicFile selectedFile = table.getSelectionModel().getSelectedItem();
-            if (selectedFile != null) {
-                loadFileForEditing(selectedFile);
+            ObservableList<MusicFile> selectedFiles = table.getSelectionModel().getSelectedItems();
+            if (selectedFiles.size() == 1) {
+                // Single file - load for editing
+                bulkEditModeCheckBox.setSelected(false);
+                toggleBulkEditMode();
+                loadFileForEditing(selectedFiles.get(0));
+            } else if (selectedFiles.size() > 1) {
+                // Multiple files - enable bulk edit mode
+                bulkEditModeCheckBox.setSelected(true);
+                toggleBulkEditMode();
+                statusLabel.setText("Bulk edit mode enabled for " + selectedFiles.size() + " files");
+            }
+        });
+        
+        // Bulk Edit menu item
+        MenuItem bulkEditItem = new MenuItem("📝 Bulk Edit Selected");
+        bulkEditItem.setOnAction(e -> {
+            ObservableList<MusicFile> selectedFiles = table.getSelectionModel().getSelectedItems();
+            if (selectedFiles.size() > 1) {
+                bulkEditModeCheckBox.setSelected(true);
+                toggleBulkEditMode();
+                statusLabel.setText("Bulk edit mode enabled for " + selectedFiles.size() + " files");
+            } else {
+                statusLabel.setText("Select multiple files to use bulk edit");
             }
         });
         
@@ -466,6 +800,7 @@ public class MetadataEditorView extends BorderPane {
         // Add all items to context menu
         contextMenu.getItems().addAll(
             editMetadataItem,
+            bulkEditItem,
             deleteItem,
             separator1,
             openLocationItem,
@@ -593,5 +928,112 @@ public class MetadataEditorView extends BorderPane {
         
         info.setContentText(details.toString());
         info.showAndWait();
+    }
+    
+    // ProfileChangeListener implementation
+    @Override
+    public void onProfileChanged(String oldProfileId, String newProfileId, DatabaseProfile newProfile) {
+        Platform.runLater(() -> {
+            statusLabel.setText("Profile changed to: " + newProfile.getName());
+            statusLabel.setStyle("-fx-text-fill: blue;");
+            
+            // Reset UI state but don't clear search results yet - 
+            // wait for database change notification
+        });
+    }
+    
+    @Override
+    public void onDatabaseChanged(String oldDatabasePath, String newDatabasePath, boolean isNewDatabase) {
+        Platform.runLater(() -> {
+            // Clear all cached data
+            resetAllData();
+            
+            if (isNewDatabase) {
+                statusLabel.setText("New database detected - search for music files to get started");
+                statusLabel.setStyle("-fx-text-fill: orange;");
+                
+                // Optionally notify user about new database
+                showNewDatabasePrompt();
+            } else {
+                statusLabel.setText("Database changed - data cleared");
+                statusLabel.setStyle("-fx-text-fill: blue;");
+            }
+        });
+    }
+    
+    /**
+     * Resets all data in the metadata editor.
+     */
+    private void resetAllData() {
+        // Clear search results
+        resultsData.clear();
+        
+        // Clear form data
+        currentFile = null;
+        clearForm();
+        
+        // Clear bulk edit fields
+        clearBulkFields();
+        
+        // Reset UI state
+        bulkEditModeCheckBox.setSelected(false);
+        toggleBulkEditMode();
+        
+        // Disable edit sections
+        if (getBottom() instanceof VBox) {
+            VBox bottomContainer = (VBox) getBottom();
+            bottomContainer.getChildren().get(0).setDisable(true);
+        }
+        
+        // Clear search field
+        searchField.clear();
+        
+        System.out.println("MetadataEditorView: All data reset due to database change");
+    }
+    
+    /**
+     * Shows a prompt for new databases suggesting to import music files.
+     */
+    private void showNewDatabasePrompt() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("New Database");
+        alert.setHeaderText("Empty Database Detected");
+        alert.setContentText(
+            "This database appears to be empty or new.\n\n" +
+            "To get started:\n" +
+            "1. Go to the 'Import & Organize' tab\n" +
+            "2. Select directories containing your music files\n" +
+            "3. The application will scan and import your music collection"
+        );
+        
+        ButtonType goToImportButton = new ButtonType("Go to Import Tab");
+        ButtonType okButton = new ButtonType("OK", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(goToImportButton, okButton);
+        
+        alert.showAndWait().ifPresent(response -> {
+            if (response == goToImportButton) {
+                // Try to switch to import tab - this would need to be handled by the main application
+                notifyRequestTabSwitch();
+            }
+        });
+    }
+    
+    /**
+     * Requests that the main application switch to the import tab.
+     * This is a placeholder - the actual implementation would depend on how tabs are managed.
+     */
+    private void notifyRequestTabSwitch() {
+        // This could be implemented with another event system or callback
+        // For now, just update the status
+        statusLabel.setText("Please switch to 'Import & Organize' tab to add music files");
+        statusLabel.setStyle("-fx-text-fill: green;");
+    }
+    
+    /**
+     * Cleanup method to unregister from notifications.
+     * Should be called when this view is being destroyed.
+     */
+    public void cleanup() {
+        ProfileChangeNotifier.getInstance().removeListener(this);
     }
 }

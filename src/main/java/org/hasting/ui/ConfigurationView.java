@@ -12,6 +12,8 @@ import org.hasting.util.DatabaseProfile;
 import org.hasting.util.DatabaseProfileManager;
 import org.hasting.util.FuzzySearchConfig;
 import org.hasting.util.HelpSystem;
+import org.hasting.util.PathTemplateManager;
+import org.hasting.model.PathTemplate;
 
 import java.io.File;
 import java.util.Set;
@@ -62,6 +64,16 @@ public class ConfigurationView extends BorderPane {
     private Button applyFuzzyConfigButton;
     private Button resetFuzzyConfigButton;
     
+    // Path template configuration components
+    private ComboBox<String> templateComboBox;
+    private TextField customTemplateField;
+    private ComboBox<PathTemplate.TextFormat> textFormatComboBox;
+    private CheckBox useSubdirectoriesCheckBox;
+    private Spinner<Integer> subdirectoryLevelsSpinner;
+    private Label templatePreviewLabel;
+    private Button applyTemplateButton;
+    private Button resetTemplateButton;
+    
     public ConfigurationView() {
         initializeComponents();
         layoutComponents();
@@ -109,6 +121,9 @@ public class ConfigurationView extends BorderPane {
         
         // Fuzzy search components
         initializeFuzzySearchComponents();
+        
+        // Path template components
+        initializePathTemplateComponents();
     }
     
     private void initializeFileTypeComponents() {
@@ -258,6 +273,69 @@ public class ConfigurationView extends BorderPane {
         return label;
     }
     
+    private void initializePathTemplateComponents() {
+        PathTemplateManager templateManager = PathTemplateManager.getInstance();
+        
+        // Template selector
+        templateComboBox = new ComboBox<>();
+        String[] descriptions = templateManager.getPredefinedTemplateDescriptions();
+        templateComboBox.getItems().addAll(descriptions);
+        templateComboBox.getItems().add("Custom Template");
+        templateComboBox.setValue(descriptions[0]); // Default to first template
+        templateComboBox.setOnAction(e -> updateTemplateFromCombo());
+        templateComboBox.setPrefWidth(400);
+        HelpSystem.setTooltip(templateComboBox, "config.template.combo");
+        
+        // Custom template field
+        customTemplateField = new TextField();
+        customTemplateField.setPromptText("Enter custom template like: {artist}/{album}/{track_number:02d}-{title}.{file_type}");
+        customTemplateField.setPrefWidth(500);
+        customTemplateField.textProperty().addListener((obs, oldVal, newVal) -> updateTemplatePreview());
+        HelpSystem.setTooltip(customTemplateField, "config.template.custom");
+        
+        // Text format selector
+        textFormatComboBox = new ComboBox<>();
+        for (PathTemplate.TextFormat format : PathTemplate.TextFormat.values()) {
+            textFormatComboBox.getItems().add(format);
+        }
+        textFormatComboBox.setValue(PathTemplate.TextFormat.UNDERSCORE);
+        textFormatComboBox.setOnAction(e -> updateTemplatePreview());
+        HelpSystem.setTooltip(textFormatComboBox, "config.template.format");
+        
+        // Subdirectory options
+        useSubdirectoriesCheckBox = new CheckBox("Group files by alphabetical subdirectories");
+        useSubdirectoriesCheckBox.setSelected(true);
+        useSubdirectoriesCheckBox.setOnAction(e -> {
+            subdirectoryLevelsSpinner.setDisable(!useSubdirectoriesCheckBox.isSelected());
+            updateTemplatePreview();
+        });
+        HelpSystem.setTooltip(useSubdirectoriesCheckBox, "config.template.subdirs");
+        
+        subdirectoryLevelsSpinner = new Spinner<>(0, 10, 7);
+        subdirectoryLevelsSpinner.setPrefWidth(80);
+        subdirectoryLevelsSpinner.valueProperty().addListener((obs, oldVal, newVal) -> updateTemplatePreview());
+        HelpSystem.setTooltip(subdirectoryLevelsSpinner, "config.template.levels");
+        
+        // Template preview
+        templatePreviewLabel = new Label();
+        templatePreviewLabel.setStyle("-fx-font-family: monospace; -fx-background-color: #f8f8f8; -fx-padding: 5; -fx-border-color: #cccccc;");
+        templatePreviewLabel.setWrapText(true);
+        templatePreviewLabel.setMaxWidth(Double.MAX_VALUE);
+        
+        // Control buttons
+        applyTemplateButton = new Button("Apply Path Template");
+        applyTemplateButton.setOnAction(e -> applyPathTemplate());
+        HelpSystem.setTooltip(applyTemplateButton, "config.template.apply");
+        
+        resetTemplateButton = new Button("Reset to Default");
+        resetTemplateButton.setOnAction(e -> resetPathTemplate());
+        HelpSystem.setTooltip(resetTemplateButton, "config.template.reset");
+        
+        // Load current template
+        loadCurrentPathTemplate();
+        updateTemplatePreview();
+    }
+    
     private void layoutComponents() {
         // Create main content container
         VBox mainContent = new VBox(15);
@@ -356,6 +434,9 @@ public class ConfigurationView extends BorderPane {
         // Fuzzy search configuration section
         VBox fuzzySearchSection = createFuzzySearchSection();
         
+        // Path template configuration section
+        VBox pathTemplateSection = createPathTemplateSection();
+        
         // Add all sections to main content
         mainContent.getChildren().addAll(
             titleLabel,
@@ -365,6 +446,8 @@ public class ConfigurationView extends BorderPane {
             currentLocationSection,
             new Separator(),
             fileTypeSection,
+            new Separator(),
+            pathTemplateSection,
             new Separator(),
             fuzzySearchSection,
             new Separator(),
@@ -1111,6 +1194,210 @@ public class ConfigurationView extends BorderPane {
             
         } catch (Exception e) {
             showError("Failed to reset fuzzy search configuration: " + e.getMessage());
+        }
+    }
+    
+    private VBox createPathTemplateSection() {
+        VBox pathTemplateSection = new VBox(10);
+        
+        // Section header
+        Label pathTemplateLabel = createBoldLabel("File Organization Templates:");
+        Label pathTemplateDescription = new Label("Configure how music files are organized when copied to a new location:");
+        pathTemplateDescription.setStyle("-fx-font-size: 11px; -fx-text-fill: #666666;");
+        
+        // Template selection
+        VBox templateSelectionBox = new VBox(5);
+        Label templateSelectorLabel = new Label("Template:");
+        templateSelectorLabel.setStyle("-fx-font-weight: bold;");
+        
+        VBox customTemplateBox = new VBox(5);
+        customTemplateBox.setVisible(false); // Initially hidden
+        Label customTemplateLabel = new Label("Custom Template:");
+        customTemplateLabel.setStyle("-fx-font-weight: bold;");
+        customTemplateBox.getChildren().addAll(customTemplateLabel, customTemplateField);
+        
+        templateSelectionBox.getChildren().addAll(templateSelectorLabel, templateComboBox, customTemplateBox);
+        
+        // Formatting options
+        GridPane formatGrid = new GridPane();
+        formatGrid.setHgap(15);
+        formatGrid.setVgap(5);
+        
+        formatGrid.add(new Label("Text Format:"), 0, 0);
+        formatGrid.add(textFormatComboBox, 1, 0);
+        
+        formatGrid.add(useSubdirectoriesCheckBox, 0, 1);
+        formatGrid.add(new HBox(5, new Label("Subdirectory Groups:"), subdirectoryLevelsSpinner), 1, 1);
+        
+        // Template preview
+        VBox previewBox = new VBox(5);
+        Label previewLabel = createBoldLabel("Preview:");
+        previewBox.getChildren().addAll(previewLabel, templatePreviewLabel);
+        
+        // Available fields reference
+        VBox fieldsBox = new VBox(5);
+        Label fieldsLabel = createBoldLabel("Available Template Fields:");
+        String fieldsList = "Standard fields:\n" +
+                          "  {artist}, {album}, {title}, {genre}, {year}, {track_number}, {bit_rate}, {sample_rate}, {file_type}\n\n" +
+                          "Special fields:\n" +
+                          "  {subdirectory} - creates alphabetical folders based on artist distribution\n\n" +
+                          "Number formatting:\n" +
+                          "  {track_number:02d} - zero-padded track numbers (01, 02, 03...)\n\n" +
+                          "Subdirectory groups distribute artists across folders (e.g., A-F/, G-M/, N-Z/ with 3 groups)";
+        TextArea fieldsArea = new TextArea(fieldsList);
+        fieldsArea.setEditable(false);
+        fieldsArea.setPrefRowCount(7);
+        fieldsArea.setWrapText(true);
+        fieldsArea.setStyle("-fx-font-family: monospace; -fx-font-size: 10px; -fx-background-color: #f8f8f8;");
+        
+        fieldsBox.getChildren().addAll(fieldsLabel, fieldsArea);
+        
+        // Control buttons
+        HBox templateButtonBox = new HBox(10);
+        templateButtonBox.getChildren().addAll(applyTemplateButton, resetTemplateButton);
+        
+        pathTemplateSection.getChildren().addAll(
+            pathTemplateLabel,
+            pathTemplateDescription,
+            templateSelectionBox,
+            new Separator(),
+            createBoldLabel("Format Options:"),
+            formatGrid,
+            new Separator(),
+            previewBox,
+            new Separator(),
+            fieldsBox,
+            templateButtonBox
+        );
+        
+        return pathTemplateSection;
+    }
+    
+    private void updateTemplateFromCombo() {
+        String selected = templateComboBox.getValue();
+        VBox customTemplateBox = (VBox) ((VBox) templateComboBox.getParent()).getChildren().get(2);
+        
+        if ("Custom Template".equals(selected)) {
+            customTemplateBox.setVisible(true);
+            customTemplateField.setText("");
+        } else {
+            customTemplateBox.setVisible(false);
+            // Get the selected predefined template
+            PathTemplateManager manager = PathTemplateManager.getInstance();
+            String[] descriptions = manager.getPredefinedTemplateDescriptions();
+            for (int i = 0; i < descriptions.length; i++) {
+                if (descriptions[i].equals(selected)) {
+                    PathTemplate template = manager.getPredefinedTemplate(i);
+                    customTemplateField.setText(template.getTemplate());
+                    textFormatComboBox.setValue(template.getTextFormat());
+                    useSubdirectoriesCheckBox.setSelected(template.isUseSubdirectoryGrouping());
+                    subdirectoryLevelsSpinner.getValueFactory().setValue(template.getSubdirectoryLevels());
+                    break;
+                }
+            }
+        }
+        updateTemplatePreview();
+    }
+    
+    private void updateTemplatePreview() {
+        try {
+            String templateStr = customTemplateField.getText();
+            if (templateStr == null || templateStr.trim().isEmpty()) {
+                templatePreviewLabel.setText("Enter a template to see preview");
+                return;
+            }
+            
+            PathTemplate template = new PathTemplate(
+                templateStr,
+                textFormatComboBox.getValue(),
+                useSubdirectoriesCheckBox.isSelected(),
+                subdirectoryLevelsSpinner.getValue()
+            );
+            
+            String preview = PathTemplateManager.getInstance().getTemplatePreview(template);
+            templatePreviewLabel.setText("Preview: " + preview);
+            
+        } catch (Exception e) {
+            templatePreviewLabel.setText("Error in template: " + e.getMessage());
+        }
+    }
+    
+    private void loadCurrentPathTemplate() {
+        try {
+            PathTemplateManager manager = PathTemplateManager.getInstance();
+            PathTemplate current = manager.getCurrentTemplate();
+            
+            customTemplateField.setText(current.getTemplate());
+            textFormatComboBox.setValue(current.getTextFormat());
+            useSubdirectoriesCheckBox.setSelected(current.isUseSubdirectoryGrouping());
+            subdirectoryLevelsSpinner.getValueFactory().setValue(current.getSubdirectoryLevels());
+            
+            // Determine if it matches a predefined template
+            String[] descriptions = manager.getPredefinedTemplateDescriptions();
+            boolean foundMatch = false;
+            for (int i = 0; i < descriptions.length; i++) {
+                PathTemplate predefined = manager.getPredefinedTemplate(i);
+                if (templatesMatch(current, predefined)) {
+                    templateComboBox.setValue(descriptions[i]);
+                    foundMatch = true;
+                    break;
+                }
+            }
+            
+            if (!foundMatch) {
+                templateComboBox.setValue("Custom Template");
+                VBox customTemplateBox = (VBox) ((VBox) templateComboBox.getParent()).getChildren().get(2);
+                customTemplateBox.setVisible(true);
+            }
+            
+        } catch (Exception e) {
+            showError("Failed to load current path template: " + e.getMessage());
+        }
+    }
+    
+    private boolean templatesMatch(PathTemplate t1, PathTemplate t2) {
+        return t1.getTemplate().equals(t2.getTemplate()) &&
+               t1.getTextFormat() == t2.getTextFormat() &&
+               t1.isUseSubdirectoryGrouping() == t2.isUseSubdirectoryGrouping() &&
+               t1.getSubdirectoryLevels() == t2.getSubdirectoryLevels();
+    }
+    
+    private void applyPathTemplate() {
+        try {
+            String templateStr = customTemplateField.getText();
+            if (templateStr == null || templateStr.trim().isEmpty()) {
+                showError("Please enter a template");
+                return;
+            }
+            
+            PathTemplate template = new PathTemplate(
+                templateStr,
+                textFormatComboBox.getValue(),
+                useSubdirectoriesCheckBox.isSelected(),
+                subdirectoryLevelsSpinner.getValue()
+            );
+            
+            PathTemplateManager.getInstance().setCurrentTemplate(template);
+            
+            statusLabel.setText("Path template applied successfully");
+            statusLabel.setStyle("-fx-text-fill: green;");
+            
+        } catch (Exception e) {
+            showError("Failed to apply path template: " + e.getMessage());
+        }
+    }
+    
+    private void resetPathTemplate() {
+        try {
+            PathTemplateManager.getInstance().resetToDefault();
+            loadCurrentPathTemplate();
+            updateTemplatePreview();
+            
+            statusLabel.setText("Path template reset to default");
+            statusLabel.setStyle("-fx-text-fill: green;");
+            
+        } catch (Exception e) {
+            showError("Failed to reset path template: " + e.getMessage());
         }
     }
 }

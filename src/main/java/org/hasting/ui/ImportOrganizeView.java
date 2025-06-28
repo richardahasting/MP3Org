@@ -1,19 +1,26 @@
 package org.hasting.ui;
 
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.layout.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.hasting.model.MusicFile;
+import org.hasting.model.PathTemplate;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.MusicFileScanner;
+import org.hasting.util.PathTemplateManager;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class ImportOrganizeView extends BorderPane {
     
@@ -27,9 +34,34 @@ public class ImportOrganizeView extends BorderPane {
     private TextField organizeFolderField;
     private Button browseFolderButton;
     
+    // File selection components for Issue #6
+    private TableView<MusicFileSelection> fileSelectionTable;
+    private ObservableList<MusicFileSelection> fileSelectionData;
+    private CheckBox selectAllCheckBox;
+    private Button refreshSelectionButton;
+    private Label selectionCountLabel;
+    
     public ImportOrganizeView() {
         initializeComponents();
         layoutComponents();
+    }
+    
+    /**
+     * Helper class to wrap MusicFile with selection state for Issue #6
+     */
+    public static class MusicFileSelection {
+        private final MusicFile musicFile;
+        private javafx.beans.property.BooleanProperty selected;
+        
+        public MusicFileSelection(MusicFile musicFile) {
+            this.musicFile = musicFile;
+            this.selected = new javafx.beans.property.SimpleBooleanProperty(false);
+        }
+        
+        public MusicFile getMusicFile() { return musicFile; }
+        public javafx.beans.property.BooleanProperty selectedProperty() { return selected; }
+        public boolean isSelected() { return selected.get(); }
+        public void setSelected(boolean selected) { this.selected.set(selected); }
     }
     
     private void initializeComponents() {
@@ -62,6 +94,114 @@ public class ImportOrganizeView extends BorderPane {
         
         browseFolderButton = new Button("Browse");
         browseFolderButton.setOnAction(e -> selectOrganizeFolder());
+        
+        // Initialize file selection components for Issue #6
+        initializeFileSelectionComponents();
+    }
+    
+    private void initializeFileSelectionComponents() {
+        fileSelectionData = FXCollections.observableArrayList();
+        fileSelectionTable = createFileSelectionTable();
+        fileSelectionTable.setItems(fileSelectionData);
+        
+        selectAllCheckBox = new CheckBox("Select All");
+        selectAllCheckBox.setOnAction(e -> toggleSelectAll());
+        
+        refreshSelectionButton = new Button("Refresh File List");
+        refreshSelectionButton.setOnAction(e -> refreshFileSelection());
+        
+        selectionCountLabel = new Label("0 files selected");
+        
+        // Load initial file list
+        refreshFileSelection();
+    }
+    
+    private TableView<MusicFileSelection> createFileSelectionTable() {
+        TableView<MusicFileSelection> table = new TableView<>();
+        table.setPrefHeight(300);
+        
+        // Selection column
+        TableColumn<MusicFileSelection, Boolean> selectCol = new TableColumn<>("Select");
+        selectCol.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
+        selectCol.setCellFactory(CheckBoxTableCell.forTableColumn(selectCol));
+        selectCol.setPrefWidth(60);
+        selectCol.setEditable(true);
+        
+        // Artist column
+        TableColumn<MusicFileSelection, String> artistCol = new TableColumn<>("Artist");
+        artistCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getMusicFile().getArtist()));
+        artistCol.setPrefWidth(150);
+        
+        // Title column
+        TableColumn<MusicFileSelection, String> titleCol = new TableColumn<>("Title");
+        titleCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getMusicFile().getTitle()));
+        titleCol.setPrefWidth(200);
+        
+        // Album column
+        TableColumn<MusicFileSelection, String> albumCol = new TableColumn<>("Album");
+        albumCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getMusicFile().getAlbum()));
+        albumCol.setPrefWidth(150);
+        
+        // Duration column
+        TableColumn<MusicFileSelection, String> durationCol = new TableColumn<>("Duration");
+        durationCol.setCellValueFactory(data -> {
+            Integer duration = data.getValue().getMusicFile().getDurationSeconds();
+            if (duration != null) {
+                int minutes = duration / 60;
+                int seconds = duration % 60;
+                return new SimpleStringProperty(String.format("%d:%02d", minutes, seconds));
+            }
+            return new SimpleStringProperty("");
+        });
+        durationCol.setPrefWidth(80);
+        
+        // File path column
+        TableColumn<MusicFileSelection, String> pathCol = new TableColumn<>("File Path");
+        pathCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getMusicFile().getFilePath()));
+        pathCol.setPrefWidth(400);
+        
+        table.getColumns().addAll(selectCol, artistCol, titleCol, albumCol, durationCol, pathCol);
+        table.setEditable(true);
+        
+        return table;
+    }
+    
+    private void toggleSelectAll() {
+        boolean selectAll = selectAllCheckBox.isSelected();
+        for (MusicFileSelection selection : fileSelectionData) {
+            selection.setSelected(selectAll);
+        }
+        updateSelectionCount();
+    }
+    
+    private void refreshFileSelection() {
+        try {
+            List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+            fileSelectionData.clear();
+            
+            for (MusicFile file : allFiles) {
+                MusicFileSelection selection = new MusicFileSelection(file);
+                // Add listener to each selection to update count when changed
+                selection.selectedProperty().addListener((obs, oldVal, newVal) -> updateSelectionCount());
+                fileSelectionData.add(selection);
+            }
+            
+            updateSelectionCount();
+            statusLabel.setText("Loaded " + allFiles.size() + " files for selection");
+        } catch (Exception e) {
+            statusLabel.setText("Error loading files: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void updateSelectionCount() {
+        long selectedCount = fileSelectionData.stream()
+            .mapToLong(selection -> selection.isSelected() ? 1 : 0)
+            .sum();
+        selectionCountLabel.setText(selectedCount + " of " + fileSelectionData.size() + " files selected");
+        
+        // Enable/disable organize button based on selection
+        organizeButton.setDisable(selectedCount == 0 || organizeFolderField.getText().trim().isEmpty());
     }
     
     private void layoutComponents() {
@@ -92,15 +232,38 @@ public class ImportOrganizeView extends BorderPane {
             selectedDirectoriesArea
         );
         
+        // File selection section for Issue #6
+        VBox fileSelectionSection = new VBox(10);
+        
+        Label selectionTitle = new Label("Select Files to Organize");
+        selectionTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        
+        Label selectionInstructions = new Label(
+            "Choose which music files to organize. You can select individual files or use 'Select All'."
+        );
+        selectionInstructions.setWrapText(true);
+        
+        HBox selectionControlsBox = new HBox(10);
+        selectionControlsBox.getChildren().addAll(
+            selectAllCheckBox, refreshSelectionButton, selectionCountLabel
+        );
+        
+        fileSelectionSection.getChildren().addAll(
+            selectionTitle,
+            selectionInstructions,
+            selectionControlsBox,
+            fileSelectionTable
+        );
+        
         // Organize section
         VBox organizeSection = new VBox(10);
         
-        Label organizeTitle = new Label("Organize Music Files");
+        Label organizeTitle = new Label("Organize Selected Files");
         organizeTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         
         Label organizeInstructions = new Label(
-            "Copy all music files from the database to a new organized folder structure.\n" +
-            "Files will be organized as: Artist/Album/TrackNumber-Title.ext"
+            "Copy selected music files to a new organized folder structure.\n" +
+            "Files will be organized using the template configured in Settings."
         );
         organizeInstructions.setWrapText(true);
         
@@ -126,13 +289,20 @@ public class ImportOrganizeView extends BorderPane {
         
         // Main layout
         VBox mainContent = new VBox(20);
-        mainContent.getChildren().addAll(importSection, new Separator(), organizeSection);
+        mainContent.getChildren().addAll(
+            importSection, 
+            new Separator(), 
+            fileSelectionSection, 
+            new Separator(), 
+            organizeSection
+        );
         
         setCenter(mainContent);
         setBottom(new VBox(10, progressSection, statusSection));
         
-        // Make text area grow
+        // Make text area and file selection table grow
         VBox.setVgrow(selectedDirectoriesArea, Priority.ALWAYS);
+        VBox.setVgrow(fileSelectionTable, Priority.ALWAYS);
     }
     
     private void selectDirectoriesToScan() {
@@ -261,6 +431,7 @@ public class ImportOrganizeView extends BorderPane {
                     } else {
                         statusLabel.setText("Import completed: " + result.size() + " files processed");
                         progressDialog.setCompleted(true, "Successfully imported " + result.size() + " music files");
+                        refreshFileSelection(); // Refresh file selection after import
                     }
                 });
             }
@@ -294,7 +465,7 @@ public class ImportOrganizeView extends BorderPane {
         File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
         if (selectedDirectory != null) {
             organizeFolderField.setText(selectedDirectory.getAbsolutePath());
-            organizeButton.setDisable(false);
+            updateSelectionCount(); // This will update organize button state based on file selection
         }
     }
     
@@ -311,6 +482,17 @@ public class ImportOrganizeView extends BorderPane {
             return;
         }
         
+        // Get selected files for Issue #6
+        List<MusicFile> selectedFiles = fileSelectionData.stream()
+            .filter(MusicFileSelection::isSelected)
+            .map(MusicFileSelection::getMusicFile)
+            .collect(Collectors.toList());
+        
+        if (selectedFiles.isEmpty()) {
+            statusLabel.setText("Please select files to organize");
+            return;
+        }
+        
         // Disable buttons during organization
         scanButton.setDisable(true);
         clearDatabaseButton.setDisable(true);
@@ -323,18 +505,32 @@ public class ImportOrganizeView extends BorderPane {
         Task<Void> organizeTask = new Task<Void>() {
             @Override
             protected Void call() throws Exception {
-                List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-                int totalFiles = allFiles.size();
+                // Use selected files instead of all files
+                int totalFiles = selectedFiles.size();
                 int processedFiles = 0;
                 int successfulCopies = 0;
                 
-                for (MusicFile musicFile : allFiles) {
+                // Get current path template
+                PathTemplate currentTemplate = PathTemplateManager.getInstance().getCurrentTemplate();
+                
+                for (MusicFile musicFile : selectedFiles) {
                     try {
                         Platform.runLater(() -> 
                             progressLabel.setText("Copying: " + musicFile.getTitle())
                         );
                         
-                        musicFile.copyToNewLocation(destinationPath);
+                        // Use the configured template for organization
+                        String newPath = musicFile.newFileNameAndLocation(destinationPath, currentTemplate);
+                        java.nio.file.Path sourcePath = java.nio.file.Paths.get(musicFile.getFilePath());
+                        java.nio.file.Path destinationFilePath = java.nio.file.Paths.get(newPath);
+                        
+                        // Create directories if they do not exist
+                        java.nio.file.Files.createDirectories(destinationFilePath.getParent());
+                        
+                        // Copy the file to the new location
+                        java.nio.file.Files.copy(sourcePath, destinationFilePath);
+                        System.out.println("Copying file..." + sourcePath + " -> " + destinationFilePath);
+                        
                         successfulCopies++;
                         
                     } catch (Exception e) {
@@ -398,6 +594,7 @@ public class ImportOrganizeView extends BorderPane {
                     selectedDirectoriesArea.clear();
                     organizeFolderField.clear();
                     organizeButton.setDisable(true);
+                    refreshFileSelection(); // Refresh file selection after clearing database
                     statusLabel.setText("Database cleared successfully");
                 } catch (Exception e) {
                     statusLabel.setText("Error clearing database: " + e.getMessage());

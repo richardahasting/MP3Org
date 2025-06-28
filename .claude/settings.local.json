@@ -5,7 +5,18 @@
       "Bash(git --version)",
       "Bash(git config:*)",
       "Bash(touch:*)",
-      "Bash(git remote add:*)"
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh:*)",
+      "Bash(command gh --version)",
+      "Bash(command gh issue list --repo richardahasting/MP3Org)",
+      "Bash(command gh issue view 1 --repo richardahasting/MP3Org)",
+      "Bash(git commit:*)",
+      "Bash(command gh issue view 4 --repo richardahasting/MP3Org)",
+      "Bash(command gh issue view 3 --repo richardahasting/MP3Org)",
+      "Bash(command gh issue list --repo richardahasting/MP3Org --state open)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
