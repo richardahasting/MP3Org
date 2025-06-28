@@ -20,8 +20,32 @@ public class MusicFileScanner {
     private HashMap<String, MusicFile> musicFileCache = new HashMap<>(); // Add this line to create a cache for music files
     private Consumer<String> statusCallback;
     private Consumer<Integer> progressCallback;
+    private Consumer<String> fileProcessingCallback; // New callback for individual file processing
+    private Consumer<ScanProgress> detailedProgressCallback; // New callback for detailed progress info
     private boolean stopRequested = false;
-    private int totalFilesScanned = 0; // Add this line to declare a counter for total files scanned
+    private int totalFilesScanned = 0;
+    
+    // Progress tracking data structure
+    public static class ScanProgress {
+        public final String currentDirectory;
+        public final String currentFile;
+        public final int filesFound;
+        public final int filesProcessed;
+        public final int totalDirectories;
+        public final int directoriesProcessed;
+        public final String stage; // "scanning", "reading_tags", "saving"
+        
+        public ScanProgress(String currentDirectory, String currentFile, int filesFound, 
+                           int filesProcessed, int totalDirectories, int directoriesProcessed, String stage) {
+            this.currentDirectory = currentDirectory;
+            this.currentFile = currentFile;
+            this.filesFound = filesFound;
+            this.filesProcessed = filesProcessed;
+            this.totalDirectories = totalDirectories;
+            this.directoriesProcessed = directoriesProcessed;
+            this.stage = stage;
+        }
+    }
     
     
     public List<MusicFile> scanMusicFiles(List<String> directoryPaths) {
@@ -41,6 +65,102 @@ public class MusicFileScanner {
             .forEach(musicFiles::addAll);
         
         return musicFiles;
+    }
+    
+    /**
+     * Enhanced method for scanning with detailed progress feedback.
+     */
+    public List<MusicFile> findAllMusicFilesWithProgress(List<String> directoryPaths) {
+        List<MusicFile> allMusicFiles = new ArrayList<>();
+        int totalDirectories = directoryPaths.size();
+        int directoriesProcessed = 0;
+        int totalFilesFound = 0;
+        int totalFilesProcessed = 0;
+        
+        for (String directoryPath : directoryPaths) {
+            if (stopRequested) break;
+            
+            File directory = new File(directoryPath.trim());
+            if (!directory.exists() || !directory.isDirectory()) {
+                logger.warning("Invalid directory: " + directoryPath);
+                continue;
+            }
+            
+            // Stage 1: Directory scanning
+            if (detailedProgressCallback != null) {
+                detailedProgressCallback.accept(new ScanProgress(
+                    directoryPath, "", totalFilesFound, totalFilesProcessed, 
+                    totalDirectories, directoriesProcessed, "scanning"
+                ));
+            }
+            
+            try {
+                // Get all files with enabled extensions
+                String[] enabledExtensions = getEnabledExtensions();
+                Collection<File> files = FileUtils.listFiles(
+                    directory, 
+                    enabledExtensions, 
+                    true // Include subdirectories
+                );
+                
+                List<File> newFiles = new ArrayList<>();
+                for (File file : files) {
+                    if (!musicFileCache.containsKey(file.getPath())) {
+                        newFiles.add(file);
+                    }
+                }
+                
+                totalFilesFound += newFiles.size();
+                
+                // Stage 2: Tag reading and processing
+                int fileCount = 0;
+                for (File file : newFiles) {
+                    if (stopRequested) break;
+                    
+                    fileCount++;
+                    String fileName = file.getName();
+                    
+                    // Notify about current file being processed
+                    if (fileProcessingCallback != null) {
+                        fileProcessingCallback.accept("Reading tags: " + fileName);
+                    }
+                    
+                    if (detailedProgressCallback != null) {
+                        detailedProgressCallback.accept(new ScanProgress(
+                            directoryPath, fileName, totalFilesFound, totalFilesProcessed + fileCount, 
+                            totalDirectories, directoriesProcessed, "reading_tags"
+                        ));
+                    }
+                    
+                    try {
+                        MusicFile musicFile = new MusicFile(file);
+                        musicFileCache.put(file.getPath(), musicFile);
+                        allMusicFiles.add(musicFile);
+                        
+                        // Log the file processing (as mentioned in requirements)
+                        logger.info("Processed: " + fileName + " - " + 
+                                  musicFile.getArtist() + " - " + 
+                                  musicFile.getAlbum() + " - " + 
+                                  musicFile.getTitle());
+                        
+                    } catch (Exception e) {
+                        logger.warning("Error processing file " + fileName + ": " + e.getMessage());
+                    }
+                }
+                
+                totalFilesProcessed += newFiles.size();
+                
+            } catch (Exception e) {
+                logger.severe("Error scanning directory: " + e.getMessage());
+                if (statusCallback != null) {
+                    statusCallback.accept("Error scanning directory: " + e.getMessage());
+                }
+            }
+            
+            directoriesProcessed++;
+        }
+        
+        return allMusicFiles;
     }
     
     /**
@@ -155,6 +275,24 @@ public class MusicFileScanner {
      */
     public void setProgressCallback(Consumer<Integer> progressCallback) {
         this.progressCallback = progressCallback;
+    }
+    
+    /**
+     * Sets a callback to receive individual file processing updates.
+     * 
+     * @param fileProcessingCallback A consumer that accepts file processing messages
+     */
+    public void setFileProcessingCallback(Consumer<String> fileProcessingCallback) {
+        this.fileProcessingCallback = fileProcessingCallback;
+    }
+    
+    /**
+     * Sets a callback to receive detailed progress information.
+     * 
+     * @param detailedProgressCallback A consumer that accepts ScanProgress objects
+     */
+    public void setDetailedProgressCallback(Consumer<ScanProgress> detailedProgressCallback) {
+        this.detailedProgressCallback = detailedProgressCallback;
     }
     
     /**

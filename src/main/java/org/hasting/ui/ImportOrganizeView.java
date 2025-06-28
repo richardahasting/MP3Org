@@ -12,6 +12,7 @@ import org.hasting.util.DatabaseManager;
 import org.hasting.util.MusicFileScanner;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ImportOrganizeView extends BorderPane {
@@ -161,6 +162,12 @@ public class ImportOrganizeView extends BorderPane {
         
         String[] directories = directoriesText.split("\n");
         
+        // Create enhanced progress dialog
+        ImportProgressDialog progressDialog = new ImportProgressDialog(getScene().getWindow());
+        progressDialog.setOnCancel(() -> {
+            // Handle cancellation - this will be passed to the scanner
+        });
+        
         // Disable buttons during scan
         scanButton.setDisable(true);
         clearDatabaseButton.setDisable(true);
@@ -170,50 +177,91 @@ public class ImportOrganizeView extends BorderPane {
         progressLabel.setText("Scanning directories...");
         statusLabel.setText("Scanning in progress...");
         
-        Task<Void> scanTask = new Task<Void>() {
+        // Show progress dialog
+        progressDialog.show();
+        progressDialog.addLogEntry("Starting import process...");
+        
+        Task<List<MusicFile>> scanTask = new Task<List<MusicFile>>() {
             @Override
-            protected Void call() throws Exception {
-                int totalDirectories = directories.length;
-                int processedDirectories = 0;
+            protected List<MusicFile> call() throws Exception {
+                // Create scanner with enhanced progress callbacks
+                MusicFileScanner scanner = new MusicFileScanner();
                 
-                for (String directory : directories) {
-                    File dir = new File(directory.trim());
-                    if (dir.exists() && dir.isDirectory()) {
-                        Platform.runLater(() -> 
-                            progressLabel.setText("Scanning: " + dir.getName())
+                // Set up progress callbacks
+                scanner.setDetailedProgressCallback(progress -> {
+                    if (!progressDialog.isCancelled()) {
+                        progressDialog.updateProgress(progress);
+                    }
+                });
+                
+                scanner.setFileProcessingCallback(message -> {
+                    if (!progressDialog.isCancelled()) {
+                        progressDialog.addLogEntry(message);
+                    }
+                });
+                
+                // Handle cancellation
+                progressDialog.setOnCancel(() -> {
+                    scanner.requestStop();
+                });
+                
+                // Use enhanced scanning method
+                List<String> directoryList = java.util.Arrays.asList(directories);
+                List<MusicFile> allMusicFiles = scanner.findAllMusicFilesWithProgress(directoryList);
+                
+                if (progressDialog.isCancelled()) {
+                    return new ArrayList<>(); // Return empty list if cancelled
+                }
+                
+                // Stage 3: Save files to database with progress
+                int totalFiles = allMusicFiles.size();
+                int savedFiles = 0;
+                
+                for (MusicFile musicFile : allMusicFiles) {
+                    if (progressDialog.isCancelled()) {
+                        break;
+                    }
+                    
+                    try {
+                        DatabaseManager.saveMusicFile(musicFile);
+                        savedFiles++;
+                        
+                        // Update saving progress
+                        progressDialog.updateSavingProgress(
+                            musicFile.getArtist(),
+                            musicFile.getAlbum(), 
+                            musicFile.getTitle(),
+                            savedFiles,
+                            totalFiles
                         );
                         
-                        MusicFileScanner scanner = new MusicFileScanner();
-                        List<MusicFile> musicFiles = scanner.findAllMusicFiles(dir.getAbsolutePath());
-                        
-                        // Save files to database
-                        for (MusicFile musicFile : musicFiles) {
-                            try {
-                                DatabaseManager.saveMusicFile(musicFile);
-                            } catch (Exception e) {
-                                // Skip duplicates
-                                System.err.println("Skipping duplicate or error: " + e.getMessage());
-                            }
-                        }
-                        
-                        processedDirectories++;
-                        final double progress = (double) processedDirectories / totalDirectories;
-                        Platform.runLater(() -> updateProgressBar(progress, ""));
+                    } catch (Exception e) {
+                        // Skip duplicates but log them
+                        progressDialog.addLogEntry("Skipped (duplicate or error): " + musicFile.getTitle() + " - " + e.getMessage());
                     }
                 }
                 
-                return null;
+                return allMusicFiles;
             }
             
             @Override
             protected void succeeded() {
                 Platform.runLater(() -> {
+                    List<MusicFile> result = getValue();
+                    
                     scanButton.setDisable(false);
                     clearDatabaseButton.setDisable(false);
                     organizeButton.setDisable(false);
                     progressBar.setVisible(false);
                     progressLabel.setText("");
-                    statusLabel.setText("Scan completed successfully");
+                    
+                    if (progressDialog.isCancelled()) {
+                        statusLabel.setText("Import cancelled by user");
+                        progressDialog.setCompleted(false, "Import was cancelled by user");
+                    } else {
+                        statusLabel.setText("Import completed: " + result.size() + " files processed");
+                        progressDialog.setCompleted(true, "Successfully imported " + result.size() + " music files");
+                    }
                 });
             }
             
@@ -225,7 +273,10 @@ public class ImportOrganizeView extends BorderPane {
                     organizeButton.setDisable(false);
                     progressBar.setVisible(false);
                     progressLabel.setText("");
-                    statusLabel.setText("Scan failed: " + getException().getMessage());
+                    
+                    String errorMessage = getException().getMessage();
+                    statusLabel.setText("Import failed: " + errorMessage);
+                    progressDialog.setCompleted(false, errorMessage);
                     getException().printStackTrace();
                 });
             }
