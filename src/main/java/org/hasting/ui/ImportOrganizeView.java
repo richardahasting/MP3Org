@@ -22,6 +22,45 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * User interface for importing music files and organizing them using configurable templates.
+ * 
+ * <p>This view provides comprehensive file management functionality including:
+ * <ul>
+ * <li>Directory scanning for supported audio file types</li>
+ * <li>Selective file import with preview and confirmation</li>
+ * <li>Template-based file organization and copying</li>
+ * <li>Progress tracking for long-running operations</li>
+ * <li>Database management (scanning, organizing, clearing)</li>
+ * <li>Batch processing with cancellation support</li>
+ * </ul>
+ * 
+ * <p>Import process features:
+ * <ul>
+ * <li>Recursive directory scanning with file type filtering</li>
+ * <li>Metadata extraction and validation during import</li>
+ * <li>Duplicate detection and handling</li>
+ * <li>Real-time progress feedback with detailed status messages</li>
+ * <li>Error handling and recovery for corrupted or inaccessible files</li>
+ * </ul>
+ * 
+ * <p>Organization capabilities include:
+ * <ul>
+ * <li>Configurable path templates for systematic file organization</li>
+ * <li>Artist-based directory grouping with automatic distribution</li>
+ * <li>File copying with integrity verification</li>
+ * <li>Selective processing based on user-defined criteria</li>
+ * <li>Preview of organization structure before execution</li>
+ * </ul>
+ * 
+ * <p>The interface supports both single-directory and multi-directory operations,
+ * with comprehensive progress tracking and user feedback throughout all processes.
+ * 
+ * @see MusicFileScanner for directory scanning implementation
+ * @see PathTemplate for file organization templates
+ * @see DatabaseManager for data persistence
+ * @since 1.0
+ */
 public class ImportOrganizeView extends BorderPane {
     
     private TextArea selectedDirectoriesArea;
@@ -41,6 +80,13 @@ public class ImportOrganizeView extends BorderPane {
     private Button refreshSelectionButton;
     private Label selectionCountLabel;
     
+    /**
+     * Creates a new ImportOrganizeView with initialized components for file
+     * importing and organization operations.
+     * 
+     * <p>The view is immediately ready for user interaction with all necessary
+     * components initialized and properly laid out.
+     */
     public ImportOrganizeView() {
         initializeComponents();
         layoutComponents();

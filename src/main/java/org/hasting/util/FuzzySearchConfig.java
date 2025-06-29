@@ -3,8 +3,88 @@ package org.hasting.util;
 import java.util.Properties;
 
 /**
- * Configuration class for fuzzy search parameters used in duplicate detection.
- * Allows fine-tuning of how similar songs are considered duplicates.
+ * Comprehensive configuration class for fine-tuning fuzzy search algorithms in duplicate detection.
+ * 
+ * <p>This class provides extensive customization options for controlling how the duplicate
+ * detection system determines similarity between music files. It supports multiple matching
+ * strategies, configurable thresholds, and various normalization options to handle the
+ * complexities of real-world music metadata variations.
+ * 
+ * <p>Core configuration categories:
+ * <ul>
+ * <li><strong>Similarity Thresholds</strong> - Percentage-based matching requirements for each field</li>
+ * <li><strong>Text Normalization</strong> - Case, punctuation, and formatting handling options</li>
+ * <li><strong>Music-Specific Rules</strong> - Artist prefixes, featuring credits, album editions</li>
+ * <li><strong>Duration Matching</strong> - Time-based tolerance for audio length comparison</li>
+ * <li><strong>Track Number Handling</strong> - Strict or flexible track number matching</li>
+ * <li><strong>Quality Parameters</strong> - Bitrate tolerance and minimum field requirements</li>
+ * </ul>
+ * 
+ * <p>Similarity threshold configuration (0-100%):
+ * <ul>
+ * <li><strong>Title Similarity</strong> - Default 85% (configurable)</li>
+ * <li><strong>Artist Similarity</strong> - Default 90% (configurable)</li>
+ * <li><strong>Album Similarity</strong> - Default 85% (configurable)</li>
+ * <li><strong>Minimum Fields to Match</strong> - Default 2 out of 4 fields (configurable 1-4)</li>
+ * </ul>
+ * 
+ * <p>Text normalization options:
+ * <ul>
+ * <li><strong>Case Sensitivity</strong> - Optional case-insensitive matching (default: ignore case)</li>
+ * <li><strong>Punctuation Handling</strong> - Optional punctuation normalization (default: ignore)</li>
+ * <li><strong>Word Order Sensitivity</strong> - Whether word order affects similarity (default: insensitive)</li>
+ * <li><strong>Artist Prefixes</strong> - Handle "The", "A", "An" prefixes (default: ignore)</li>
+ * <li><strong>Featuring Credits</strong> - Handle "feat.", "ft.", "featuring" (default: keep)</li>
+ * <li><strong>Album Editions</strong> - Handle "Deluxe", "Remastered", etc. (default: ignore)</li>
+ * </ul>
+ * 
+ * <p>Duration tolerance supports both absolute and percentage-based matching:
+ * <ul>
+ * <li><strong>Absolute Tolerance</strong> - Default ±10 seconds</li>
+ * <li><strong>Percentage Tolerance</strong> - Default ±5% of average duration</li>
+ * <li>Files match if they satisfy <em>either</em> tolerance condition</li>
+ * </ul>
+ * 
+ * <p>Pre-configured profiles for common use cases:
+ * <ul>
+ * <li><strong>Strict</strong> - 100% exact matching with all requirements</li>
+ * <li><strong>Balanced</strong> - Default settings for typical collections (recommended)</li>
+ * <li><strong>Lenient</strong> - Lower thresholds for collections with inconsistent metadata</li>
+ * </ul>
+ * 
+ * <p>Usage examples:
+ * <pre>{@code
+ * // Create default configuration
+ * FuzzySearchConfig config = new FuzzySearchConfig();
+ * 
+ * // Customize for strict matching
+ * config.setTitleSimilarityThreshold(95.0);
+ * config.setTrackNumberMustMatch(true);
+ * config.setMinimumFieldsToMatch(3);
+ * 
+ * // Use predefined profiles
+ * FuzzySearchConfig strict = FuzzySearchConfig.createStrictConfig();
+ * FuzzySearchConfig lenient = FuzzySearchConfig.createLenientConfig();
+ * 
+ * // Save and load configurations
+ * Properties props = config.toProperties();
+ * FuzzySearchConfig restored = FuzzySearchConfig.fromProperties(props);
+ * 
+ * // Use with duplicate detection
+ * boolean isDuplicate = FuzzyMatcher.areDuplicates(file1, file2, config);
+ * double similarity = FuzzyMatcher.calculateSimilarity(file1, file2, config);
+ * }</pre>
+ * 
+ * <p>All setter methods include automatic range validation to ensure sensible values.
+ * Percentage thresholds are clamped to 0-100%, and minimum field counts are constrained
+ * to 1-4 (corresponding to title, artist, album, and duration fields).
+ * 
+ * <p>The configuration can be serialized to and from Properties format for persistence,
+ * making it suitable for user preferences and configuration file storage.
+ * 
+ * @see FuzzyMatcher for the algorithms that use these configurations
+ * @see MusicFile for the data model being compared
+ * @since 1.0
  */
 public class FuzzySearchConfig {
     

@@ -8,6 +8,38 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Central database management class providing all database operations for the MP3Org application.
+ * 
+ * <p>This class manages:
+ * <ul>
+ *   <li><strong>Database Connections:</strong> Connection pooling, initialization, and cleanup</li>
+ *   <li><strong>CRUD Operations:</strong> Create, read, update, delete operations for music files</li>
+ *   <li><strong>Search Functionality:</strong> Advanced search across multiple metadata fields</li>
+ *   <li><strong>Duplicate Detection:</strong> Sophisticated fuzzy matching for finding duplicate files</li>
+ *   <li><strong>Profile Management:</strong> Multiple database profiles with dynamic switching</li>
+ *   <li><strong>Configuration Management:</strong> Dynamic configuration loading and reloading</li>
+ * </ul>
+ * 
+ * <p>The class uses SQLite as the underlying database and provides thread-safe operations
+ * through synchronized methods. It supports multiple database profiles allowing users to
+ * maintain separate music collections with different configurations.
+ * 
+ * <p><strong>Key Features:</strong>
+ * <ul>
+ *   <li>Automatic table creation and schema management</li>
+ *   <li>File type filtering based on user configuration</li>
+ *   <li>Advanced duplicate detection with configurable similarity thresholds</li>
+ *   <li>Full-text search across title, artist, album, and other metadata fields</li>
+ *   <li>Integrated file system operations (delete files from disk)</li>
+ * </ul>
+ * 
+ * @author MP3Org Development Team
+ * @version 1.0
+ * @since 1.0
+ * @see DatabaseConfig
+ * @see MusicFile
+ */
 public class DatabaseManager {
     private static DatabaseConfig config;
     private static Connection connection;
@@ -19,6 +51,22 @@ public class DatabaseManager {
         DatabaseConfig.createSampleConfigFile();
     }
 
+    /**
+     * Initializes the database connection and creates necessary tables.
+     * 
+     * <p>This method performs the following operations:
+     * <ol>
+     *   <li>Establishes a connection to the SQLite database using configuration settings</li>
+     *   <li>Creates the music_files table if it doesn't exist</li>
+     *   <li>Verifies the connection is working properly</li>
+     * </ol>
+     * 
+     * <p>The method is thread-safe and will only initialize once. Subsequent calls
+     * will be ignored if a connection already exists.
+     * 
+     * @throws RuntimeException if database initialization fails due to connection issues,
+     *                         invalid configuration, or table creation problems
+     */
     public static synchronized void initialize() {
         if (connection == null) {
             try {
@@ -41,6 +89,21 @@ public class DatabaseManager {
     }
 
 
+    /**
+     * Drops the music_files table from the database and closes the connection.
+     * 
+     * <p><strong>WARNING:</strong> This operation is destructive and will permanently
+     * delete all music file records from the database. Use with extreme caution.
+     * 
+     * <p>The method will:
+     * <ol>
+     *   <li>Execute a DROP TABLE command for the music_files table</li>
+     *   <li>Close the current database connection</li>
+     *   <li>Reset the connection to null</li>
+     * </ol>
+     * 
+     * @throws SQLException if the table cannot be dropped or connection cannot be closed
+     */
     public static synchronized void deleteMusicFilesTable() {
         String sql = "DROP TABLE music_files";
        try {
@@ -68,6 +131,24 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Creates the music_files table with the required schema if it doesn't already exist.
+     * 
+     * <p>The table schema includes:
+     * <ul>
+     *   <li><strong>id:</strong> Auto-generated primary key (BIGINT)</li>
+     *   <li><strong>file_path:</strong> Unique file system path (VARCHAR 1024)</li>
+     *   <li><strong>title, artist, album:</strong> Basic metadata (VARCHAR 255)</li>
+     *   <li><strong>genre:</strong> Music genre (VARCHAR 50)</li>
+     *   <li><strong>track_number, yr, duration_seconds:</strong> Numeric metadata (INT)</li>
+     *   <li><strong>file_size_bytes:</strong> File size in bytes (BIGINT)</li>
+     *   <li><strong>bit_rate, sample_rate:</strong> Audio quality metrics (INT)</li>
+     *   <li><strong>file_type:</strong> File extension (VARCHAR 10)</li>
+     *   <li><strong>last_modified, date_added:</strong> Timestamp fields</li>
+     * </ul>
+     * 
+     * @throws RuntimeException if table creation fails due to SQL errors or connection issues
+     */
     private static synchronized void createMusicFilesTable() {
         String sql = "CREATE TABLE music_files (" +
                 "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, " + // Keep id as the primary key
@@ -96,6 +177,18 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Gets the current database connection, initializing it if necessary.
+     * 
+     * <p>This method provides lazy initialization of the database connection.
+     * If no connection exists, it will automatically call initialize() to create one.
+     * 
+     * <p>The connection is managed as a singleton and is thread-safe through synchronization.
+     * All database operations in this class use this method to obtain the connection.
+     * 
+     * @return the active SQLite database connection
+     * @throws RuntimeException if connection initialization fails
+     */
     public static synchronized Connection getConnection() {
         if (connection == null) {
             initialize();
@@ -103,6 +196,24 @@ public class DatabaseManager {
         return connection;
     }
 
+    /**
+     * Properly closes the database connection and cleans up resources.
+     * 
+     * <p>This method should be called when the application is shutting down
+     * to ensure the database connection is properly closed and resources are released.
+     * 
+     * <p>The method:
+     * <ol>
+     *   <li>Checks if a connection exists</li>
+     *   <li>Closes the connection if it's open</li>
+     *   <li>Sets the connection reference to null</li>
+     *   <li>Logs the shutdown status</li>
+     * </ol>
+     * 
+     * <p>It's safe to call this method multiple times - subsequent calls will be ignored.
+     * 
+     * @throws RuntimeException if connection closure fails (though this is typically logged and ignored)
+     */
     public static synchronized void shutdown() {
         if (connection != null) {
             try {
@@ -234,6 +345,25 @@ public class DatabaseManager {
 
     // CRUD operations for MusicFile
 
+    /**
+     * Saves a new music file record to the database.
+     * 
+     * <p>This method performs the following operations:
+     * <ol>
+     *   <li>Checks if a file with the same path already exists in the database</li>
+     *   <li>If duplicate exists, skips insertion and logs a message</li>
+     *   <li>If new file, inserts all metadata fields into the music_files table</li>
+     *   <li>Sets the generated database ID on the MusicFile object</li>
+     *   <li>Marks the MusicFile as unmodified after successful save</li>
+     * </ol>
+     * 
+     * <p>The method handles null values appropriately for optional fields like track number,
+     * year, duration, file size, bit rate, and sample rate.
+     * 
+     * @param musicFile the MusicFile object to save (must not be null, must have a valid file path)
+     * @throws RuntimeException if database operation fails or connection is unavailable
+     * @throws IllegalArgumentException if musicFile is null or has no file path
+     */
     public static synchronized void saveMusicFile(MusicFile musicFile) {
         // Check if the music file already exists by file_path
         if (findByPath(musicFile.getFilePath()) != null) {
@@ -310,6 +440,25 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Updates an existing music file record in the database.
+     * 
+     * <p>This method only performs the update if the MusicFile has been marked as modified.
+     * If the file is not modified, the method returns immediately without database interaction
+     * for performance optimization.
+     * 
+     * <p>The update operation:
+     * <ol>
+     *   <li>Checks if the MusicFile has been modified using isModified()</li>
+     *   <li>Updates all metadata fields in the database record</li>
+     *   <li>Uses the ID field to identify which record to update</li>
+     *   <li>Marks the MusicFile as unmodified after successful update</li>
+     * </ol>
+     * 
+     * @param musicFile the MusicFile object to update (must not be null, must have a valid ID)
+     * @throws RuntimeException if database operation fails or connection is unavailable
+     * @throws IllegalStateException if musicFile has no ID (cannot update unsaved record)
+     */
     public static synchronized void updateMusicFile(MusicFile musicFile) {
         String sql = "UPDATE music_files SET file_path = ?, title = ?, artist = ?, album = ?, " +
                 "genre = ?, track_number = ?, yr = ?, duration_seconds = ?, file_size_bytes = ?, " +
@@ -413,6 +562,29 @@ public class DatabaseManager {
         return null;
     }
 
+    /**
+     * Retrieves all music files from the database with intelligent sorting and filtering.
+     * 
+     * <p>This method provides the primary data access for displaying music collections.
+     * The results are:
+     * <ul>
+     *   <li><strong>Filtered:</strong> Only includes file types enabled in configuration</li>
+     *   <li><strong>Sorted:</strong> Ordered by artist, album, title (case-insensitive), then by bit rate and duration (descending)</li>
+     *   <li><strong>Complete:</strong> All metadata fields are populated from database</li>
+     * </ul>
+     * 
+     * <p>The sorting logic prioritizes:
+     * <ol>
+     *   <li>Artist name (alphabetically, case-insensitive)</li>
+     *   <li>Album name (alphabetically, case-insensitive)</li>
+     *   <li>Track title (alphabetically, case-insensitive)</li>
+     *   <li>Higher bit rate (for quality preference)</li>
+     *   <li>Longer duration (for completeness preference)</li>
+     * </ol>
+     * 
+     * @return a list of all MusicFile objects matching the current file type filter, sorted as described
+     * @throws RuntimeException if database query fails or connection is unavailable
+     */
     public static synchronized List<MusicFile> getAllMusicFiles() {
         List<MusicFile> musicFiles = new ArrayList<>();
         String sql = "SELECT * FROM music_files WHERE 1=1" + getFileTypeFilterClause() + 
@@ -432,6 +604,29 @@ public class DatabaseManager {
         return musicFiles;
     }
 
+    /**
+     * Performs a comprehensive search across multiple metadata fields.
+     * 
+     * <p>This method searches for the given term across the following fields:
+     * <ul>
+     *   <li>Title</li>
+     *   <li>Artist</li>
+     *   <li>Album</li>
+     *   <li>Genre</li>
+     * </ul>
+     * 
+     * <p>The search is:
+     * <ul>
+     *   <li><strong>Case-insensitive:</strong> Converts both search term and data to lowercase</li>
+     *   <li><strong>Partial match:</strong> Uses SQL LIKE with wildcards for substring matching</li>
+     *   <li><strong>Filtered:</strong> Only includes file types enabled in configuration</li>
+     *   <li><strong>Sorted:</strong> Same intelligent sorting as getAllMusicFiles()</li>
+     * </ul>
+     * 
+     * @param searchTerm the text to search for across metadata fields (null or empty returns empty list)
+     * @return a list of MusicFile objects where any metadata field contains the search term
+     * @throws RuntimeException if database query fails or connection is unavailable
+     */
     public static synchronized List<MusicFile> searchMusicFiles(String searchTerm) {
         List<MusicFile> musicFiles = new ArrayList<>();
         String sql = "SELECT * FROM music_files WHERE (" +

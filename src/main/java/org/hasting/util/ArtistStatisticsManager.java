@@ -3,8 +3,62 @@ package org.hasting.util;
 import java.util.*;
 
 /**
- * Utility class for managing artist statistics and subdirectory grouping calculations.
- * Handles artist counting, alphabet-based grouping, and directory organization for music files.
+ * Advanced utility class for managing artist statistics and intelligent subdirectory grouping.
+ * 
+ * <p>This class provides sophisticated algorithms for organizing large music collections by
+ * automatically analyzing artist distributions and creating balanced directory structures.
+ * It implements intelligent grouping strategies that ensure roughly equal numbers of artists
+ * per subdirectory, improving file system performance and user navigation.
+ * 
+ * <p>Core functionality includes:
+ * <ul>
+ * <li><strong>Artist distribution analysis</strong> - Analyzes frequency of artist names by initial letters</li>
+ * <li><strong>Balanced directory grouping</strong> - Creates alphabetical ranges with even artist distribution</li>
+ * <li><strong>Configurable subdirectory counts</strong> - Supports 1-26 subdirectories with optimal defaults</li>
+ * <li><strong>Real-time statistics</strong> - Provides comprehensive statistics on collection composition</li>
+ * <li><strong>Thread-safe operations</strong> - Synchronized methods for concurrent access</li>
+ * </ul>
+ * 
+ * <p>Grouping algorithm details:
+ * <ul>
+ * <li><strong>Target balancing</strong> - Calculates optimal artists per directory based on total count</li>
+ * <li><strong>Alphabetical ranges</strong> - Creates ranges like "A-C", "D-F", handling single letters appropriately</li>
+ * <li><strong>Overflow handling</strong> - Manages edge cases where distributions don't divide evenly</li>
+ * <li><strong>Non-alphabetic handling</strong> - Excludes artists starting with non-alphabetic characters from grouping</li>
+ * </ul>
+ * 
+ * <p>The class maintains several internal collections:
+ * <ul>
+ * <li><strong>Artist/Album/Genre sets</strong> - Unique collections for deduplication and counting</li>
+ * <li><strong>Frequency maps</strong> - Letter-based frequency analysis for distribution calculations</li>
+ * <li><strong>Initial mappings</strong> - Letter-to-directory-range mappings for file organization</li>
+ * <li><strong>Statistics tracking</strong> - Comprehensive metrics on collection composition</li>
+ * </ul>
+ * 
+ * <p>Usage example:
+ * <pre>{@code
+ * // Add artists to the manager
+ * ArtistStatisticsManager.addArtist("The Beatles");
+ * ArtistStatisticsManager.addArtist("Bob Dylan");
+ * ArtistStatisticsManager.addArtist("Radiohead");
+ * 
+ * // Configure subdirectory count
+ * ArtistStatisticsManager.setNumberOfSubdirectories(8);
+ * 
+ * // Calculate optimal groupings
+ * HashMap<String, String> initials = ArtistStatisticsManager.calculateInitials();
+ * 
+ * // Get directory range for an artist
+ * String range = ArtistStatisticsManager.getDirectoryRangeForInitial("B"); // Returns "A-C" or similar
+ * }</pre>
+ * 
+ * <p>This class is designed to be used as a singleton utility with static methods.
+ * All methods are thread-safe and can be called from multiple threads simultaneously.
+ * The class maintains state between calls, so resetArtistCounts() should be called
+ * when processing a new collection.
+ * 
+ * @see FileOrganizer for file organization implementation using these statistics
+ * @since 1.0
  */
 public class ArtistStatisticsManager {
     

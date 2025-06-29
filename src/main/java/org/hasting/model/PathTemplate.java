@@ -6,8 +6,79 @@ import java.util.regex.Pattern;
 import java.util.HashMap;
 
 /**
- * Represents a configurable path template for organizing music files.
- * Supports field placeholders like {artist}, {album}, etc. with text formatting options.
+ * Configurable path template engine for systematic music file organization.
+ * 
+ * <p>This class provides a flexible templating system that generates standardized file paths
+ * for music collections based on metadata fields. It supports dynamic field substitution,
+ * multiple text formatting options, and intelligent directory grouping for large collections.
+ * 
+ * <p>Template features include:
+ * <ul>
+ * <li><strong>Field placeholders</strong> - Support for {artist}, {album}, {title}, {year}, etc.</li>
+ * <li><strong>Format specifiers</strong> - Custom formatting like {track_number:02d} for zero-padding</li>
+ * <li><strong>Text transformations</strong> - Multiple formatting options (underscore, dash, camelCase, etc.)</li>
+ * <li><strong>Subdirectory grouping</strong> - Automatic alphabetical grouping for large artist collections</li>
+ * <li><strong>Null handling</strong> - Graceful handling of missing metadata with "Unknown" defaults</li>
+ * </ul>
+ * 
+ * <p>Supported field placeholders:
+ * <ul>
+ * <li><code>{artist}</code> - Artist name</li>
+ * <li><code>{album}</code> - Album title</li>
+ * <li><code>{title}</code> - Track title</li>
+ * <li><code>{genre}</code> - Music genre</li>
+ * <li><code>{year}</code> - Release year</li>
+ * <li><code>{track_number}</code> - Track number (supports formatting like :02d)</li>
+ * <li><code>{bit_rate}</code> - Audio bitrate</li>
+ * <li><code>{sample_rate}</code> - Audio sample rate</li>
+ * <li><code>{file_type}</code> - File extension (mp3, flac, etc.)</li>
+ * <li><code>{subdirectory}</code> - Alphabetical grouping directory</li>
+ * </ul>
+ * 
+ * <p>Text formatting options:
+ * <ul>
+ * <li><strong>NONE</strong> - No formatting applied</li>
+ * <li><strong>UNDERSCORE</strong> - Replace spaces with underscores (file_name.mp3)</li>
+ * <li><strong>DASH</strong> - Replace spaces with dashes (file-name.mp3)</li>
+ * <li><strong>CAMEL_CASE</strong> - camelCase formatting (fileName.mp3)</li>
+ * <li><strong>PASCAL_CASE</strong> - PascalCase formatting (FileName.mp3)</li>
+ * <li><strong>LOWER_CASE</strong> - All lowercase (filename.mp3)</li>
+ * <li><strong>UPPER_CASE</strong> - All uppercase (FILENAME.mp3)</li>
+ * </ul>
+ * 
+ * <p>Subdirectory grouping creates balanced alphabetical ranges (e.g., "A-C", "D-F")
+ * to prevent large single directories that can slow file system operations. The grouping
+ * algorithm integrates with {@link ArtistStatisticsManager} for optimal distribution.
+ * 
+ * <p>Usage examples:
+ * <pre>{@code
+ * // Basic template
+ * PathTemplate template = new PathTemplate();
+ * template.setTemplate("{artist}/{album}/{track_number:02d}-{title}.{file_type}");
+ * 
+ * // Generate path for a music file
+ * String path = template.generatePath("/music", musicFile);
+ * // Result: "/music/The_Beatles/Abbey_Road/01-Come_Together.mp3"
+ * 
+ * // Custom formatting
+ * template.setTextFormat(TextFormat.DASH);
+ * String path2 = template.generatePath("/music", musicFile);
+ * // Result: "/music/The-Beatles/Abbey-Road/01-Come-Together.mp3"
+ * 
+ * // With subdirectory grouping
+ * template.setTemplate("{subdirectory}/{artist}/{album}/{title}.{file_type}");
+ * String path3 = template.generatePath("/music", musicFile);
+ * // Result: "/music/T-Z/The-Beatles/Abbey-Road/Come-Together.mp3"
+ * }</pre>
+ * 
+ * <p>The class is thread-safe for read operations but not for concurrent modifications.
+ * Template processing is optimized with compiled regex patterns for high-performance
+ * batch operations on large music collections.
+ * 
+ * @see MusicFile for the data model used in template processing
+ * @see ArtistStatisticsManager for subdirectory grouping algorithms
+ * @see TextFormat for available formatting options
+ * @since 1.0
  */
 public class PathTemplate {
     

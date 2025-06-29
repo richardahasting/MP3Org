@@ -23,6 +23,39 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * User interface for managing duplicate music files in the MP3Org application.
+ * 
+ * <p>This view provides functionality to:
+ * <ul>
+ * <li>Automatically detect duplicate music files using fuzzy matching algorithms</li>
+ * <li>Display duplicates in a searchable, sortable table format</li>
+ * <li>Compare potential duplicates side-by-side for manual review</li>
+ * <li>Delete unwanted duplicate files with confirmation dialogs</li>
+ * <li>Open files in external applications for detailed examination</li>
+ * <li>Handle asynchronous duplicate detection with progress feedback</li>
+ * </ul>
+ * 
+ * <p>The duplicate detection process uses sophisticated fuzzy matching based on:
+ * <ul>
+ * <li>Artist and title similarity (configurable threshold, default >90%)</li>
+ * <li>Duration comparison (within 5% tolerance)</li>
+ * <li>Bitrate analysis (prefers higher quality files)</li>
+ * <li>File path uniqueness validation</li>
+ * </ul>
+ * 
+ * <p>The interface is designed for efficient duplicate management workflows:
+ * <ul>
+ * <li>Background processing with cancellation support</li>
+ * <li>Progressive loading with user feedback</li>
+ * <li>Responsive UI that remains interactive during long operations</li>
+ * <li>Profile-aware duplicate detection (responds to database profile changes)</li>
+ * </ul>
+ * 
+ * @see MusicFile#isSimilarTo(MusicFile) for duplicate detection algorithm
+ * @see DatabaseManager#searchMusicFiles(String) for data retrieval
+ * @since 1.0
+ */
 public class DuplicateManagerView extends BorderPane implements ProfileChangeListener {
     
     private TableView<MusicFile> duplicatesTable;
@@ -36,6 +69,14 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     private ExecutorService executorService;
     private Task<List<MusicFile>> currentDuplicateTask;
     
+    /**
+     * Creates a new DuplicateManagerView with initialized components and starts
+     * asynchronous duplicate detection.
+     * 
+     * <p>The view is immediately displayed while duplicate detection runs in the
+     * background. Progress feedback is provided through progress indicators and
+     * status messages.
+     */
     public DuplicateManagerView() {
         initializeComponents();
         layoutComponents();
@@ -47,6 +88,9 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         loadDuplicatesAsync();
     }
     
+    /**
+     * Initializes all UI components including tables, progress indicators, and buttons.
+     */
     private void initializeComponents() {
         // Initialize data lists
         duplicatesData = FXCollections.observableArrayList();

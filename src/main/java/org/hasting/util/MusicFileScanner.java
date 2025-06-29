@@ -9,6 +9,58 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+/**
+ * High-performance music file scanner for recursive directory traversal and metadata extraction.
+ * 
+ * <p>This utility class provides comprehensive file system scanning capabilities specifically
+ * optimized for music file collections. It supports multiple audio formats, provides detailed
+ * progress feedback, and includes caching mechanisms for improved performance on subsequent scans.
+ * 
+ * <p>Key capabilities include:
+ * <ul>
+ * <li><strong>Multi-format support</strong> - Handles MP3, FLAC, OGG, WAV, AAC, M4A, WMA, AIFF, APE, OPUS</li>
+ * <li><strong>Recursive scanning</strong> - Traverses entire directory trees efficiently</li>
+ * <li><strong>Progress tracking</strong> - Detailed progress callbacks with file and directory counts</li>
+ * <li><strong>Metadata extraction</strong> - Extracts audio metadata using JAudioTagger library</li>
+ * <li><strong>Caching system</strong> - Caches metadata to avoid re-processing unchanged files</li>
+ * <li><strong>Cancellation support</strong> - Graceful cancellation of long-running operations</li>
+ * <li><strong>Error handling</strong> - Robust error handling for corrupted or inaccessible files</li>
+ * </ul>
+ * 
+ * <p>Performance features:
+ * <ul>
+ * <li><strong>File filtering</strong> - Pre-filters files by extension before processing</li>
+ * <li><strong>Batch processing</strong> - Processes files in batches for memory efficiency</li>
+ * <li><strong>Directory counting</strong> - Pre-counts directories for accurate progress reporting</li>
+ * <li><strong>Metadata caching</strong> - Avoids re-reading unchanged file metadata</li>
+ * </ul>
+ * 
+ * <p>Progress tracking provides multiple callback mechanisms:
+ * <ul>
+ * <li><strong>Status callbacks</strong> - High-level status messages for user feedback</li>
+ * <li><strong>Progress callbacks</strong> - Numeric progress percentages (0-100)</li>
+ * <li><strong>File processing callbacks</strong> - Individual file processing notifications</li>
+ * <li><strong>Detailed progress callbacks</strong> - Comprehensive progress data structures</li>
+ * </ul>
+ * 
+ * <p>Usage example:
+ * <pre>{@code
+ * MusicFileScanner scanner = new MusicFileScanner();
+ * scanner.setStatusCallback(status -> System.out.println(status));
+ * scanner.setProgressCallback(percent -> updateProgressBar(percent));
+ * 
+ * List<String> directories = Arrays.asList("/music/rock", "/music/jazz");
+ * List<MusicFile> musicFiles = scanner.scanDirectories(directories);
+ * }</pre>
+ * 
+ * <p>The scanner is designed to be reusable across multiple scanning operations while
+ * maintaining state for caching and progress tracking. All callback operations are
+ * performed on the calling thread, so UI updates may require additional threading considerations.
+ * 
+ * @see MusicFile for the data model produced by scanning
+ * @see ScanProgress for detailed progress information structure
+ * @since 1.0
+ */
 public class MusicFileScanner {
     private static final Logger logger = Logger.getLogger(MusicFileScanner.class.getName());
     // create a javafx UI that allows the user to select one or more  directories, and then calls

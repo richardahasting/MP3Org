@@ -7,8 +7,61 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Utility class for fuzzy string matching and duplicate detection.
- * Implements various string similarity algorithms and music-specific matching logic.
+ * Advanced utility class for fuzzy string matching and duplicate music file detection.
+ * 
+ * <p>This class implements sophisticated algorithms for determining similarity between
+ * music files based on metadata fields. It provides configurable fuzzy matching that
+ * accounts for common variations in music metadata such as different spellings,
+ * punctuation, prefixes, and formatting differences.
+ * 
+ * <p>Core similarity algorithms implemented:
+ * <ul>
+ * <li><strong>Jaro-Winkler similarity</strong> - Primary algorithm optimized for names and titles</li>
+ * <li><strong>Levenshtein distance</strong> - Edit distance calculation for exact differences</li>
+ * <li><strong>Duration comparison</strong> - Time-based matching with configurable tolerances</li>
+ * <li><strong>Track number validation</strong> - Exact or fuzzy track number matching</li>
+ * </ul>
+ * 
+ * <p>Music-specific normalizations:
+ * <ul>
+ * <li><strong>Artist prefixes</strong> - Handles "The", "A", "An" prefixes intelligently</li>
+ * <li><strong>Featuring artists</strong> - Optionally ignores "feat.", "ft.", "featuring" variations</li>
+ * <li><strong>Album editions</strong> - Handles "Deluxe", "Remastered", "Special Edition" variants</li>
+ * <li><strong>Punctuation normalization</strong> - Configurable punctuation and spacing handling</li>
+ * <li><strong>Case sensitivity</strong> - Optional case-insensitive matching</li>
+ * </ul>
+ * 
+ * <p>Duplicate detection workflow:
+ * <ol>
+ * <li>Normalize field values based on configuration settings</li>
+ * <li>Calculate similarity scores for title, artist, and album fields</li>
+ * <li>Check duration compatibility within specified tolerances</li>
+ * <li>Validate track number requirements if configured</li>
+ * <li>Apply minimum field matching criteria</li>
+ * <li>Return composite similarity score or boolean duplicate status</li>
+ * </ol>
+ * 
+ * <p>All methods are static and thread-safe. The class uses compiled regex patterns
+ * for efficient text processing and caches normalization results where appropriate.
+ * 
+ * <p>Usage examples:
+ * <pre>{@code
+ * // Basic duplicate check
+ * boolean isDupe = FuzzyMatcher.areDuplicates(file1, file2, config);
+ * 
+ * // Get detailed similarity score
+ * double similarity = FuzzyMatcher.calculateSimilarity(file1, file2, config);
+ * 
+ * // Find all duplicates in a collection
+ * List<MusicFile> dupes = FuzzyMatcher.findFuzzyDuplicates(files, config);
+ * 
+ * // Group duplicates together
+ * List<List<MusicFile>> groups = FuzzyMatcher.groupDuplicates(files, config);
+ * }</pre>
+ * 
+ * @see FuzzySearchConfig for configuration options
+ * @see MusicFile for the data model being compared
+ * @since 1.0
  */
 public class FuzzyMatcher {
     

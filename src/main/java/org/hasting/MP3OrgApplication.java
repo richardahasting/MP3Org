@@ -16,8 +16,49 @@ import org.hasting.ui.ConfigurationView;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.HelpSystem;
 
+/**
+ * Main application class for MP3Org - Music Collection Manager.
+ * 
+ * <p>MP3Org is a comprehensive music collection management application that provides:
+ * <ul>
+ *   <li>Duplicate song detection and removal</li>
+ *   <li>Metadata editing and correction</li>
+ *   <li>File organization and directory structuring</li>
+ *   <li>Import and scanning of music collections</li>
+ *   <li>Configuration management with database profiles</li>
+ * </ul>
+ * 
+ * <p>The application uses a tabbed interface to organize functionality into distinct modules:
+ * <ul>
+ *   <li><strong>Duplicate Manager</strong> - Find and manage duplicate songs</li>
+ *   <li><strong>Metadata Editor</strong> - Edit song information and metadata</li>
+ *   <li><strong>Import & Organize</strong> - Scan directories and organize files</li>
+ *   <li><strong>Configuration</strong> - Manage settings and database profiles</li>
+ * </ul>
+ * 
+ * <p>Supported audio formats include: MP3, FLAC, M4A, WAV, OGG, WMA, AIFF, APE, OPUS
+ * 
+ * @author MP3Org Development Team
+ * @version 1.0
+ * @since 1.0
+ */
 public class MP3OrgApplication extends Application {
 
+    /**
+     * Starts the MP3Org application by initializing the user interface and database.
+     * 
+     * <p>This method performs the following initialization steps:
+     * <ol>
+     *   <li>Initializes the database manager and connections</li>
+     *   <li>Creates the main window layout with menu bar and tab pane</li>
+     *   <li>Sets up the four main functional tabs (Duplicate Manager, Metadata Editor, Import & Organize, Configuration)</li>
+     *   <li>Configures keyboard shortcuts and tooltips</li>
+     *   <li>Displays the main application window</li>
+     * </ol>
+     * 
+     * @param primaryStage the primary stage for this application, onto which the application scene can be set
+     * @throws RuntimeException if database initialization fails or UI components cannot be created
+     */
     @Override
     public void start(Stage primaryStage) {
         // Initialize database
@@ -77,6 +118,19 @@ public class MP3OrgApplication extends Application {
         primaryStage.show();
     }
     
+    /**
+     * Creates and configures the main menu bar for the application.
+     * 
+     * <p>Currently provides a Help menu with the following items:
+     * <ul>
+     *   <li>Getting Started (Ctrl+H) - Opens the getting started guide</li>
+     *   <li>MP3Org Help (F1) - Opens the general help system</li>
+     *   <li>About MP3Org - Shows application information dialog</li>
+     * </ul>
+     * 
+     * @param primaryStage the main application stage, used as parent for dialogs
+     * @return a configured MenuBar with help menu and keyboard shortcuts
+     */
     private MenuBar createMenuBar(Stage primaryStage) {
         MenuBar menuBar = new MenuBar();
         
@@ -100,6 +154,18 @@ public class MP3OrgApplication extends Application {
         return menuBar;
     }
     
+    /**
+     * Configures global keyboard shortcuts for the application.
+     * 
+     * <p>Sets up the following keyboard shortcuts:
+     * <ul>
+     *   <li><strong>F1</strong> - Opens general help</li>
+     *   <li><strong>Ctrl+H</strong> - Opens getting started guide</li>
+     * </ul>
+     * 
+     * @param scene the main application scene to attach shortcuts to
+     * @param primaryStage the main stage, used as parent for help dialogs
+     */
     private void setupKeyboardShortcuts(Scene scene, Stage primaryStage) {
         scene.getAccelerators().put(
             new KeyCodeCombination(KeyCode.F1),
@@ -112,6 +178,19 @@ public class MP3OrgApplication extends Application {
         );
     }
     
+    /**
+     * Displays the About dialog with application information.
+     * 
+     * <p>The dialog includes:
+     * <ul>
+     *   <li>Application version and description</li>
+     *   <li>List of main features and capabilities</li>
+     *   <li>Supported audio file formats</li>
+     *   <li>Help system access information</li>
+     * </ul>
+     * 
+     * @param owner the parent stage for the dialog (used for proper dialog positioning and modality)
+     */
     private void showAboutDialog(Stage owner) {
         Alert aboutDialog = new Alert(Alert.AlertType.INFORMATION);
         aboutDialog.initOwner(owner);
@@ -130,6 +209,19 @@ public class MP3OrgApplication extends Application {
         aboutDialog.showAndWait();
     }
 
+    /**
+     * Performs cleanup operations when the application is shutting down.
+     * 
+     * <p>This method is automatically called by the JavaFX framework when the application
+     * is closing. It ensures proper cleanup of resources including:
+     * <ul>
+     *   <li>Closing database connections</li>
+     *   <li>Releasing any held resources</li>
+     *   <li>Logging shutdown status</li>
+     * </ul>
+     * 
+     * @throws RuntimeException if cleanup operations fail (though application will still terminate)
+     */
     @Override
     public void stop() {
         // Clean up database connection if needed
@@ -137,6 +229,15 @@ public class MP3OrgApplication extends Application {
         System.out.println("Application shutting down...");
     }
 
+    /**
+     * Main entry point for the MP3Org application.
+     * 
+     * <p>Launches the JavaFX application by calling the inherited {@code launch} method.
+     * This method will create an instance of {@code MP3OrgApplication} and call its
+     * {@code start} method on the JavaFX Application Thread.
+     * 
+     * @param args command line arguments passed to the application (currently unused)
+     */
     public static void main(String[] args) {
         launch(args);
     }

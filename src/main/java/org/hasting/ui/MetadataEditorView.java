@@ -22,6 +22,43 @@ import java.awt.Desktop;
 import java.io.File;
 import java.util.List;
 
+/**
+ * User interface for searching, viewing, and editing music file metadata in the MP3Org application.
+ * 
+ * <p>This view provides comprehensive metadata management functionality including:
+ * <ul>
+ * <li>Advanced search capabilities with multiple criteria (title, artist, album, genre)</li>
+ * <li>Real-time search results display in sortable, filterable tables</li>
+ * <li>Individual file metadata editing with validation</li>
+ * <li>Bulk editing operations for multiple selected files</li>
+ * <li>File system integration (open files, show in folder)</li>
+ * <li>Database synchronization and persistence</li>
+ * </ul>
+ * 
+ * <p>Search functionality supports:
+ * <ul>
+ * <li>Partial text matching across all metadata fields</li>
+ * <li>Case-insensitive search operations</li>
+ * <li>Real-time filtering as the user types</li>
+ * <li>Multiple search criteria combinations</li>
+ * </ul>
+ * 
+ * <p>Editing capabilities include:
+ * <ul>
+ * <li>Single file editing with immediate validation feedback</li>
+ * <li>Bulk editing for applying changes to multiple files simultaneously</li>
+ * <li>Automatic database updates with rollback on errors</li>
+ * <li>Change tracking and user confirmation for destructive operations</li>
+ * </ul>
+ * 
+ * <p>The interface is profile-aware and automatically refreshes when the active
+ * database profile changes, ensuring users always see current data.
+ * 
+ * @see MusicFile for the underlying data model
+ * @see DatabaseManager#searchMusicFiles(String) for search implementation
+ * @see DatabaseManager#updateMusicFile(MusicFile) for persistence
+ * @since 1.0
+ */
 public class MetadataEditorView extends BorderPane implements ProfileChangeListener {
     
     private TextField searchField;

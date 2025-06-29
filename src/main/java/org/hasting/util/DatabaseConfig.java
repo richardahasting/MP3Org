@@ -8,12 +8,81 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Configuration class for managing database location and connection settings.
- * Supports multiple configuration sources in order of precedence:
- * 1. System properties (-Dmp3org.database.path=...)
- * 2. Environment variables (MP3ORG_DATABASE_PATH)
- * 3. Configuration file (mp3org.properties)
- * 4. Default location (./mp3org)
+ * Centralized configuration management for database connectivity and application settings.
+ * 
+ * <p>This singleton class provides a comprehensive configuration system that supports
+ * multiple configuration sources with clear precedence ordering. It manages database
+ * connectivity, file type filtering, and profile-based configuration switching for
+ * the MP3Org application.
+ * 
+ * <p>Configuration source precedence (highest to lowest):
+ * <ol>
+ * <li><strong>Active Database Profile</strong> - User-defined profiles with complete settings</li>
+ * <li><strong>System Properties</strong> - JVM arguments like {@code -Dmp3org.database.path=/path}</li>
+ * <li><strong>Environment Variables</strong> - {@code MP3ORG_DATABASE_PATH} and related vars</li>
+ * <li><strong>Configuration File</strong> - {@code mp3org.properties} in current or home directory</li>
+ * <li><strong>Default Values</strong> - Built-in defaults ({@code ./mp3org} database path)</li>
+ * </ol>
+ * 
+ * <p>Key features include:
+ * <ul>
+ * <li><strong>Profile Management</strong> - Multiple database profiles with easy switching</li>
+ * <li><strong>File Type Filtering</strong> - Configurable support for audio file formats</li>
+ * <li><strong>Path Normalization</strong> - Automatic path resolution and directory creation</li>
+ * <li><strong>JDBC Configuration</strong> - Apache Derby embedded database setup</li>
+ * <li><strong>Dynamic Reconfiguration</strong> - Runtime configuration changes with persistence</li>
+ * <li><strong>Legacy Compatibility</strong> - Backward compatibility with older configuration methods</li>
+ * </ul>
+ * 
+ * <p>Supported audio file types:
+ * <ul>
+ * <li><strong>MP3</strong> - MPEG Audio Layer 3</li>
+ * <li><strong>FLAC</strong> - Free Lossless Audio Codec</li>
+ * <li><strong>OGG</strong> - Ogg Vorbis</li>
+ * <li><strong>WAV</strong> - Waveform Audio File Format</li>
+ * <li><strong>AAC</strong> - Advanced Audio Coding</li>
+ * <li><strong>M4A</strong> - MPEG-4 Audio</li>
+ * <li><strong>WMA</strong> - Windows Media Audio</li>
+ * <li><strong>AIFF</strong> - Audio Interchange File Format</li>
+ * <li><strong>APE</strong> - Monkey's Audio</li>
+ * <li><strong>OPUS</strong> - Opus Audio Codec</li>
+ * </ul>
+ * 
+ * <p>Database configuration uses Apache Derby embedded database with automatic
+ * table creation and schema management. Connection pooling and transaction
+ * management are handled by the {@link DatabaseManager} class.
+ * 
+ * <p>Usage examples:
+ * <pre>{@code
+ * // Get configuration instance
+ * DatabaseConfig config = DatabaseConfig.getInstance();
+ * 
+ * // Check current database path
+ * String dbPath = config.getDatabasePath();
+ * 
+ * // Change database location
+ * config.setDatabasePath("/new/database/path");
+ * 
+ * // Configure file types
+ * Set<String> types = Set.of("mp3", "flac", "wav");
+ * config.setEnabledFileTypes(types);
+ * 
+ * // Switch between profiles
+ * config.switchToProfileByName("Work Collection");
+ * 
+ * // Get JDBC connection details
+ * String jdbcUrl = config.getJdbcUrl();
+ * String driver = config.getJdbcDriver();
+ * }</pre>
+ * 
+ * <p>The class is thread-safe and uses synchronized methods for configuration
+ * changes. All configuration modifications are automatically persisted to ensure
+ * settings survive application restarts.
+ * 
+ * @see DatabaseManager for database operations using this configuration
+ * @see DatabaseProfile for profile-based configuration management
+ * @see DatabaseProfileManager for profile lifecycle management
+ * @since 1.0
  */
 public class DatabaseConfig {
     
