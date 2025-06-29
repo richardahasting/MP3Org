@@ -16,7 +16,11 @@
       "Bash(command gh issue view 4 --repo richardahasting/MP3Org)",
       "Bash(command gh issue view 3 --repo richardahasting/MP3Org)",
       "Bash(command gh issue list --repo richardahasting/MP3Org --state open)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(command gh issue close 7 --repo richardahasting/MP3Org --comment \"Completed: Renamed 'Subdirectory Depth' to 'Subdirectory Groups' in ConfigurationView for better clarity. Reduced maximum from 12 to 10 and improved help text to explain the distribution behavior accurately.\")",
+      "Bash(command gh issue close 8 --repo richardahasting/MP3Org --comment \"Completed: Implemented comprehensive profile change notification system with ProfileChangeListener interface and ProfileChangeNotifier singleton. MetadataEditorView and DuplicateManagerView now automatically reset MusicFile lists when profiles or database locations change, with auto-prompt for new database initialization.\")",
+      "Bash(mvn compile:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
