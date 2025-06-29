@@ -1,7 +1,9 @@
 package org.hasting.model;
 
+import org.hasting.util.ArtistStatisticsManager;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.HashMap;
 
 /**
  * Represents a configurable path template for organizing music files.
@@ -75,9 +77,9 @@ public class PathTemplate {
      */
     private String generateSubdirectory(MusicFile musicFile) {
         // Set the subdirectory levels and regenerate initials if needed
-        if (MusicFile.getNumberOfSubdirectorys() != subdirectoryLevels) {
-            MusicFile.setNumberOfSubdirectorys(subdirectoryLevels);
-            MusicFile.resetArtistCounts(); // This will force regeneration
+        if (ArtistStatisticsManager.getNumberOfSubdirectories() != subdirectoryLevels) {
+            ArtistStatisticsManager.setNumberOfSubdirectories(subdirectoryLevels);
+            ArtistStatisticsManager.resetArtistCounts(); // This will force regeneration
         }
         
         String artist = musicFile.getArtist();
@@ -90,17 +92,9 @@ public class PathTemplate {
             return "Misc";
         }
         
-        // Use reflection to access the static whatInitials method and initials map
-        try {
-            java.lang.reflect.Method whatInitialsMethod = MusicFile.class.getDeclaredMethod("whatInitials");
-            whatInitialsMethod.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            java.util.HashMap<String, String> initials = (java.util.HashMap<String, String>) whatInitialsMethod.invoke(null);
-            return initials.getOrDefault(firstLetter, "misc");
-        } catch (Exception e) {
-            // Fallback to simple grouping if reflection fails
-            return firstLetter;
-        }
+        // Get the directory range for this initial letter
+        HashMap<String, String> initials = ArtistStatisticsManager.getInitials();
+        return initials.getOrDefault(firstLetter, "misc");
     }
     
     /**

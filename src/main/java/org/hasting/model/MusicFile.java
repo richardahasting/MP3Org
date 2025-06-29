@@ -1,17 +1,13 @@
 package org.hasting.model;
 
 import org.hasting.util.StringUtils;
-import org.jaudiotagger.audio.AudioFile;
-import org.jaudiotagger.audio.AudioFileIO;
-import org.jaudiotagger.audio.AudioHeader;
-import org.jaudiotagger.tag.FieldKey;
-import org.jaudiotagger.tag.Tag;
+import org.hasting.util.MusicFileComparator;
+import org.hasting.util.ArtistStatisticsManager;
+import org.hasting.util.FileOrganizer;
+import org.hasting.util.MetadataExtractor;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -19,19 +15,6 @@ public class MusicFile {
 
     final private static int DEFAULT_NUM_OF_SIMILAR_FILES = 10;
 
-    private static Set<String> artistNames = new HashSet<>(Arrays.asList("Unknown"));
-    private static Set<String> albumNames = new HashSet<>(Arrays.asList("Unknown"));
-    private static Set<String> genreNames = new HashSet<>(Arrays.asList("Unknown"));
-
-    private static HashMap<String, Integer> firstFieldMap = new HashMap<>();
-    private static HashMap<String, Integer> albumMap = new HashMap<>();
-    private static HashMap<String, Integer> genreMap = new HashMap<>();
-    private static HashMap<String, Integer> initialsMap = new HashMap<>();
-    private static int totalFirstFieldWithAlphaNames = 0;
-    private static int totalAlbumNamesWithAlphaNames = 0;
-    private static int totalGenreNamesWithAlphaNames = 0;
-
-    private static HashMap<String, String> initials = new HashMap<>();
 
     private Long id;
     private String filePath;
@@ -56,15 +39,21 @@ public class MusicFile {
     public enum Fields {
         TITLE, ARTIST, ALBUM, GENRE, TRACK_NUMBER, YEAR, BIT_RATE, SAMPLE_RATE;
     }
+    /**
+     * @deprecated Use {@link ArtistStatisticsManager#getNumberOfSubdirectories()} instead
+     */
+    @Deprecated
     public static int getNumberOfSubdirectorys() {
-        return numberOfSubdirectorys;
+        return ArtistStatisticsManager.getNumberOfSubdirectories();
     }
 
+    /**
+     * @deprecated Use {@link ArtistStatisticsManager#setNumberOfSubdirectories(int)} instead
+     */
+    @Deprecated
     public static void setNumberOfSubdirectorys(int numberOfSubdirectorys) {
-        MusicFile.numberOfSubdirectorys = numberOfSubdirectorys;
+        ArtistStatisticsManager.setNumberOfSubdirectories(numberOfSubdirectorys);
     }
-
-    private static int numberOfSubdirectorys = 7;
 
     public String getField (Fields field) {
         String value = null;
@@ -122,103 +111,20 @@ public class MusicFile {
      */
     public MusicFile(File musicFile) {
         this();  // Call default constructor to set dateAdded
-
-        try {
-            // Set basic file information
-            this.filePath = musicFile.getAbsolutePath();
-            this.fileType = getFileExtension(musicFile.getName());
-            this.fileSizeBytes = musicFile.length();
-            this.lastModified = new Date(musicFile.lastModified());
-
-            // Extract audio metadata using JAudioTagger
-            AudioFile audioFile = AudioFileIO.read(musicFile);
-
-            // Get audio header information
-            AudioHeader header = audioFile.getAudioHeader();
-            if (header != null) {
-                this.durationSeconds = header.getTrackLength();
-                this.bitRate = header.getBitRateAsNumber();
-                this.sampleRate = header.getSampleRateAsNumber();
-            }
-
-            // Get tag information
-            Tag tag = audioFile.getTag();
-            if (tag != null) {
-                // Extract basic metadata
-                this.title = getTagField(tag, FieldKey.TITLE);
-                this.artist = getTagField(tag, FieldKey.ARTIST);
-                if (this.artist != null)
-                    artistNames.add(this.artist);  // Add artist to set of known artists
-                this.album = getTagField(tag, FieldKey.ALBUM);
-                if (this.album!= null)
-                    albumNames.add(this.album);  // Add album to set of known albums
-                this.genre = getTagField(tag, FieldKey.GENRE);
-                if (this.genre!= null)
-                    genreNames.add(this.genre);  // Add genre to set of known genres
-
-                // Extract track number
-                String trackNumberStr = getTagField(tag, FieldKey.TRACK);
-                if (trackNumberStr != null && !trackNumberStr.isEmpty()) {
-                    try {
-                        // Handle track numbers in format "1/10"
-                        if (trackNumberStr.contains("/")) {
-                            trackNumberStr = trackNumberStr.split("/")[0];
-                        }
-                        this.trackNumber = Integer.parseInt(trackNumberStr.trim());
-                    } catch (NumberFormatException e) {
-                        // Ignore parsing errors
-                    }
-                }
-
-                // Extract year
-                String yearStr = getTagField(tag, FieldKey.YEAR);
-                if (yearStr != null && !yearStr.isEmpty()) {
-                    try {
-                        this.year = Integer.parseInt(yearStr.trim());
-                    } catch (NumberFormatException e) {
-                        // Ignore parsing errors
-                    }
-                }
-            }
-
-            // Use filename as title if no title was found
-            if (this.title == null || this.title.isEmpty()) {
-                this.title = getFilenameWithoutExtension(musicFile.getName());
-            }
-
-        } catch (Exception e) {
-            // Log error and set basic file information
-            System.err.println("Error reading metadata from file: " + musicFile.getAbsolutePath());
-            System.err.println(e.getMessage());
-
-            // Set basic information even if metadata extraction fails
-            this.filePath = musicFile.getAbsolutePath();
-            this.fileType = getFileExtension(musicFile.getName());
-            this.fileSizeBytes = musicFile.length();
-            this.lastModified = new Date(musicFile.lastModified());
-            this.title = getFilenameWithoutExtension(musicFile.getName());
-        }
+        
+        // Use MetadataExtractor to populate this object with metadata
+        MetadataExtractor.extractMetadata(this, musicFile);
     }
 
     /**
      * Comparator for MusicFile objects that compares based on fuzzy match scores
      * of both the artist and the title, and considers track numbers if available.
+     * 
+     * @deprecated Use {@link MusicFileComparator#createFuzzyComparator(MusicFile)} instead
      */
+    @Deprecated
     public static Comparator<MusicFile> fuzzyComparator(MusicFile target) {
-        return (MusicFile mf1, MusicFile mf2) -> {
-            // Fuzzy match scores for artist and title
-            int artistScore1 = StringUtils.fuzzyMatch(mf1.getArtist(), target.getArtist());
-            int artistScore2 = StringUtils.fuzzyMatch(mf2.getArtist(), target.getArtist());
-
-            int titleScore1 = StringUtils.fuzzyMatch(mf1.getTitle(), target.getTitle());
-            int titleScore2 = StringUtils.fuzzyMatch(mf2.getTitle(), target.getTitle());
-
-            int totalScore1 = artistScore1 + titleScore1;
-            int totalScore2 = artistScore2 + titleScore2;
-
-            // Higher total score means closer match, so we reverse the order for descending
-            return Integer.compare(totalScore2, totalScore1);
-        };
+        return MusicFileComparator.createFuzzyComparator(target);
     }
 
     /**
@@ -229,35 +135,11 @@ public class MusicFile {
      * @param matchByTitle  If true, compare by title.
      * @param matchByArtist If true, compare by artist.
      * @return A Comparator that prioritizes exact matches.
+     * @deprecated Use {@link MusicFileComparator#createExactMatchComparator(MusicFile, boolean, boolean)} instead
      */
+    @Deprecated
     public static Comparator<MusicFile> exactMatchComparator(MusicFile target, boolean matchByTitle, boolean matchByArtist) {
-        return (MusicFile mf1, MusicFile mf2) -> {
-            int matchScore1 = 0;
-            int matchScore2 = 0;
-
-            if (matchByTitle) {
-                String targetTitle = target.getTitle().replaceAll("\\s+", "").toLowerCase();
-                if (mf1.getTitle().replaceAll("\\s+", "").equalsIgnoreCase(targetTitle)) {
-                    matchScore1++;
-                }
-                if (mf2.getTitle().replaceAll("\\s+", "").equalsIgnoreCase(targetTitle)) {
-                    matchScore2++;
-                }
-            }
-
-            if (matchByArtist) {
-                String targetArtist = target.getArtist().replaceAll("\\s+", "").toLowerCase();
-                if (mf1.getArtist().replaceAll("\\s+", "").equalsIgnoreCase(targetArtist)) {
-                    matchScore1++;
-                }
-                if (mf2.getArtist().replaceAll("\\s+", "").equalsIgnoreCase(targetArtist)) {
-                    matchScore2++;
-                }
-            }
-
-            // Higher match score means closer match
-            return Integer.compare(matchScore2, matchScore1);
-        };
+        return MusicFileComparator.createExactMatchComparator(target, matchByTitle, matchByArtist);
     }
 
     /**
@@ -268,114 +150,29 @@ public class MusicFile {
      * @param target     The target MusicFile to compare against.
      * @param num        The number of most similar MusicFile objects to return.
      * @return A list of the 'num' most similar MusicFile objects.
+     * @deprecated Use {@link MusicFileComparator#findMostSimilarFiles(List, MusicFile, int)} instead
      */
+    @Deprecated
     public static List<MusicFile> findMostSimilarFiles(List<MusicFile> musicFiles, MusicFile target, int num) {
-        final String currentFilePath = target.getFilePath();
-        return musicFiles.stream()
-                .filter(mf -> !mf.getFilePath().equals(currentFilePath)) // Filter out files with the same path
-                .sorted(fuzzyComparator(target))
-                .limit(num)
-                .collect(Collectors.toList());
+        return MusicFileComparator.findMostSimilarFiles(musicFiles, target, num);
     }
 
+    /**
+     * @deprecated Use {@link ArtistStatisticsManager#resetArtistCounts()} instead
+     */
+    @Deprecated
     public static void resetArtistCounts() {
-        firstFieldMap.clear();
-        totalFirstFieldWithAlphaNames = 0;
-        totalAlbumNamesWithAlphaNames = 0;
-        totalGenreNamesWithAlphaNames = 0;
-        artistNames.clear();
-        albumNames.clear();
-        genreNames.clear();
-        initials.clear();
-        albumMap.clear();
-        genreMap.clear();
+        ArtistStatisticsManager.resetArtistCounts();
     }
 
-    private static void countFirstFieldByLetters() {
-        List<String> artists = new ArrayList<>(artistNames.stream().toList());
-        totalFirstFieldWithAlphaNames = 0;
-        for (String artist : artists) {
-            String artistInitial = artist.substring(0, 1).toUpperCase();
-            if (artistInitial.matches("[A-Z]")) {// only count artists with at least alpha names
-                Integer count = firstFieldMap.getOrDefault(artistInitial, 0);
-                totalFirstFieldWithAlphaNames++;
-                System.out.println(String.format("%s: %d", artistInitial, count));
-                count++;
-                firstFieldMap.put(artistInitial, count); // Reset the count for the artist
-            }
-        }
-    }
-
+    /**
+     * @deprecated Use {@link ArtistStatisticsManager#calculateInitials()} instead
+     */
+    @Deprecated
     private static synchronized HashMap<String, String> whatInitials() {
-        if (firstFieldMap.isEmpty()) {
-            countFirstFieldByLetters();
-        }
-        int totalDirsCreated = 0;
-        initials = new HashMap<>();
-        final int targetTally = totalFirstFieldWithAlphaNames / 8 -5; // 8 directories for artists
-
-        // we want 8 directories for artists, format a-c, d-f ... and misc artists go to "misc" so 9 total directories
-
-        for (char currentChar = 'A'; currentChar <= 'Z'; ) {
-            char startingChar = currentChar;
-            int currentTally = 0;
-            while ((totalDirsCreated >= numberOfSubdirectorys || currentTally < targetTally) && currentChar <= 'Z') {
-                Integer artistCounterAtCurrentChar = firstFieldMap.getOrDefault(Character.toString(currentChar), 0);
-                if (totalDirsCreated < numberOfSubdirectorys && artistCounterAtCurrentChar / 2 + currentTally > targetTally)
-                    currentTally = targetTally + 1;
-                else {
-                    currentTally += artistCounterAtCurrentChar;
-                    currentChar++;
-                }
-            }
-            totalDirsCreated++;
-            char endingChar = currentChar;
-            if (endingChar > startingChar) endingChar--;  // adjust endingChar to account for last artist in the range  }
-            String initialString = startingChar + "-" + endingChar;
-            if (startingChar == endingChar) {
-                initialString = "" + startingChar;
-            }
-            while (startingChar <= endingChar) {
-                initials.put(Character.toString(startingChar), initialString);
-                startingChar++;
-            }
-        }
-        return initials;
+        return ArtistStatisticsManager.calculateInitials();
     }
 
-    /**
-     * Helper method to safely get a tag field
-     */
-    private String getTagField(Tag tag, FieldKey key) {
-        try {
-            String value = tag.getFirst(key);
-            return value != null && !value.isEmpty() ? value : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /**
-     * Helper method to get file extension
-     */
-    private String getFileExtension(String filename) {
-        int lastDotIndex = filename.lastIndexOf('.');
-        if (lastDotIndex > 0) {
-            return filename.substring(lastDotIndex + 1).toLowerCase();
-        }
-        return "";
-    }
-
-    /**
-     * Helper method to get filename without extension
-     */
-    private String getFilenameWithoutExtension(String filename) {
-        int lastDotIndex = filename.lastIndexOf('.');
-        if (lastDotIndex > 0) {
-            return filename.substring(0, lastDotIndex);
-        }
-        return filename;
-    }
 
     // Getters and setters
     public Long getId() {
@@ -413,7 +210,7 @@ public class MusicFile {
         this.artist = artist;
         this.isModified = true;
         if (artist != null)
-            artistNames.add(artist);  // Add artist to set of known artists
+            ArtistStatisticsManager.addArtist(artist);  // Add artist to set of known artists
     }
 
     public String getAlbum() {
@@ -542,62 +339,15 @@ public class MusicFile {
      * @return true if the songs are likely the same, false otherwise.
      */
     public boolean isItLikelyTheSameSong(MusicFile other) {
-        if (other == null) {
-            return false;
-        }
-
-        if (this.title == null || other.title == null) {
-            return false;
-        }
-        if (this.artist == null || other.artist == null) {
-            return false;
-        }
-        if (this.album == null || other.album == null) {
-            return false;
-        }
-        if (this.getBitRate() >= 192L) { // wanting to get rid of possible lower bitrate files
-            return false;
-        }
-
-        // Check track numbers
-        if (this.trackNumber != null && other.trackNumber != null &&
-                this.trackNumber != 0 && other.trackNumber != 0 &&
-                !this.trackNumber.equals(other.trackNumber)) {
-            return false; // Track numbers differ
-        }
-
-        // Fuzzy match scores for title and artist
-        int titleScore = StringUtils.fuzzyMatch(this.title, other.title);
-        int artistScore = StringUtils.fuzzyMatch(this.artist, other.artist);
-
-        // Check if duration is within 10%
-        boolean durationMatch = false;
-        int durationDifference = 1000;
-        if (this.durationSeconds != null && other.durationSeconds != null) {
-            durationDifference = Math.abs(this.durationSeconds - other.durationSeconds);
-            int maxAllowedDifference = (int) (0.05 * Math.max(this.durationSeconds, other.durationSeconds));
-            durationMatch = durationDifference <= maxAllowedDifference;
-        }
-
-        // Fuzzy match score for album if not null
-        int albumScore = 0;
-        if (this.album != null && other.album != null) {
-            albumScore = StringUtils.fuzzyMatch(this.album, other.album);
-        }
-
-        // Determine if it's likely the same song based on scores and duration match
-        if (durationMatch && durationDifference < 3 && titleScore > 90) {
-            return true;
-        }
-        return titleScore > 90 && artistScore > 90 && durationMatch && (this.album == null || albumScore > 90);
+        return MusicFileComparator.isLikelyTheSameSong(this, other);
     }
 
     public List<MusicFile> findMostSimilarFiles(List<MusicFile> musicFiles, int num) {
-        return findMostSimilarFiles(musicFiles, this, num);
+        return MusicFileComparator.findMostSimilarFiles(musicFiles, this, num);
     }
 
     public List<MusicFile> findMostSimilarFiles(List<MusicFile> musicFiles) {
-        return findMostSimilarFiles(musicFiles, this, DEFAULT_NUM_OF_SIMILAR_FILES);
+        return MusicFileComparator.findMostSimilarFiles(musicFiles, this);
     }
 
     /**
@@ -645,9 +395,7 @@ public class MusicFile {
      * @return A string representing the new file name and location.
      */
     public String newFileNameAndLocation(String startingPath) {
-        // Use default template for backward compatibility
-        PathTemplate defaultTemplate = new PathTemplate();
-        return newFileNameAndLocation(startingPath, defaultTemplate);
+        return FileOrganizer.generateFilePath(this, startingPath);
     }
 
     /**
@@ -658,16 +406,7 @@ public class MusicFile {
      * @return A string representing the new file name and location.
      */
     public String newFileNameAndLocation(String startingPath, PathTemplate template) {
-        if (template == null) {
-            template = new PathTemplate(); // Use default if null
-        }
-        
-        // Ensure initials are calculated if subdirectory grouping is enabled
-        if (template.isUseSubdirectoryGrouping() && (initials == null || initials.isEmpty())) {
-            whatInitials();
-        }
-        
-        return template.generatePath(startingPath, this);
+        return FileOrganizer.generateFilePath(this, startingPath, template);
     }
 
     /**
@@ -678,18 +417,7 @@ public class MusicFile {
      * @throws IOException If an I/O error occurs during copying.
      */
     public void copyToNewLocation(String startingPath) throws IOException {
-        String newFilePath = newFileNameAndLocation(startingPath);
-        Path sourcePath = Paths.get(this.filePath);
-        Path destinationPath = Paths.get(newFilePath);
-
-        // Create directories if they do not exist
-        Files.createDirectories(destinationPath.getParent());
-
-        // Copy the file to the new location
-        Files.copy(sourcePath, destinationPath);
-        System.out.println("Copying file..." + sourcePath + " -> " + destinationPath);
-
-        // System.out.println("File copied to: " + newFilePath);
+        FileOrganizer.copyToNewLocation(this, startingPath);
     }
     
     /**
@@ -717,24 +445,6 @@ public class MusicFile {
      * @return The generated organizational path
      */
     public String generateOrganizationalPath(String basePath, PathTemplate template) {
-        if (template == null) {
-            template = new PathTemplate(); // Use default if null
-        }
-        
-        // Ensure initials are calculated if subdirectory grouping is enabled
-        if (template.isUseSubdirectoryGrouping()) {
-            try {
-                java.lang.reflect.Method whatInitialsMethod = MusicFile.class.getDeclaredMethod("whatInitials");
-                whatInitialsMethod.setAccessible(true);
-                whatInitialsMethod.invoke(null);
-            } catch (Exception e) {
-                // If reflection fails, continue without subdirectory grouping
-                System.err.println("Warning: Could not initialize subdirectory grouping: " + e.getMessage());
-            }
-        }
-        
-        String path = template.generatePath(basePath, this);
-        this.organizationalPath = path;
-        return path;
+        return FileOrganizer.generateOrganizationalPath(this, basePath, template);
     }
 }
