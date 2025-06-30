@@ -78,22 +78,34 @@ public class MP3OrgApplication extends Application {
         Tab duplicateTab = new Tab("Duplicate Manager");
         duplicateTab.setClosable(false);
         duplicateTab.setContent(new DuplicateManagerView());
-        HelpSystem.setTooltip(duplicateTab.getGraphic() != null ? (Control)duplicateTab.getGraphic() : new Label(), "tab.duplicates");
+        HelpSystem.setTooltip(
+            duplicateTab.getGraphic() != null ? (Control)duplicateTab.getGraphic() : new Label(), 
+            "tab.duplicates"
+        );
         
         Tab metadataTab = new Tab("Metadata Editor");
         metadataTab.setClosable(false);
         metadataTab.setContent(new MetadataEditorView());
-        HelpSystem.setTooltip(metadataTab.getGraphic() != null ? (Control)metadataTab.getGraphic() : new Label(), "tab.metadata");
+        HelpSystem.setTooltip(
+            metadataTab.getGraphic() != null ? (Control)metadataTab.getGraphic() : new Label(), 
+            "tab.metadata"
+        );
         
         Tab importTab = new Tab("Import & Organize");
         importTab.setClosable(false);
         importTab.setContent(new ImportOrganizeView());
-        HelpSystem.setTooltip(importTab.getGraphic() != null ? (Control)importTab.getGraphic() : new Label(), "tab.import");
+        HelpSystem.setTooltip(
+            importTab.getGraphic() != null ? (Control)importTab.getGraphic() : new Label(), 
+            "tab.import"
+        );
         
         Tab configTab = new Tab("Config");
         configTab.setClosable(false);
         configTab.setContent(new ConfigurationView());
-        HelpSystem.setTooltip(configTab.getGraphic() != null ? (Control)configTab.getGraphic() : new Label(), "tab.config");
+        HelpSystem.setTooltip(
+            configTab.getGraphic() != null ? (Control)configTab.getGraphic() : new Label(), 
+            "tab.config"
+        );
         
         // Add tabs to tab pane
         tabPane.getTabs().addAll(duplicateTab, metadataTab, importTab, configTab);

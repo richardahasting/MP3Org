@@ -48,7 +48,6 @@ public class MusicFile {
 
     final private static int DEFAULT_NUM_OF_SIMILAR_FILES = 10;
 
-
     private Long id;
     private String filePath;
     private String title;

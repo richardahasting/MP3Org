@@ -22,7 +22,9 @@
       "Bash(mvn compile:*)",
       "Bash(grep:*)",
       "Bash(unalias:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

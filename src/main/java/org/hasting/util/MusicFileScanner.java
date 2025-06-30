@@ -63,13 +63,12 @@ import java.util.logging.Logger;
  */
 public class MusicFileScanner {
     private static final Logger logger = Logger.getLogger(MusicFileScanner.class.getName());
-    // create a javafx UI that allows the user to select one or more  directories, and then calls
     // List of supported music file extensions
     private static final String[] SUPPORTED_EXTENSIONS = {
         "mp3", "flac", "ogg", "wav", "aac", "m4a", "wma", "aiff", "ape", "opus"
     };
 
-    private HashMap<String, MusicFile> musicFileCache = new HashMap<>(); // Add this line to create a cache for music files
+    private HashMap<String, MusicFile> musicFileCache = new HashMap<>(); // Cache for music files
     private Consumer<String> statusCallback;
     private Consumer<Integer> progressCallback;
     private Consumer<String> fileProcessingCallback; // New callback for individual file processing
