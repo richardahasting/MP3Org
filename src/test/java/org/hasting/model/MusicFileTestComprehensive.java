@@ -206,10 +206,10 @@ public class MusicFileTestComprehensive {
         MusicFile fileWithNulls = new MusicFile();
         assertFalse(file1.isItLikelyTheSameSong(fileWithNulls));
         
-        // Test high bitrate exclusion
+        // Test that bitrate differences don't affect song matching
         MusicFile highBitrateFile = createTestMusicFile("Test Song", "Test Artist", "Test Album", "Rock", 1, 2023, 200, 320L, 44100);
-        highBitrateFile.setBitRate(500L); // High bitrate
-        assertFalse(highBitrateFile.isItLikelyTheSameSong(file2));
+        highBitrateFile.setBitRate(500L); // High bitrate - should still match same song
+        assertTrue(highBitrateFile.isItLikelyTheSameSong(file2), "Same song with different bitrates should match");
     }
 
     @Test

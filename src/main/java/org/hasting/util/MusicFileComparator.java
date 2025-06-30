@@ -144,11 +144,19 @@ public class MusicFileComparator {
             return false;
         }
 
-        // Check track numbers
+        // Check track numbers with album context
         if (file1.getTrackNumber() != null && file2.getTrackNumber() != null &&
                 file1.getTrackNumber() != 0 && file2.getTrackNumber() != 0 &&
                 !file1.getTrackNumber().equals(file2.getTrackNumber())) {
-            return false; // Track numbers differ
+            
+            // Only exclude if albums are similar - different tracks on same album = different songs
+            if (file1.getAlbum() != null && file2.getAlbum() != null) {
+                int albumSimilarity = StringUtils.fuzzyMatch(file1.getAlbum(), file2.getAlbum());
+                if (albumSimilarity > 70) {
+                    return false; // Different tracks on same/similar album = definitely different songs
+                }
+            }
+            // If albums are different or unknown, track numbers might not matter (compilations, etc.)
         }
 
         // Fuzzy match scores for title and artist
@@ -170,10 +178,21 @@ public class MusicFileComparator {
             albumScore = StringUtils.fuzzyMatch(file1.getAlbum(), file2.getAlbum());
         }
 
+        // Check for strong track number evidence
+        boolean trackNumbersMatch = file1.getTrackNumber() != null && file2.getTrackNumber() != null &&
+                file1.getTrackNumber() != 0 && file2.getTrackNumber() != 0 &&
+                file1.getTrackNumber().equals(file2.getTrackNumber());
+        
         // Determine if it's likely the same song based on scores and duration match
         if (durationMatch && durationDifference < 3 && titleScore > 90) {
             return true;
         }
+        
+        // If track numbers match on same album, lower the threshold for other checks
+        if (trackNumbersMatch && albumScore > 70 && durationMatch) {
+            return titleScore > 80 && artistScore > 80; // Lower thresholds with track number confidence
+        }
+        
         return titleScore > 90 && artistScore > 90 && durationMatch && (file1.getAlbum() == null || albumScore > 90);
     }
     
