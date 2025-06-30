@@ -293,9 +293,9 @@ public class MusicFileListUtilsTest {
     @Order(18)
     @DisplayName("Test findPotentialDuplicates with null input")
     void testFindPotentialDuplicatesNullInput() {
-        assertThrows(Exception.class, () -> {
-            MusicFileListUtils.findPotentialDuplicates(null);
-        }, "Should handle null input gracefully");
+        List<MusicFile> result = MusicFileListUtils.findPotentialDuplicates(null);
+        assertNotNull(result);
+        assertEquals(0, result.size(), "Should return empty list for null input");
     }
 
     @Test

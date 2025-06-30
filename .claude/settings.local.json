@@ -24,7 +24,8 @@
       "Bash(unalias:*)",
       "Bash(ls:*)",
       "Bash(rg:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

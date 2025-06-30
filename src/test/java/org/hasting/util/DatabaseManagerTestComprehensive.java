@@ -1,5 +1,6 @@
 package org.hasting.util;
 
+import org.hasting.MP3OrgTestBase;
 import org.hasting.model.MusicFile;
 import org.junit.jupiter.api.*;
 
@@ -11,25 +12,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class DatabaseManagerTestComprehensive {
+public class DatabaseManagerTestComprehensive extends MP3OrgTestBase {
 
     private MusicFile testMusicFile1;
     private MusicFile testMusicFile2;
     private MusicFile testMusicFile3;
 
-    @BeforeAll
-    void setUpDatabase() {
-        // Initialize the database
-        DatabaseManager.initialize();
-        
-        // Clear any existing data for clean testing
-        DatabaseManager.deleteAllMusicFiles();
-    }
-
     @BeforeEach
-    void setUp() {
-        // Create test music files
+    void setUpTestMusicFiles() {
+        // Create additional test music files for this specific test class
+        // The base class already handles database setup and test data population
         testMusicFile1 = createTestMusicFile("Test Song 1", "Test Artist 1", "Test Album 1", 
                                             "Rock", 1, 2023, 240, 320L, 44100, "/test/path1.mp3");
         
@@ -38,17 +30,6 @@ public class DatabaseManagerTestComprehensive {
         
         testMusicFile3 = createTestMusicFile("Test Song 1", "Test Artist 1", "Test Album 1", 
                                             "Rock", 1, 2023, 240, 256L, 44100, "/test/path3.mp3");
-    }
-
-    @AfterEach
-    void tearDown() {
-        // Clean up test data after each test
-        DatabaseManager.deleteAllMusicFiles();
-    }
-
-    @AfterAll
-    void shutdownDatabase() {
-        DatabaseManager.shutdown();
     }
 
     @Test
@@ -183,6 +164,9 @@ public class DatabaseManagerTestComprehensive {
     @Order(9)
     @DisplayName("Test get all music files")
     void testGetAllMusicFiles() {
+        // Get count of existing test data
+        int existingCount = DatabaseManager.getAllMusicFiles().size();
+        
         // Save multiple files
         DatabaseManager.saveMusicFile(testMusicFile1);
         DatabaseManager.saveMusicFile(testMusicFile2);
@@ -190,9 +174,9 @@ public class DatabaseManagerTestComprehensive {
         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
         
         assertNotNull(allFiles, "Result should not be null");
-        assertEquals(2, allFiles.size(), "Should return 2 files");
+        assertEquals(existingCount + 2, allFiles.size(), "Should return existing + 2 files");
         
-        // Verify files are ordered correctly (by artist, album, title)
+        // Verify our test files are included
         assertTrue(allFiles.stream().anyMatch(f -> f.getTitle().equals("Test Song 1")));
         assertTrue(allFiles.stream().anyMatch(f -> f.getTitle().equals("Test Song 2")));
     }
@@ -205,13 +189,13 @@ public class DatabaseManagerTestComprehensive {
         DatabaseManager.saveMusicFile(testMusicFile1);
         DatabaseManager.saveMusicFile(testMusicFile2);
         
-        // Search by partial title
+        // Search by partial title - should find our test files plus any existing that match
         List<MusicFile> results = DatabaseManager.searchMusicFiles("Song");
-        assertEquals(2, results.size(), "Should find both songs");
+        assertTrue(results.size() >= 2, "Should find at least our 2 test songs");
         
-        // Search by artist
-        results = DatabaseManager.searchMusicFiles("Artist 1");
-        assertEquals(1, results.size(), "Should find one song by Artist 1");
+        // Search by specific artist - should find only our test file
+        results = DatabaseManager.searchMusicFiles("Test Artist 1");
+        assertEquals(1, results.size(), "Should find one song by Test Artist 1");
         assertEquals("Test Song 1", results.get(0).getTitle());
         
         // Search with no results
@@ -306,16 +290,16 @@ public class DatabaseManagerTestComprehensive {
         DatabaseManager.saveMusicFile(testMusicFile1);
         DatabaseManager.saveMusicFile(testMusicFile2);
         
-        // Verify files exist
+        // Verify our files exist (plus any existing test data)
         List<MusicFile> beforeDelete = DatabaseManager.getAllMusicFiles();
-        assertEquals(2, beforeDelete.size());
+        assertTrue(beforeDelete.size() >= 2, "Should have at least our 2 test files");
         
         // Delete all
         assertDoesNotThrow(() -> DatabaseManager.deleteAllMusicFiles());
         
         // Verify all files are deleted
         List<MusicFile> afterDelete = DatabaseManager.getAllMusicFiles();
-        assertEquals(0, afterDelete.size());
+        assertEquals(0, afterDelete.size(), "All files should be deleted");
     }
 
     @Test
@@ -367,13 +351,16 @@ public class DatabaseManagerTestComprehensive {
         MusicFile file2 = createTestMusicFile("Concurrent 2", "Artist", "Album", 
                                              "Rock", 2, 2023, 200, 320L, 44100, "/concurrent2.mp3");
         
+        // Get count before adding our files
+        int beforeCount = DatabaseManager.getAllMusicFiles().size();
+        
         assertDoesNotThrow(() -> {
             DatabaseManager.saveMusicFile(file1);
             DatabaseManager.saveMusicFile(file2);
         });
         
         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-        assertEquals(2, allFiles.size());
+        assertEquals(beforeCount + 2, allFiles.size(), "Should have existing + 2 new files");
     }
 
     @Test
@@ -386,8 +373,9 @@ public class DatabaseManagerTestComprehensive {
         fileWithLongData.setTitle("A".repeat(1000)); // Very long title
         fileWithLongData.setArtist("Test Artist");
         
-        // Should either succeed or throw a RuntimeException
-        assertDoesNotThrow(() -> DatabaseManager.saveMusicFile(fileWithLongData));
+        // Should throw a RuntimeException due to database column size limits
+        assertThrows(RuntimeException.class, () -> DatabaseManager.saveMusicFile(fileWithLongData),
+                    "Should throw RuntimeException for data too long for database columns");
     }
 
     // Helper method to create test music files

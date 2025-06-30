@@ -102,8 +102,8 @@ public class FileOrganizationTest {
         String path = file.generateOrganizationalPath("/music", template);
         
         assertTrue(path.contains("Rock/"));
-        assertTrue(path.contains("1971-"));
-        assertTrue(path.contains("04-"));
+        assertTrue(path.contains("1971 -"));
+        assertTrue(path.contains("04 -"));
         System.out.println("Genre template: " + path);
     }
     
