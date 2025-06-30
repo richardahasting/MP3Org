@@ -117,3 +117,18 @@ Uses fuzzy string matching with configurable thresholds:
 These behaviors ensure complete traceability, proper project management, and comprehensive documentation of all development work.
 
 **Note**: These universal behaviors are also maintained in CLAUDE-TEMPLATE.md for use in other projects.
+
+## Development Philosophy
+
+**CRITICAL**: Always read and follow the principles in `DEVELOPMENT-PHILOSOPHY.md` before starting any development work.
+
+**Core Principle**: "Documentation is communication with our future selves, for you especially."
+
+Key philosophy points:
+- **Good code is self-documenting, self-explaining, and self-evident**
+- **Code that is hard to read will be hard to maintain** - always avoid this
+- **Write code that explains its purpose** with clear naming and obvious design
+- **Create patterns that teach themselves** for rapid understanding
+- **Make the codebase tell its own story** through logical organization
+
+The best continuity mechanism is code that doesn't need explanation. Focus on clear communication through the code itself rather than complex processes.
