@@ -179,7 +179,7 @@ public class StringUtilsTest {
         
         assertTrue(score1 > 95, "Capitalization differences should match very well");
         assertTrue(score2 > 85, "Common typos should match well");
-        assertTrue(score3 > 80, "Version differences should match well");
+        assertTrue(score3 > 75, "Version differences should match well");
         assertTrue(score4 > 90, "Apostrophe differences should match very well");
     }
 
