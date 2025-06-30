@@ -76,7 +76,9 @@ public class PathTemplateConfigPanel extends VBox {
         
         // Custom template field
         customTemplateField = new TextField();
-        customTemplateField.setPromptText("Enter custom template like: {artist}/{album}/{track_number:02d}-{title}.{file_type}");
+        customTemplateField.setPromptText(
+            "Enter custom template like: {artist}/{album}/{track_number:02d}-{title}.{file_type}"
+        );
         customTemplateField.setPrefWidth(500);
         customTemplateField.textProperty().addListener((obs, oldVal, newVal) -> updateTemplatePreview());
         HelpSystem.setTooltip(customTemplateField, "config.template.custom");

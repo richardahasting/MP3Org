@@ -69,8 +69,15 @@ public class FuzzyMatcher {
     private static final Pattern PUNCTUATION_PATTERN = Pattern.compile("[\\p{Punct}\\s]+");
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private static final Pattern ARTIST_PREFIX_PATTERN = Pattern.compile("^(the|a|an)\\s+", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FEATURING_PATTERN = Pattern.compile("\\s+(feat\\.?|ft\\.?|featuring)\\s+.*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ALBUM_EDITION_PATTERN = Pattern.compile("\\s+\\(?(deluxe|remastered|special|limited|extended|expanded|anniversary|collector's?)\\s*(edition|version)?\\)?.*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FEATURING_PATTERN = Pattern.compile(
+        "\\s+(feat\\.?|ft\\.?|featuring)\\s+.*$", 
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern ALBUM_EDITION_PATTERN = Pattern.compile(
+        "\\s+\\(?(deluxe|remastered|special|limited|extended|expanded|anniversary|collector's?)" +
+        "\\s*(edition|version)?\\)?.*$", 
+        Pattern.CASE_INSENSITIVE
+    );
     
     /**
      * Calculates the similarity between two music files based on fuzzy search configuration.
@@ -460,9 +467,18 @@ public class FuzzyMatcher {
         boolean trackMatch = checkTrackNumberMatch(file1, file2, config);
         
         breakdown.append("Similarity Breakdown:\n");
-        breakdown.append(String.format("  Title: %.1f%% (threshold: %.1f%%)\n", titleSim, config.getTitleSimilarityThreshold()));
-        breakdown.append(String.format("  Artist: %.1f%% (threshold: %.1f%%)\n", artistSim, config.getArtistSimilarityThreshold()));
-        breakdown.append(String.format("  Album: %.1f%% (threshold: %.1f%%)\n", albumSim, config.getAlbumSimilarityThreshold()));
+        breakdown.append(String.format(
+            "  Title: %.1f%% (threshold: %.1f%%)\n", 
+            titleSim, config.getTitleSimilarityThreshold()
+        ));
+        breakdown.append(String.format(
+            "  Artist: %.1f%% (threshold: %.1f%%)\n", 
+            artistSim, config.getArtistSimilarityThreshold()
+        ));
+        breakdown.append(String.format(
+            "  Album: %.1f%% (threshold: %.1f%%)\n", 
+            albumSim, config.getAlbumSimilarityThreshold()
+        ));
         breakdown.append(String.format("  Duration: %s\n", durationMatch ? "MATCH" : "NO MATCH"));
         breakdown.append(String.format("  Track: %s\n", trackMatch ? "MATCH" : "NO MATCH"));
         

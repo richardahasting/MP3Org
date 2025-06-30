@@ -74,7 +74,11 @@ public class DatabaseManager {
                 // Class.forName(config.getJdbcDriver());
 
                 // Open a connection using configured database location
-                connection = DriverManager.getConnection(config.getJdbcUrl(), config.getUsername(), config.getPassword());
+                connection = DriverManager.getConnection(
+                    config.getJdbcUrl(), 
+                    config.getUsername(), 
+                    config.getPassword()
+                );
                 
                 System.out.println("Connected to database at: " + config.getDatabasePath());
 
@@ -151,8 +155,8 @@ public class DatabaseManager {
      */
     private static synchronized void createMusicFilesTable() {
         String sql = "CREATE TABLE music_files (" +
-                "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, " + // Keep id as the primary key
-                "file_path VARCHAR(1024) NOT NULL UNIQUE, " + // Add unique constraint to file_path
+                "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, " +
+                "file_path VARCHAR(1024) NOT NULL UNIQUE, " +
                 "title VARCHAR(255), " +
                 "artist VARCHAR(255), " +
                 "album VARCHAR(255), " +
@@ -588,7 +592,8 @@ public class DatabaseManager {
     public static synchronized List<MusicFile> getAllMusicFiles() {
         List<MusicFile> musicFiles = new ArrayList<>();
         String sql = "SELECT * FROM music_files WHERE 1=1" + getFileTypeFilterClause() + 
-                    " ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC";
+                    " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
+                    "bit_rate, duration_seconds DESC";
 
         try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
@@ -634,7 +639,8 @@ public class DatabaseManager {
                 "LOWER(artist) LIKE ? OR " +
                 "LOWER(album) LIKE ? OR " +
                 "LOWER(genre) LIKE ?)" + getFileTypeFilterClause() + 
-                " ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC";
+                " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
+                "bit_rate, duration_seconds DESC";
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             String term = "%" + searchTerm.toLowerCase() + "%";
@@ -831,7 +837,8 @@ public class DatabaseManager {
     public static synchronized List<MusicFile> searchMusicFilesByTitle(String title) {
         List<MusicFile> musicFiles = new ArrayList<>();
         String sql = "SELECT * FROM music_files WHERE LOWER(title) LIKE ?" + getFileTypeFilterClause() + 
-                    " ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC";
+                    " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
+                    "bit_rate, duration_seconds DESC";
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, "%" + title.toLowerCase() + "%");
@@ -852,7 +859,8 @@ public class DatabaseManager {
     public static synchronized List<MusicFile> searchMusicFilesByArtist(String artist) {
         List<MusicFile> musicFiles = new ArrayList<>();
         String sql = "SELECT * FROM music_files WHERE LOWER(artist) LIKE ?" + getFileTypeFilterClause() + 
-                    " ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC";
+                    " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
+                    "bit_rate, duration_seconds DESC";
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, "%" + artist.toLowerCase() + "%");
@@ -873,7 +881,8 @@ public class DatabaseManager {
     public static synchronized List<MusicFile> searchMusicFilesByAlbum(String album) {
         List<MusicFile> musicFiles = new ArrayList<>();
         String sql = "SELECT * FROM music_files WHERE LOWER(album) LIKE ?" + getFileTypeFilterClause() + 
-                    " ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC";
+                    " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
+                    "bit_rate, duration_seconds DESC";
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, "%" + album.toLowerCase() + "%");
@@ -925,7 +934,9 @@ public class DatabaseManager {
             throw new IllegalArgumentException("At least one search parameter must be provided");
         }
 
-        sql.append(String.join(" AND ", conditions) + getFileTypeFilterClause() + " ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC");
+        sql.append(String.join(" AND ", conditions) + getFileTypeFilterClause() + 
+                " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
+                "bit_rate, duration_seconds DESC");
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql.toString())) {
             for (int i = 0; i < parameters.size(); i++) {
