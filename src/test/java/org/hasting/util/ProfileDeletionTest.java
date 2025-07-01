@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>Basic profile deletion operations</li>
  *   <li>Safety mechanisms (cannot delete last profile)</li>
  *   <li>Active profile switching when deleting current profile</li>
- *   <li>Database file preservation after profile deletion</li>
+ *   <li>Database file deletion when profile is removed</li>
  *   <li>Configuration persistence after deletions</li>
  * </ul>
  * 
@@ -152,11 +152,12 @@ public class ProfileDeletionTest {
             assertEquals(activeProfileId, currentActiveProfile.getId(), 
                         "Active profile should remain unchanged when deleting non-active profile");
             
-            // Verify database files still exist (if they existed before)
+            // Verify database files are deleted
             if (databaseExistedBefore) {
-                // Note: Database files should be preserved according to the design
-                System.out.println("Database file path: " + databasePath);
-                System.out.println("Database files preserved as expected");
+                // Database files should now be deleted with the new implementation
+                boolean databaseStillExists = databaseFile.exists() || (parentFile != null && parentFile.exists());
+                assertFalse(databaseStillExists, "Database directory should be deleted when profile is removed");
+                System.out.println("✓ Database files successfully deleted at: " + databasePath);
             }
             
             System.out.println("✓ Non-active profile deleted successfully");
