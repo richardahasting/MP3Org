@@ -385,7 +385,7 @@ public class ProfileManagementPanel extends VBox {
             confirmAlert.setContentText(
                 "Are you sure you want to delete this profile?\n\n" +
                 "This will permanently remove the profile configuration.\n" +
-                "The database files will not be deleted from disk.\n\n" +
+                "The database files will be deleted from disk.\n\n" +
                 "This action cannot be undone."
             );
             
