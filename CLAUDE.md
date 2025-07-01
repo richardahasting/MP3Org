@@ -15,6 +15,11 @@ MP3Org is a Java-based music file organization tool that scans MP3 files, extrac
 ./gradlew jar            # Create executable JAR
 ```
 
+### Claude Code Commands
+```bash
+/run                     # Quick command to run the MP3Org application
+```
+
 ### Testing
 ```bash
 ./gradlew test           # Run all tests

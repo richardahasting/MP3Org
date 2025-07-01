@@ -100,14 +100,16 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
      * status messages.
      */
     public DuplicateManagerView() {
+        // Set default display mode first, before initializing components
+        currentDisplayMode = DisplayMode.ALL_FILES;
+        
         initializeComponents();
         layoutComponents();
         
         // Register for profile change notifications
         ProfileChangeNotifier.getInstance().addListener(this);
         
-        // Set default display mode and load all files initially
-        currentDisplayMode = DisplayMode.ALL_FILES;
+        // Load all files initially
         loadFilesForCurrentMode();
     }
     
