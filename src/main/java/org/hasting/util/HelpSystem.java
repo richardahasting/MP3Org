@@ -67,7 +67,8 @@ public class HelpSystem {
         tooltips.put("config.fuzzy.reset", "Restore all duplicate detection settings to the default balanced configuration.");
         
         // Duplicate Manager View
-        tooltips.put("duplicates.refresh", "Scan the database for potential duplicate songs using the current similarity settings.");
+        tooltips.put("duplicates.display.mode", "Choose display mode: 'All Files' shows your complete music collection immediately, 'Duplicates Only' analyzes and shows potential duplicates.");
+        tooltips.put("duplicates.refresh", "Refresh the current view - reload all files or re-scan for duplicates based on selected display mode.");
         tooltips.put("duplicates.delete.selected", "Permanently delete the selected song file from disk and remove it from the database.");
         tooltips.put("duplicates.keep.better", "Compare selected songs and automatically delete the one with lower audio quality (bitrate).");
         tooltips.put("duplicates.potential.table", "Songs that might be duplicates based on similarity analysis. Select a song to see similar matches.");

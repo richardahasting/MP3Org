@@ -58,6 +58,25 @@ import java.util.concurrent.Executors;
  */
 public class DuplicateManagerView extends BorderPane implements ProfileChangeListener {
     
+    /**
+     * Enumeration for different display modes in the duplicate manager.
+     */
+    public enum DisplayMode {
+        ALL_FILES("All Files"),
+        DUPLICATES_ONLY("Duplicates Only");
+        
+        private final String displayName;
+        
+        DisplayMode(String displayName) {
+            this.displayName = displayName;
+        }
+        
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
+    
     private TableView<MusicFile> duplicatesTable;
     private TableView<MusicFile> comparisonTable;
     private ObservableList<MusicFile> duplicatesData;
@@ -66,6 +85,9 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     private ProgressIndicator progressIndicator;
     private ProgressBar progressBar;
     private Button cancelButton;
+    private ChoiceBox<DisplayMode> displayModeChoice;
+    private DisplayMode currentDisplayMode;
+    private Label leftPaneLabel;
     private ExecutorService executorService;
     private Task<List<MusicFile>> currentDuplicateTask;
     
@@ -84,8 +106,9 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         // Register for profile change notifications
         ProfileChangeNotifier.getInstance().addListener(this);
         
-        // Start loading duplicates asynchronously - UI shows immediately
-        loadDuplicatesAsync();
+        // Set default display mode and load all files initially
+        currentDisplayMode = DisplayMode.ALL_FILES;
+        loadFilesForCurrentMode();
     }
     
     /**
@@ -128,6 +151,19 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         cancelButton = new Button("Cancel");
         cancelButton.setVisible(false);
         cancelButton.setOnAction(e -> cancelCurrentOperation());
+        
+        // Display mode choice box
+        displayModeChoice = new ChoiceBox<>();
+        displayModeChoice.getItems().addAll(DisplayMode.values());
+        displayModeChoice.setValue(DisplayMode.ALL_FILES);
+        displayModeChoice.setOnAction(e -> {
+            DisplayMode newMode = displayModeChoice.getValue();
+            if (newMode != currentDisplayMode) {
+                currentDisplayMode = newMode;
+                loadFilesForCurrentMode();
+            }
+        });
+        HelpSystem.setTooltip(displayModeChoice, "duplicates.display.mode");
         
         // Initialize thread pool for background operations
         executorService = Executors.newSingleThreadExecutor(r -> {
@@ -194,8 +230,12 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         HBox topControls = new HBox(10);
         topControls.setPadding(new Insets(5));
         
-        Button refreshButton = new Button("Refresh Duplicates");
-        refreshButton.setOnAction(e -> loadDuplicatesAsync());
+        // Display mode label and choice box
+        Label displayModeLabel = new Label("Display:");
+        displayModeLabel.setStyle("-fx-font-weight: bold;");
+        
+        Button refreshButton = new Button("Refresh");
+        refreshButton.setOnAction(e -> loadFilesForCurrentMode());
         HelpSystem.setTooltip(refreshButton, "duplicates.refresh");
         
         Button deleteSelectedButton = new Button("Delete Selected");
@@ -210,19 +250,20 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         helpButton.setPrefSize(25, 25);
         helpButton.setOnAction(e -> HelpSystem.showHelpDialog("duplicates.help", "Duplicate Management Help", getScene().getWindow()));
         
-        topControls.getChildren().addAll(refreshButton, deleteSelectedButton, keepBetterQualityButton, helpButton);
+        topControls.getChildren().addAll(displayModeLabel, displayModeChoice, new Separator(Orientation.VERTICAL), 
+                                          refreshButton, deleteSelectedButton, keepBetterQualityButton, helpButton);
         
         // Create main content area with split pane
         SplitPane splitPane = new SplitPane();
         splitPane.setOrientation(Orientation.HORIZONTAL);
         
-        // Left side - potential duplicates
+        // Left side - dynamic label based on display mode
         VBox leftSide = new VBox(5);
         leftSide.setPadding(new Insets(5));
-        Label duplicatesLabel = new Label("Potential Duplicates:");
-        duplicatesLabel.setStyle("-fx-font-weight: bold;");
+        leftPaneLabel = new Label(getLeftPaneLabelText());
+        leftPaneLabel.setStyle("-fx-font-weight: bold;");
         HelpSystem.setTooltip(duplicatesTable, "duplicates.potential.table");
-        leftSide.getChildren().addAll(duplicatesLabel, duplicatesTable);
+        leftSide.getChildren().addAll(leftPaneLabel, duplicatesTable);
         
         // Right side - similar files
         VBox rightSide = new VBox(5);
@@ -364,6 +405,108 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     private void cancelCurrentOperation() {
         if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
             currentDuplicateTask.cancel(true);
+        }
+    }
+    
+    /**
+     * Loads files based on the current display mode.
+     * - ALL_FILES: Shows complete database (fast load)
+     * - DUPLICATES_ONLY: Shows only potential duplicates (parallel processing)
+     */
+    private void loadFilesForCurrentMode() {
+        updateLeftPaneLabel();
+        
+        switch (currentDisplayMode) {
+            case ALL_FILES:
+                loadAllFiles();
+                break;
+            case DUPLICATES_ONLY:
+                loadDuplicatesAsync();
+                break;
+        }
+    }
+    
+    /**
+     * Loads all files from the database quickly and displays them.
+     * This provides immediate access to the complete music collection.
+     */
+    private void loadAllFiles() {
+        // Cancel any existing operation
+        if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
+            currentDuplicateTask.cancel(true);
+        }
+        
+        // Clear existing data
+        duplicatesData.clear();
+        comparisonData.clear();
+        
+        // Show loading state briefly
+        statusLabel.setText("Loading all music files...");
+        progressIndicator.setVisible(true);
+        
+        // Create quick loading task
+        currentDuplicateTask = new Task<List<MusicFile>>() {
+            @Override
+            protected List<MusicFile> call() throws Exception {
+                return DatabaseManager.getAllMusicFiles();
+            }
+            
+            @Override
+            protected void succeeded() {
+                List<MusicFile> allFiles = getValue();
+                if (allFiles != null && !isCancelled()) {
+                    Platform.runLater(() -> {
+                        duplicatesData.setAll(allFiles);
+                        progressIndicator.setVisible(false);
+                        statusLabel.setText("Showing all " + allFiles.size() + " music files - select 'Duplicates Only' to find potential duplicates");
+                    });
+                }
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    progressIndicator.setVisible(false);
+                    Throwable exception = getException();
+                    String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
+                    statusLabel.setText("Error loading files: " + errorMsg);
+                    exception.printStackTrace();
+                });
+            }
+            
+            @Override
+            protected void cancelled() {
+                Platform.runLater(() -> {
+                    progressIndicator.setVisible(false);
+                    statusLabel.setText("File loading cancelled");
+                });
+            }
+        };
+        
+        // Execute task on background thread
+        executorService.submit(currentDuplicateTask);
+    }
+    
+    /**
+     * Gets the appropriate label text for the left pane based on current display mode.
+     */
+    private String getLeftPaneLabelText() {
+        switch (currentDisplayMode) {
+            case ALL_FILES:
+                return "All Music Files:";
+            case DUPLICATES_ONLY:
+                return "Potential Duplicates:";
+            default:
+                return "Music Files:";
+        }
+    }
+    
+    /**
+     * Updates the left pane label to match the current display mode.
+     */
+    private void updateLeftPaneLabel() {
+        if (leftPaneLabel != null) {
+            leftPaneLabel.setText(getLeftPaneLabelText());
         }
     }
     
