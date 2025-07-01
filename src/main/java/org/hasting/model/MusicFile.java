@@ -5,6 +5,8 @@ import org.hasting.util.MusicFileComparator;
 import org.hasting.util.ArtistStatisticsManager;
 import org.hasting.util.FileOrganizer;
 import org.hasting.util.MetadataExtractor;
+import org.hasting.util.logging.MP3OrgLoggingManager;
+import org.hasting.util.logging.Logger;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
  */
 public class MusicFile {
 
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(MusicFile.class);
     final private static int DEFAULT_NUM_OF_SIMILAR_FILES = 10;
 
     private Long id;
@@ -530,17 +533,17 @@ public class MusicFile {
                         this.album = "****deleted****";
                         this.genre = "****deleted****";
                         this.fileType = "****deleted****";
-                        System.out.println(String.format("Deleted: %s", path));
+                        logger.info("Deleted file: {}", path);
                         return true;
                     } else {
-                        System.err.println("Failed to delete the file.");
+                        logger.error("Failed to delete file: {}", pathname);
                     }
                 } else {
-                    System.err.println("File does not exist: " + pathname);
+                    logger.warning("File does not exist: {}", pathname);
                 }
             }
         } else {
-            System.err.println("File cannot be deleted because the ID is not null.");
+            logger.error("File cannot be deleted because the ID is not null: {}", this.filePath);
         }
         return false;
     }

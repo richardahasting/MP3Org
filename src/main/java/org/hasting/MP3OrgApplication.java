@@ -13,8 +13,11 @@ import org.hasting.ui.DuplicateManagerView;
 import org.hasting.ui.MetadataEditorView;
 import org.hasting.ui.ImportOrganizeView;
 import org.hasting.ui.ConfigurationView;
+import org.hasting.ui.LogViewerDialog;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.HelpSystem;
+import org.hasting.util.logging.MP3OrgLoggingManager;
+import org.hasting.util.logging.Logger;
 
 /**
  * Main application class for MP3Org - Music Collection Manager.
@@ -43,6 +46,8 @@ import org.hasting.util.HelpSystem;
  * @since 1.0
  */
 public class MP3OrgApplication extends Application {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(MP3OrgApplication.class);
 
     /**
      * Starts the MP3Org application by initializing the user interface and database.
@@ -61,8 +66,16 @@ public class MP3OrgApplication extends Application {
      */
     @Override
     public void start(Stage primaryStage) {
+        // Initialize logging system
+        MP3OrgLoggingManager.initialize();
+        MP3OrgLoggingManager.logApplicationStartup("MP3Org", "1.0");
+        
+        logger.info("Initializing MP3Org application");
+        
         // Initialize database
+        logger.debug("Initializing database manager");
         DatabaseManager.initialize();
+        logger.info("Database manager initialized successfully");
         
         // Create main layout
         BorderPane root = new BorderPane();
@@ -157,10 +170,14 @@ public class MP3OrgApplication extends Application {
         generalHelpItem.setAccelerator(new KeyCodeCombination(KeyCode.F1));
         generalHelpItem.setOnAction(e -> HelpSystem.showGeneralHelp(primaryStage));
         
+        MenuItem logViewerItem = new MenuItem("View Logs...");
+        logViewerItem.setAccelerator(new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN));
+        logViewerItem.setOnAction(e -> showLogViewer(primaryStage));
+        
         MenuItem aboutItem = new MenuItem("About MP3Org");
         aboutItem.setOnAction(e -> showAboutDialog(primaryStage));
         
-        helpMenu.getItems().addAll(gettingStartedItem, generalHelpItem, new SeparatorMenuItem(), aboutItem);
+        helpMenu.getItems().addAll(gettingStartedItem, generalHelpItem, new SeparatorMenuItem(), logViewerItem, aboutItem);
         
         menuBar.getMenus().add(helpMenu);
         return menuBar;
@@ -173,6 +190,7 @@ public class MP3OrgApplication extends Application {
      * <ul>
      *   <li><strong>F1</strong> - Opens general help</li>
      *   <li><strong>Ctrl+H</strong> - Opens getting started guide</li>
+     *   <li><strong>Ctrl+Shift+L</strong> - Opens log viewer</li>
      * </ul>
      * 
      * @param scene the main application scene to attach shortcuts to
@@ -187,6 +205,11 @@ public class MP3OrgApplication extends Application {
         scene.getAccelerators().put(
             new KeyCodeCombination(KeyCode.H, KeyCombination.CONTROL_DOWN),
             () -> HelpSystem.showGettingStarted(primaryStage)
+        );
+        
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+            () -> showLogViewer(primaryStage)
         );
     }
     
@@ -220,6 +243,37 @@ public class MP3OrgApplication extends Application {
         );
         aboutDialog.showAndWait();
     }
+    
+    /**
+     * Shows the log viewer dialog for viewing application logs.
+     * 
+     * <p>The log viewer provides functionality for:
+     * <ul>
+     *   <li>Viewing log files with syntax highlighting</li>
+     *   <li>Filtering logs by level (DEBUG, INFO, WARNING, ERROR, CRITICAL)</li>
+     *   <li>Searching log content with regex support</li>
+     *   <li>Real-time tail mode for active log monitoring</li>
+     *   <li>Exporting filtered log content</li>
+     * </ul>
+     * 
+     * @param owner the parent stage for the dialog
+     */
+    private void showLogViewer(Stage owner) {
+        try {
+            LogViewerDialog logViewer = new LogViewerDialog(owner);
+            logViewer.show();
+            logger.info("Log viewer dialog opened");
+        } catch (Exception e) {
+            logger.error("Failed to open log viewer dialog: {}", e.getMessage(), e);
+            
+            Alert errorDialog = new Alert(Alert.AlertType.ERROR);
+            errorDialog.initOwner(owner);
+            errorDialog.setTitle("Error");
+            errorDialog.setHeaderText("Failed to Open Log Viewer");
+            errorDialog.setContentText("An error occurred while opening the log viewer: " + e.getMessage());
+            errorDialog.showAndWait();
+        }
+    }
 
     /**
      * Performs cleanup operations when the application is shutting down.
@@ -237,8 +291,9 @@ public class MP3OrgApplication extends Application {
     @Override
     public void stop() {
         // Clean up database connection if needed
+        logger.info("Shutting down application");
         DatabaseManager.shutdown();
-        System.out.println("Application shutting down...");
+        MP3OrgLoggingManager.shutdown();
     }
 
     /**

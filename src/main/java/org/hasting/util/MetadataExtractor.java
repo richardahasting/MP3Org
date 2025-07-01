@@ -1,6 +1,8 @@
 package org.hasting.util;
 
 import org.hasting.model.MusicFile;
+import org.hasting.util.logging.MP3OrgLoggingManager;
+import org.hasting.util.logging.Logger;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.audio.AudioHeader;
@@ -15,6 +17,8 @@ import java.util.Date;
  * Handles reading of audio file properties, tags, and basic file information.
  */
 public class MetadataExtractor {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(MetadataExtractor.class);
     
     /**
      * Private constructor to prevent instantiation of utility class.
@@ -68,8 +72,7 @@ public class MetadataExtractor {
 
         } catch (Exception e) {
             // Log error and set basic file information
-            System.err.println("Error reading metadata from file: " + audioFile.getAbsolutePath());
-            System.err.println(e.getMessage());
+            logger.error("Error reading metadata from file: {}", audioFile.getAbsolutePath(), e);
 
             // Set basic information even if metadata extraction fails
             musicFile.setFilePath(audioFile.getAbsolutePath());
@@ -97,19 +100,19 @@ public class MetadataExtractor {
         try {
             musicFile.setDurationSeconds(header.getTrackLength());
         } catch (Exception e) {
-            // Ignore individual property extraction errors
+            logger.debug("Failed to extract duration from audio header: {}", e.getMessage());
         }
         
         try {
             musicFile.setBitRate(header.getBitRateAsNumber());
         } catch (Exception e) {
-            // Ignore individual property extraction errors
+            logger.debug("Failed to extract bit rate from audio header: {}", e.getMessage());
         }
         
         try {
             musicFile.setSampleRate(header.getSampleRateAsNumber());
         } catch (Exception e) {
-            // Ignore individual property extraction errors
+            logger.debug("Failed to extract sample rate from audio header: {}", e.getMessage());
         }
     }
     

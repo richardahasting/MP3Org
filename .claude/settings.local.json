@@ -25,7 +25,9 @@
       "Bash(ls:*)",
       "Bash(rg:*)",
       "Bash(sed:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(command -v:*)",
+      "Bash(ffmpeg:*)"
     ],
     "deny": []
   }
