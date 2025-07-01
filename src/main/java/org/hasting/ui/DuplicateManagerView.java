@@ -155,6 +155,14 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         albumCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getAlbum()));
         albumCol.setPrefWidth(150);
         
+        // Track Number column
+        TableColumn<MusicFile, String> trackCol = new TableColumn<>("Track #");
+        trackCol.setCellValueFactory(data -> {
+            Integer trackNumber = data.getValue().getTrackNumber();
+            return new SimpleStringProperty(trackNumber != null ? trackNumber.toString() : "");
+        });
+        trackCol.setPrefWidth(70);
+        
         // Duration column
         TableColumn<MusicFile, String> durationCol = new TableColumn<>("Duration");
         durationCol.setCellValueFactory(data -> {
@@ -181,7 +189,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         pathCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getFilePath()));
         pathCol.setPrefWidth(300);
         
-        table.getColumns().addAll(artistCol, titleCol, albumCol, durationCol, bitrateCol, pathCol);
+        table.getColumns().addAll(artistCol, titleCol, albumCol, trackCol, durationCol, bitrateCol, pathCol);
         
         // Add context menu
         setupTableContextMenu(table);
