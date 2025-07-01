@@ -674,6 +674,11 @@ public class DatabaseManager {
         return musicFiles;
     }
 
+    /**
+     * Legacy method - finds potential duplicates using blocking algorithm.
+     * @deprecated Use findPotentialDuplicatesParallel() for better performance with large datasets.
+     */
+    @Deprecated
     public static synchronized List<MusicFile> findPotentialDuplicates() {
         // Get the active profile's fuzzy search configuration
         DatabaseProfile activeProfile = getActiveProfile();
@@ -681,11 +686,10 @@ public class DatabaseManager {
             ? activeProfile.getFuzzySearchConfig() 
             : new FuzzySearchConfig();
         
-        // Stage 1: Get all music files for fuzzy comparison
-        // We'll use a broader query to get potential candidates
+        // Get all music files and apply fuzzy matching
         List<MusicFile> allFiles = getAllMusicFiles();
         
-        // Stage 2: Apply fuzzy matching to find duplicates
+        // Use legacy method for backward compatibility
         return FuzzyMatcher.findFuzzyDuplicates(allFiles, fuzzyConfig);
     }
     
@@ -704,21 +708,36 @@ public class DatabaseManager {
     }
     
     /**
-     * Finds potential duplicates using optimized SQL pre-filtering.
-     * This method uses a more targeted approach for better performance with large datasets.
+     * Finds potential duplicates using parallel processing for better performance.
+     * This method streams results via callback and can be cancelled mid-process.
      */
+    public static synchronized void findPotentialDuplicatesParallel(FuzzyMatcher.DuplicateCallback callback) {
+        DatabaseProfile activeProfile = getActiveProfile();
+        FuzzySearchConfig fuzzyConfig = (activeProfile != null && activeProfile.getFuzzySearchConfig() != null) 
+            ? activeProfile.getFuzzySearchConfig() 
+            : new FuzzySearchConfig();
+        
+        // Get all music files and use parallel fuzzy matching
+        List<MusicFile> allFiles = getAllMusicFiles();
+        FuzzyMatcher.findFuzzyDuplicatesParallel(allFiles, fuzzyConfig, callback);
+    }
+    
+    /**
+     * Legacy method - finds potential duplicates using optimized SQL pre-filtering.
+     * @deprecated Use findPotentialDuplicatesParallel() for better performance with large datasets.
+     */
+    @Deprecated
     public static synchronized List<MusicFile> findPotentialDuplicatesOptimized() {
         DatabaseProfile activeProfile = getActiveProfile();
         FuzzySearchConfig fuzzyConfig = (activeProfile != null && activeProfile.getFuzzySearchConfig() != null) 
             ? activeProfile.getFuzzySearchConfig() 
             : new FuzzySearchConfig();
         
-        // Stage 1: Use SQL to get potential candidates
-        // We'll use loose matching in SQL and then apply strict fuzzy matching
-        List<MusicFile> candidates = getPotentialDuplicateCandidates();
+        // Skip SQL pre-filtering as it's ineffective for fuzzy search - just use all files
+        List<MusicFile> allFiles = getAllMusicFiles();
         
-        // Stage 2: Apply fuzzy matching to candidates
-        return FuzzyMatcher.findFuzzyDuplicates(candidates, fuzzyConfig);
+        // Use legacy method for backward compatibility
+        return FuzzyMatcher.findFuzzyDuplicates(allFiles, fuzzyConfig);
     }
     
     /**
