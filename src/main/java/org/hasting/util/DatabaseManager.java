@@ -91,6 +91,56 @@ public class DatabaseManager {
             }
         }
     }
+    
+    /**
+     * Initializes the database connection with automatic profile fallback for locked databases.
+     * 
+     * <p>This method implements the self-teaching database initialization pattern that ensures
+     * the MP3Org application can always start successfully, even when the preferred database
+     * is locked by another application instance. The method name clearly communicates its
+     * purpose and the automatic fallback behavior.
+     * 
+     * <p><strong>Initialization Strategy:</strong>
+     * <ol>
+     *   <li><strong>Use profile manager:</strong> Leverage DatabaseProfileManager's fallback logic</li>
+     *   <li><strong>Activate with fallback:</strong> Automatically handle locked database scenarios</li>
+     *   <li><strong>Reload configuration:</strong> Update DatabaseConfig with the resolved profile</li>
+     *   <li><strong>Initialize normally:</strong> Use standard initialization once profile is resolved</li>
+     * </ol>
+     * 
+     * <p>This approach follows the development philosophy of "code that teaches its patterns" -
+     * future developers can understand the initialization flow by reading the method delegation
+     * and following the clear sequence of operations.
+     * 
+     * @param preferredProfileId the database profile the user wants to use
+     * @return the database profile that was actually activated (may differ from preferred due to fallback)
+     * @throws RuntimeException if no database profiles can be activated (extremely rare)
+     */
+    public static synchronized DatabaseProfile initializeWithAutomaticFallback(String preferredProfileId) {
+        if (connection != null) {
+            // Already initialized - return current active profile
+            return DatabaseProfileManager.getInstance().getActiveProfile();
+        }
+        
+        try {
+            // Use profile manager's fallback logic to resolve the best available profile
+            DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+            DatabaseProfile resolvedProfile = profileManager.activateProfileWithAutomaticFallback(preferredProfileId);
+            
+            // Reload configuration to reflect the resolved profile
+            config = DatabaseConfig.getInstance();
+            config.reload();
+            
+            // Now initialize with the resolved, available database
+            initialize();
+            
+            return resolvedProfile;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to initialize database connection with fallback: " + e.getMessage(), e);
+        }
+    }
 
 
     /**
