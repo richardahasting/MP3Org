@@ -13,13 +13,18 @@ import javafx.scene.layout.*;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
+import org.hasting.util.FuzzyMatcher;
 import org.hasting.util.HelpSystem;
 import org.hasting.util.ProfileChangeListener;
 import org.hasting.util.ProfileChangeNotifier;
 
 import java.awt.Desktop;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -90,6 +95,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     private Label leftPaneLabel;
     private ExecutorService executorService;
     private Task<List<MusicFile>> currentDuplicateTask;
+    private Task<List<MusicFile>> currentSimilarFilesTask;
     
     /**
      * Creates a new DuplicateManagerView with initialized components and starts
@@ -315,8 +321,10 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         cancelButton.setVisible(true);
         progressIndicator.setVisible(true);
         
-        // Create background task for duplicate detection
+        // Create background task for duplicate detection using parallel processing
         currentDuplicateTask = new Task<List<MusicFile>>() {
+            private final Set<MusicFile> foundDuplicates = Collections.synchronizedSet(new HashSet<>());
+            
             @Override
             protected List<MusicFile> call() throws Exception {
                 // Get total file count for progress tracking
@@ -325,35 +333,59 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                 
                 if (isCancelled()) return null;
                 
-                // Use the optimized duplicate detection if available
-                updateMessage("Detecting potential duplicates...");
+                updateMessage("Detecting potential duplicates using parallel processing...");
                 updateProgress(0, 100);
                 
-                List<MusicFile> duplicates;
-                try {
-                    // Try optimized version first for better performance
-                    duplicates = DatabaseManager.findPotentialDuplicatesOptimized();
-                    updateProgress(100, 100);
-                } catch (Exception e) {
-                    if (isCancelled()) return null;
-                    // Fall back to standard detection
-                    updateMessage("Using comprehensive duplicate detection...");
-                    duplicates = DatabaseManager.findPotentialDuplicates();
-                    updateProgress(100, 100);
-                }
+                // Create callback for streaming results
+                FuzzyMatcher.DuplicateCallback callback = new FuzzyMatcher.DuplicateCallback() {
+                    @Override
+                    public void onDuplicateFound(MusicFile file1, MusicFile file2) {
+                        if (!isCancelled()) {
+                            foundDuplicates.add(file1);
+                            foundDuplicates.add(file2);
+                            
+                            // Update UI immediately with new duplicates
+                            Platform.runLater(() -> {
+                                if (!duplicatesData.contains(file1)) {
+                                    duplicatesData.add(file1);
+                                }
+                                if (!duplicatesData.contains(file2)) {
+                                    duplicatesData.add(file2);
+                                }
+                            });
+                            
+                            // Update message from task thread (not JavaFX thread)
+                            updateMessage("Found " + foundDuplicates.size() + " potential duplicates so far...");
+                        }
+                    }
+                    
+                    @Override
+                    public void onProgressUpdate(int completed, int total) {
+                        if (!isCancelled()) {
+                            double progress = (double) completed / total * 100.0;
+                            updateProgress(progress, 100);
+                            updateMessage(String.format("Analyzed %,d of %,d comparisons (%.1f%%), found %d duplicates", 
+                                completed, total, progress, foundDuplicates.size()));
+                        }
+                    }
+                    
+                    @Override
+                    public boolean isCancelled() {
+                        return currentDuplicateTask.isCancelled();
+                    }
+                };
                 
-                return duplicates;
+                // Run parallel duplicate detection
+                DatabaseManager.findPotentialDuplicatesParallel(callback);
+                
+                return new ArrayList<>(foundDuplicates);
             }
             
             @Override
             protected void succeeded() {
-                List<MusicFile> duplicates = getValue();
-                if (duplicates != null && !isCancelled()) {
-                    Platform.runLater(() -> {
-                        duplicatesData.setAll(duplicates);
-                        updateUIAfterLoad(duplicates.size(), false);
-                    });
-                }
+                Platform.runLater(() -> {
+                    updateUIAfterLoad(foundDuplicates.size(), false);
+                });
             }
             
             @Override
@@ -371,7 +403,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
             protected void cancelled() {
                 Platform.runLater(() -> {
                     statusLabel.setText("Duplicate detection cancelled");
-                    updateUIAfterLoad(0, true);
+                    updateUIAfterLoad(duplicatesData.size(), true);
                 });
             }
         };
@@ -407,6 +439,9 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     private void cancelCurrentOperation() {
         if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
             currentDuplicateTask.cancel(true);
+        }
+        if (currentSimilarFilesTask != null && !currentSimilarFilesTask.isDone()) {
+            currentSimilarFilesTask.cancel(true);
         }
     }
     
@@ -522,14 +557,75 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     }
     
     private void loadSimilarFiles(MusicFile selectedFile) {
-        try {
-            List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-            List<MusicFile> similarFiles = selectedFile.findMostSimilarFiles(allFiles, 10);
-            comparisonData.setAll(similarFiles);
-        } catch (Exception e) {
-            statusLabel.setText("Error loading similar files: " + e.getMessage());
-            e.printStackTrace();
+        // Cancel any existing similar files task
+        if (currentSimilarFilesTask != null && !currentSimilarFilesTask.isDone()) {
+            currentSimilarFilesTask.cancel(true);
         }
+        
+        // Clear existing comparison data and show loading state
+        comparisonData.clear();
+        
+        // Create background task for finding similar files
+        currentSimilarFilesTask = new Task<List<MusicFile>>() {
+            @Override
+            protected List<MusicFile> call() throws Exception {
+                updateMessage("Loading similar files for: " + selectedFile.getArtist() + " - " + selectedFile.getTitle());
+                updateProgress(0, 100);
+                
+                if (isCancelled()) return null;
+                
+                // Get all files from database
+                updateMessage("Retrieving music collection...");
+                updateProgress(25, 100);
+                List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+                
+                if (isCancelled()) return null;
+                
+                // Find most similar files
+                updateMessage("Analyzing similarities...");
+                updateProgress(50, 100);
+                List<MusicFile> similarFiles = selectedFile.findMostSimilarFiles(allFiles, 10);
+                
+                updateProgress(100, 100);
+                updateMessage("Found " + similarFiles.size() + " similar files");
+                
+                return similarFiles;
+            }
+            
+            @Override
+            protected void succeeded() {
+                List<MusicFile> similarFiles = getValue();
+                if (similarFiles != null && !isCancelled()) {
+                    Platform.runLater(() -> {
+                        comparisonData.setAll(similarFiles);
+                        statusLabel.setText("Loaded " + similarFiles.size() + " similar files");
+                    });
+                }
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    Throwable exception = getException();
+                    String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
+                    statusLabel.setText("Error loading similar files: " + errorMsg);
+                    exception.printStackTrace();
+                });
+            }
+            
+            @Override
+            protected void cancelled() {
+                Platform.runLater(() -> {
+                    statusLabel.setText("Similar files loading cancelled");
+                });
+            }
+        };
+        
+        // Show brief status message (no progress indicators for this quick operation)
+        statusLabel.setText("Finding similar files...");
+        
+        // Execute task on background thread
+        executorService.submit(currentSimilarFilesTask);
     }
     
     private void deleteSelectedFile() {
@@ -892,6 +988,9 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         // Cancel any running tasks
         if (currentDuplicateTask != null && !currentDuplicateTask.isDone()) {
             currentDuplicateTask.cancel(true);
+        }
+        if (currentSimilarFilesTask != null && !currentSimilarFilesTask.isDone()) {
+            currentSimilarFilesTask.cancel(true);
         }
         
         // Clear data lists
