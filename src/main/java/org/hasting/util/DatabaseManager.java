@@ -617,6 +617,39 @@ public class DatabaseManager {
     }
 
     /**
+     * Gets the count of music files in the database matching current file type filters.
+     * 
+     * <p>This method provides an efficient way to get the total number of music files
+     * without loading all the data into memory. It respects the current file type
+     * filtering configuration to return only the count of enabled file types.
+     * 
+     * <p>The count reflects the same filtering logic as getAllMusicFiles() but with
+     * optimized performance for scenarios where only the total number is needed,
+     * such as displaying statistics in the configuration panel.
+     * 
+     * @return the number of music files in the database matching current filters, 
+     *         or -1 if database query fails (allowing UI to display "Unknown")
+     */
+    public static synchronized int getMusicFileCount() {
+        String sql = "SELECT COUNT(*) as file_count FROM music_files WHERE 1=1" + getFileTypeFilterClause();
+        
+        try (Statement stmt = getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            if (rs.next()) {
+                return rs.getInt("file_count");
+            }
+            return 0;
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting music file count: " + e.getMessage());
+            // Return -1 to indicate error state rather than throwing exception
+            // This allows the UI to display "Unknown" or "Error" instead of crashing
+            return -1;
+        }
+    }
+
+    /**
      * Retrieves all music files from the database with intelligent sorting and filtering.
      * 
      * <p>This method provides the primary data access for displaying music collections.
@@ -742,9 +775,25 @@ public class DatabaseManager {
     }
     
     /**
-     * Finds potential duplicates using optimized SQL pre-filtering.
-     * This method uses a more targeted approach for better performance with large datasets.
+     * Finds potential duplicates using parallel processing for better performance.
+     * This method streams results via callback and can be cancelled mid-process.
      */
+    public static synchronized void findPotentialDuplicatesParallel(FuzzyMatcher.DuplicateCallback callback) {
+        DatabaseProfile activeProfile = getActiveProfile();
+        FuzzySearchConfig fuzzyConfig = (activeProfile != null && activeProfile.getFuzzySearchConfig() != null) 
+            ? activeProfile.getFuzzySearchConfig() 
+            : new FuzzySearchConfig();
+        
+        // Get all music files and use parallel fuzzy matching
+        List<MusicFile> allFiles = getAllMusicFiles();
+        FuzzyMatcher.findFuzzyDuplicatesParallel(allFiles, fuzzyConfig, callback);
+    }
+    
+    /**
+     * Legacy method - finds potential duplicates using optimized SQL pre-filtering.
+     * @deprecated Use findPotentialDuplicatesParallel() for better performance with large datasets.
+     */
+    @Deprecated
     public static synchronized List<MusicFile> findPotentialDuplicatesOptimized() {
         DatabaseProfile activeProfile = getActiveProfile();
         FuzzySearchConfig fuzzyConfig = (activeProfile != null && activeProfile.getFuzzySearchConfig() != null) 

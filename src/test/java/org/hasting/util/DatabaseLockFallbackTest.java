@@ -113,6 +113,7 @@ public class DatabaseLockFallbackTest extends MP3OrgTestBase {
             alternativeDbPath, 
             "Created for fallback testing"
         );
+        trackProfileForCleanup(alternativeProfile.getId());
         
         // Try to activate a non-existent preferred profile
         String nonExistentProfileId = "non-existent-profile-id";
@@ -188,6 +189,7 @@ public class DatabaseLockFallbackTest extends MP3OrgTestBase {
             originalDbPath,
             "Profile with specific configuration"
         );
+        trackProfileForCleanup(originalProfile.getId());
         
         // Set up original profile with specific settings
         originalProfile.setEnabledFileTypes(java.util.Set.of("mp3", "flac"));
@@ -269,6 +271,7 @@ public class DatabaseLockFallbackTest extends MP3OrgTestBase {
             testDbPath,
             "Created to test profile availability checking"
         );
+        trackProfileForCleanup(testProfile.getId());
         
         boolean isAvailable = DatabaseConnectionManager.isDatabaseAvailableForProfile(testProfile);
         

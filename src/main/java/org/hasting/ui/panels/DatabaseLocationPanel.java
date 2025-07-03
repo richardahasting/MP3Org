@@ -224,15 +224,45 @@ public class DatabaseLocationPanel extends VBox {
             statusLabel.setText("Reloading configuration...");
             statusLabel.setStyle("-fx-text-fill: orange;");
             
+            // Reload database configuration
             DatabaseManager.reloadConfig();
+            
+            // Small delay to ensure database reinitialization is complete
+            Thread.sleep(100);
+            
+            // Update the displayed information
             updateDisplayedInfo();
             
             statusLabel.setText("Configuration reloaded successfully");
             statusLabel.setStyle("-fx-text-fill: green;");
             
         } catch (Exception e) {
-            showError("Failed to reload configuration: " + e.getMessage());
+            String errorMessage = "Failed to reload configuration";
+            
+            // Provide more specific error information
+            if (e.getMessage() != null) {
+                if (e.getMessage().contains("database")) {
+                    errorMessage += " (database connection issue)";
+                } else if (e.getMessage().contains("config")) {
+                    errorMessage += " (configuration file issue)";
+                } else {
+                    errorMessage += ": " + e.getMessage();
+                }
+            }
+            
+            showError(errorMessage);
+            System.err.println("Configuration reload failed: " + e.getMessage());
             e.printStackTrace();
+            
+            // Try to at least update the display with current info
+            try {
+                updateDisplayedInfo();
+                statusLabel.setText("Reload failed, showing current configuration");
+                statusLabel.setStyle("-fx-text-fill: orange;");
+            } catch (Exception displayError) {
+                statusLabel.setText("Configuration reload failed");
+                statusLabel.setStyle("-fx-text-fill: red;");
+            }
         }
     }
     

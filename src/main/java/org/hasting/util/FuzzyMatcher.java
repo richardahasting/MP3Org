@@ -3,8 +3,10 @@ package org.hasting.util;
 import org.hasting.model.MusicFile;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Advanced utility class for fuzzy string matching and duplicate music file detection.
@@ -389,8 +391,72 @@ public class FuzzyMatcher {
     }
     
     /**
-     * Filters a list of music files to find potential duplicates based on fuzzy configuration.
+     * Callback interface for streaming duplicate detection results.
      */
+    public interface DuplicateCallback {
+        /**
+         * Called when a duplicate pair is found.
+         */
+        void onDuplicateFound(MusicFile file1, MusicFile file2);
+        
+        /**
+         * Called periodically to report progress.
+         * @param completed Number of comparisons completed
+         * @param total Total number of comparisons to perform
+         */
+        void onProgressUpdate(int completed, int total);
+        
+        /**
+         * Check if the operation should be cancelled.
+         * @return true if the operation should stop
+         */
+        boolean isCancelled();
+    }
+    
+    /**
+     * Filters a list of music files to find potential duplicates based on fuzzy configuration.
+     * Uses parallel processing and streaming results via callback for better performance.
+     */
+    public static void findFuzzyDuplicatesParallel(List<MusicFile> musicFiles, 
+                                                   FuzzySearchConfig config, 
+                                                   DuplicateCallback callback) {
+        if (musicFiles == null || musicFiles.isEmpty() || config == null || callback == null) {
+            return;
+        }
+        
+        int totalComparisons = (musicFiles.size() * (musicFiles.size() - 1)) / 2;
+        AtomicInteger completed = new AtomicInteger(0);
+        
+        IntStream.range(0, musicFiles.size())
+            .boxed()
+            .flatMap(i -> IntStream.range(i + 1, musicFiles.size())
+                .mapToObj(j -> new int[]{i, j}))
+            .parallel()
+            .takeWhile(pair -> !callback.isCancelled())
+            .forEach(pair -> {
+                MusicFile file1 = musicFiles.get(pair[0]);
+                MusicFile file2 = musicFiles.get(pair[1]);
+                
+                if (areDuplicates(file1, file2, config)) {
+                    callback.onDuplicateFound(file1, file2);
+                }
+                
+                int completedCount = completed.incrementAndGet();
+                if (completedCount % 100 == 0) {  // Report progress every 100 comparisons
+                    callback.onProgressUpdate(completedCount, totalComparisons);
+                }
+            });
+        
+        // Report final progress
+        int finalCount = completed.get();
+        callback.onProgressUpdate(finalCount, totalComparisons);
+    }
+    
+    /**
+     * Legacy method - filters a list of music files to find potential duplicates based on fuzzy configuration.
+     * @deprecated Use findFuzzyDuplicatesParallel() for better performance with large collections.
+     */
+    @Deprecated
     public static List<MusicFile> findFuzzyDuplicates(List<MusicFile> musicFiles, FuzzySearchConfig config) {
         if (musicFiles == null || musicFiles.isEmpty() || config == null) {
             return new ArrayList<>();

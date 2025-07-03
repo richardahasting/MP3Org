@@ -88,7 +88,7 @@ public class ProfileManagementPanel extends VBox {
         
         profileDescriptionArea = new TextArea();
         profileDescriptionArea.setEditable(false);
-        profileDescriptionArea.setPrefRowCount(3);
+        profileDescriptionArea.setPrefRowCount(5);
         profileDescriptionArea.setWrapText(true);
         profileDescriptionArea.setStyle("-fx-background-color: #f4f4f4; -fx-border-color: #cccccc;");
     }
@@ -172,10 +172,22 @@ public class ProfileManagementPanel extends VBox {
             DatabaseProfile activeProfile = DatabaseManager.getActiveProfile();
             if (activeProfile != null) {
                 profileNameField.setText(activeProfile.getName());
+                
+                // Get music file count from database with formatted display
+                int musicFileCount = DatabaseManager.getMusicFileCount();
+                String countDisplay;
+                if (musicFileCount >= 0) {
+                    String formattedCount = String.format("%,d", musicFileCount);
+                    countDisplay = formattedCount + (musicFileCount == 1 ? " file" : " files");
+                } else {
+                    countDisplay = "Unknown (database error)";
+                }
+                
                 profileDescriptionArea.setText(
                     "Database Path: " + activeProfile.getDatabasePath() + "\n" +
                     "Created: " + activeProfile.getCreatedDate() + "\n" +
-                    "Last Used: " + activeProfile.getLastUsedDate()
+                    "Last Used: " + activeProfile.getLastUsedDate() + "\n" +
+                    "Music Files: " + countDisplay
                 );
             } else {
                 profileNameField.setText("No active profile");
