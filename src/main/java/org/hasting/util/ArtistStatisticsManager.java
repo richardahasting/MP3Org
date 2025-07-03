@@ -200,7 +200,6 @@ public class ArtistStatisticsManager {
                 if (artistInitial.matches("[A-Z]")) { // only count artists with alphabetic names
                     Integer count = firstFieldMap.getOrDefault(artistInitial, 0);
                     totalFirstFieldWithAlphaNames++;
-                    System.out.println(String.format("%s: %d", artistInitial, count));
                     count++;
                     firstFieldMap.put(artistInitial, count);
                 }

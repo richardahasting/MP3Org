@@ -94,6 +94,56 @@ public class DatabaseManager {
             }
         }
     }
+    
+    /**
+     * Initializes the database connection with automatic profile fallback for locked databases.
+     * 
+     * <p>This method implements the self-teaching database initialization pattern that ensures
+     * the MP3Org application can always start successfully, even when the preferred database
+     * is locked by another application instance. The method name clearly communicates its
+     * purpose and the automatic fallback behavior.
+     * 
+     * <p><strong>Initialization Strategy:</strong>
+     * <ol>
+     *   <li><strong>Use profile manager:</strong> Leverage DatabaseProfileManager's fallback logic</li>
+     *   <li><strong>Activate with fallback:</strong> Automatically handle locked database scenarios</li>
+     *   <li><strong>Reload configuration:</strong> Update DatabaseConfig with the resolved profile</li>
+     *   <li><strong>Initialize normally:</strong> Use standard initialization once profile is resolved</li>
+     * </ol>
+     * 
+     * <p>This approach follows the development philosophy of "code that teaches its patterns" -
+     * future developers can understand the initialization flow by reading the method delegation
+     * and following the clear sequence of operations.
+     * 
+     * @param preferredProfileId the database profile the user wants to use
+     * @return the database profile that was actually activated (may differ from preferred due to fallback)
+     * @throws RuntimeException if no database profiles can be activated (extremely rare)
+     */
+    public static synchronized DatabaseProfile initializeWithAutomaticFallback(String preferredProfileId) {
+        if (connection != null) {
+            // Already initialized - return current active profile
+            return DatabaseProfileManager.getInstance().getActiveProfile();
+        }
+        
+        try {
+            // Use profile manager's fallback logic to resolve the best available profile
+            DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+            DatabaseProfile resolvedProfile = profileManager.activateProfileWithAutomaticFallback(preferredProfileId);
+            
+            // Reload configuration to reflect the resolved profile
+            config = DatabaseConfig.getInstance();
+            config.reload();
+            
+            // Now initialize with the resolved, available database
+            initialize();
+            
+            return resolvedProfile;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to initialize database connection with fallback: " + e.getMessage(), e);
+        }
+    }
 
 
     /**
@@ -576,6 +626,39 @@ public class DatabaseManager {
         }
 
         return null;
+    }
+
+    /**
+     * Gets the count of music files in the database matching current file type filters.
+     * 
+     * <p>This method provides an efficient way to get the total number of music files
+     * without loading all the data into memory. It respects the current file type
+     * filtering configuration to return only the count of enabled file types.
+     * 
+     * <p>The count reflects the same filtering logic as getAllMusicFiles() but with
+     * optimized performance for scenarios where only the total number is needed,
+     * such as displaying statistics in the configuration panel.
+     * 
+     * @return the number of music files in the database matching current filters, 
+     *         or -1 if database query fails (allowing UI to display "Unknown")
+     */
+    public static synchronized int getMusicFileCount() {
+        String sql = "SELECT COUNT(*) as file_count FROM music_files WHERE 1=1" + getFileTypeFilterClause();
+        
+        try (Statement stmt = getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            if (rs.next()) {
+                return rs.getInt("file_count");
+            }
+            return 0;
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting music file count: " + e.getMessage());
+            // Return -1 to indicate error state rather than throwing exception
+            // This allows the UI to display "Unknown" or "Error" instead of crashing
+            return -1;
+        }
     }
 
     /**

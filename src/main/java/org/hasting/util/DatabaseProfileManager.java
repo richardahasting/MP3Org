@@ -493,4 +493,253 @@ public class DatabaseProfileManager {
                !name.contains("\n") && 
                !name.contains("\r");
     }
+    
+    // ================================================================================================
+    // DATABASE LOCK FALLBACK METHODS
+    // Following self-documenting code philosophy: method names teach the fallback strategy
+    // ================================================================================================
+    
+    /**
+     * Attempts to activate the preferred profile, with automatic fallback to
+     * available alternatives if the primary database is locked.
+     * 
+     * <p>This method implements the core database lock fallback strategy that ensures
+     * the MP3Org application can always start successfully, even when multiple instances
+     * are running or when the preferred database is unavailable.
+     * 
+     * <p><strong>Fallback Strategy (applied in order):</strong>
+     * <ol>
+     *   <li><strong>Try preferred profile:</strong> Attempt to use the requested profile</li>
+     *   <li><strong>Scan existing profiles:</strong> Look for any unlocked alternative profiles</li>
+     *   <li><strong>Create temporary profile:</strong> Generate a new profile if all others are locked</li>
+     *   <li><strong>Notify user:</strong> Inform about any profile changes made automatically</li>
+     * </ol>
+     * 
+     * <p>This method embodies the principle that "good code teaches its patterns" - 
+     * future developers can understand the entire fallback strategy by reading this
+     * method and following its clear delegation to helper methods.
+     * 
+     * @param preferredProfileId the ID of the profile the user wants to use
+     * @return the database profile that was successfully activated (may be different from preferred)
+     * @throws IllegalArgumentException if preferredProfileId is null
+     * @throws RuntimeException if no fallback options are available (extremely rare)
+     */
+    public synchronized DatabaseProfile activateProfileWithAutomaticFallback(String preferredProfileId) {
+        if (preferredProfileId == null) {
+            throw new IllegalArgumentException("Preferred profile ID cannot be null");
+        }
+        
+        DatabaseProfile preferredProfile = getProfile(preferredProfileId);
+        if (preferredProfile == null) {
+            System.out.println("Warning: Preferred profile '" + preferredProfileId + "' not found, searching for alternatives");
+            return activateFirstAvailableProfileOrCreateTemporary();
+        }
+        
+        // Step 1: Try the preferred profile first
+        if (DatabaseConnectionManager.isDatabaseAvailableForProfile(preferredProfile)) {
+            boolean activated = setActiveProfile(preferredProfileId);
+            if (activated) {
+                System.out.println("Successfully activated preferred profile: " + preferredProfile.getName());
+                return preferredProfile;
+            }
+        }
+        
+        // Step 2: Look for alternative existing profiles
+        DatabaseProfile fallbackProfile = findFirstAvailableProfile();
+        if (fallbackProfile != null) {
+            return activateProfileWithUserNotification(fallbackProfile, preferredProfile);
+        }
+        
+        // Step 3: Create temporary profile as last resort
+        return createAndActivateTemporaryProfile(preferredProfile);
+    }
+    
+    /**
+     * Searches existing profiles to find the first one with an unlocked database.
+     * 
+     * <p>This method implements a simple but effective strategy: iterate through all
+     * existing profiles and test each one until finding an available database. The
+     * method name clearly communicates its purpose and return behavior.
+     * 
+     * <p>Profiles are tested in the order they appear in the profiles map, which
+     * typically corresponds to their creation order. This provides predictable
+     * fallback behavior that users can understand and rely upon.
+     * 
+     * @return the first profile with an available database, or null if all are locked
+     */
+    private DatabaseProfile findFirstAvailableProfile() {
+        for (DatabaseProfile profile : profiles.values()) {
+            if (DatabaseConnectionManager.isDatabaseAvailableForProfile(profile)) {
+                System.out.println("Found available fallback profile: " + profile.getName());
+                return profile;
+            }
+        }
+        
+        System.out.println("No existing profiles have available databases");
+        return null;
+    }
+    
+    /**
+     * Activates an alternative profile and notifies the user about the automatic change.
+     * 
+     * <p>This method handles the communication aspect of automatic profile switching.
+     * It activates the fallback profile and provides clear information to the user
+     * about what happened and why, maintaining transparency in the automatic fallback process.
+     * 
+     * @param fallbackProfile the profile to activate as an alternative
+     * @param originalProfile the profile that was originally requested but unavailable
+     * @return the activated fallback profile
+     */
+    private DatabaseProfile activateProfileWithUserNotification(DatabaseProfile fallbackProfile, 
+                                                                DatabaseProfile originalProfile) {
+        boolean activated = setActiveProfile(fallbackProfile.getId());
+        if (activated) {
+            System.out.println("Automatically switched to profile '" + fallbackProfile.getName() + 
+                             "' because '" + originalProfile.getName() + "' database was locked");
+            System.out.println("You can switch back to '" + originalProfile.getName() + 
+                             "' later when it becomes available");
+            return fallbackProfile;
+        } else {
+            throw new RuntimeException("Failed to activate fallback profile: " + fallbackProfile.getName());
+        }
+    }
+    
+    /**
+     * Creates a temporary profile with a unique database path when all existing profiles are locked.
+     * 
+     * <p>This method serves as the final fallback option to ensure the application can always start.
+     * It creates a completely new profile with a unique database path, guaranteeing that no lock
+     * conflicts will occur. The temporary profile inherits configuration settings from the original
+     * preferred profile to maintain consistency in user experience.
+     * 
+     * <p><strong>Temporary Profile Characteristics:</strong>
+     * <ul>
+     *   <li>Unique database path with timestamp to avoid conflicts</li>
+     *   <li>Clear naming that indicates its temporary/fallback nature</li>
+     *   <li>Inherits file type and search configurations from original profile</li>
+     *   <li>Automatically saved to profiles configuration for user access</li>
+     * </ul>
+     * 
+     * @param originalProfile the profile that was originally requested but unavailable
+     * @return the newly created and activated temporary profile
+     */
+    private DatabaseProfile createAndActivateTemporaryProfile(DatabaseProfile originalProfile) {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String tempDbPath = "temp-fallback-" + timestamp;
+        
+        DatabaseProfile tempProfile = new DatabaseProfile("temp_fallback_" + timestamp, "Temporary Fallback Profile", tempDbPath);
+        tempProfile.setDescription("Auto-created when '" + originalProfile.getName() + 
+                                   "' was locked by another MP3Org instance");
+        
+        // Inherit configuration settings from the original profile to maintain consistency
+        tempProfile.setEnabledFileTypes(originalProfile.getEnabledFileTypes());
+        tempProfile.setFuzzySearchConfig(originalProfile.getFuzzySearchConfig());
+        
+        // Add and activate the temporary profile
+        addProfile(tempProfile);
+        boolean activated = setActiveProfile(tempProfile.getId());
+        
+        if (activated) {
+            System.out.println("Created temporary profile '" + tempProfile.getName() + 
+                             "' with database at: " + tempDbPath);
+            System.out.println("This temporary profile will be available for future use");
+            return tempProfile;
+        } else {
+            throw new RuntimeException("Failed to activate temporary profile: " + tempProfile.getName());
+        }
+    }
+    
+    /**
+     * Convenience method to activate any available profile or create a temporary one.
+     * 
+     * <p>This method implements the fallback strategy when no preferred profile is specified
+     * or when the preferred profile doesn't exist. It demonstrates the same pattern as
+     * the main fallback method but without a specific preferred profile to fall back from.
+     * 
+     * @return an activated database profile (either existing or newly created)
+     */
+    private DatabaseProfile activateFirstAvailableProfileOrCreateTemporary() {
+        DatabaseProfile available = findFirstAvailableProfile();
+        if (available != null) {
+            boolean activated = setActiveProfile(available.getId());
+            if (activated) {
+                System.out.println("Activated first available profile: " + available.getName());
+                return available;
+            }
+        }
+        
+        // Create a basic temporary profile when no existing profiles are available
+        DatabaseProfile tempProfile = createBasicTemporaryProfile();
+        addProfile(tempProfile);
+        setActiveProfile(tempProfile.getId());
+        
+        System.out.println("Created basic temporary profile as no alternatives were available");
+        return tempProfile;
+    }
+    
+    /**
+     * Creates a basic temporary profile with default settings.
+     * 
+     * <p>This method creates a minimal temporary profile when no existing profiles
+     * are available to inherit settings from. It uses safe defaults that work
+     * for most MP3Org use cases.
+     * 
+     * @return a new temporary profile with default configuration
+     */
+    private DatabaseProfile createBasicTemporaryProfile() {
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String tempDbPath = "temp-basic-" + timestamp;
+        
+        DatabaseProfile tempProfile = new DatabaseProfile("temp_basic_" + timestamp, "Temporary Basic Profile", tempDbPath);
+        tempProfile.setDescription("Auto-created temporary profile with default settings");
+        
+        return tempProfile;
+    }
+    
+    /**
+     * Tests if the currently active profile's database is available.
+     * 
+     * <p>This convenience method provides a simple way to check if the current
+     * profile can be used without lock conflicts. It's useful for periodic
+     * checks or user interface status updates.
+     * 
+     * @return true if the active profile's database is available, false if locked
+     */
+    public boolean isActiveProfileDatabaseAvailable() {
+        DatabaseProfile activeProfile = getActiveProfile();
+        return activeProfile != null && 
+               DatabaseConnectionManager.isDatabaseAvailableForProfile(activeProfile);
+    }
+    
+    /**
+     * Attempts to return to a preferred profile if it becomes available.
+     * 
+     * <p>This method supports the user experience of automatically returning to
+     * a preferred profile once it becomes available (e.g., when another MP3Org
+     * instance is closed). It can be called periodically or in response to user
+     * requests to "retry preferred profile".
+     * 
+     * @param preferredProfileId the profile to attempt to return to
+     * @return true if successfully switched back to preferred profile, false if still locked
+     */
+    public synchronized boolean attemptReturnToPreferredProfile(String preferredProfileId) {
+        if (preferredProfileId == null || preferredProfileId.equals(activeProfileId)) {
+            return true; // Already using preferred profile or no preference specified
+        }
+        
+        DatabaseProfile preferredProfile = getProfile(preferredProfileId);
+        if (preferredProfile == null) {
+            return false; // Preferred profile no longer exists
+        }
+        
+        if (DatabaseConnectionManager.isDatabaseAvailableForProfile(preferredProfile)) {
+            boolean switched = setActiveProfile(preferredProfileId);
+            if (switched) {
+                System.out.println("Successfully returned to preferred profile: " + preferredProfile.getName());
+                return true;
+            }
+        }
+        
+        return false; // Preferred profile still locked or activation failed
+    }
 }

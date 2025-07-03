@@ -457,6 +457,16 @@ public class DatabaseConfig {
             if (activeProfile.getDescription() != null && !activeProfile.getDescription().trim().isEmpty()) {
                 info.append("  Description: ").append(activeProfile.getDescription()).append("\n");
             }
+            
+            // Add music file count with formatted display
+            int fileCount = getMusicFileCountSafely();
+            if (fileCount >= 0) {
+                String formattedCount = String.format("%,d", fileCount);
+                info.append("  Music Files: ").append(formattedCount)
+                    .append(fileCount == 1 ? " file" : " files").append("\n");
+            } else {
+                info.append("  Music Files: Unknown (database error)\n");
+            }
         }
         
         if (profileManager != null) {
@@ -545,6 +555,46 @@ public class DatabaseConfig {
             activeProfile.setDatabasePath(databasePath);
             activeProfile.setEnabledFileTypes(enabledFileTypes);
             profileManager.updateProfile(activeProfile);
+        }
+    }
+    
+    /**
+     * Gets the music file count safely, handling database connection issues gracefully.
+     * 
+     * <p>This method provides a safe way to retrieve the music file count for display
+     * in configuration panels. It handles potential database connection issues by
+     * catching exceptions and returning -1 to indicate an error state, allowing
+     * the UI to display appropriate messages like "Unknown" instead of crashing.
+     * 
+     * <p>This method is especially important during configuration reloads when the
+     * database connection might be temporarily unavailable or being reinitialized.
+     * 
+     * @return the number of music files in the database, or -1 if unable to query
+     */
+    private int getMusicFileCountSafely() {
+        try {
+            // Check if we're in the middle of a configuration reload
+            // by verifying basic database connectivity first
+            Class<?> dbManagerClass = Class.forName("org.hasting.util.DatabaseManager");
+            
+            // First check if database connection is available
+            java.lang.reflect.Method getConnectionMethod = dbManagerClass.getMethod("getConnection");
+            Object connection = getConnectionMethod.invoke(null);
+            
+            if (connection == null) {
+                // Database connection not available, return error state
+                return -1;
+            }
+            
+            // Now safely get the count
+            java.lang.reflect.Method getCountMethod = dbManagerClass.getMethod("getMusicFileCount");
+            return (Integer) getCountMethod.invoke(null);
+            
+        } catch (Exception e) {
+            // Log the error but don't throw - return -1 to indicate error state
+            // This is especially important during config reloads when connection might be temporarily unavailable
+            System.err.println("Warning: Could not retrieve music file count (possibly during config reload): " + e.getMessage());
+            return -1;
         }
     }
 }

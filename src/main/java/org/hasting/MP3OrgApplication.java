@@ -15,6 +15,8 @@ import org.hasting.ui.ImportOrganizeView;
 import org.hasting.ui.ConfigurationView;
 import org.hasting.ui.LogViewerDialog;
 import org.hasting.util.DatabaseManager;
+import org.hasting.util.DatabaseProfile;
+import org.hasting.util.DatabaseProfileManager;
 import org.hasting.util.HelpSystem;
 import org.hasting.util.logging.MP3OrgLoggingManager;
 import org.hasting.util.logging.Logger;
@@ -54,7 +56,7 @@ public class MP3OrgApplication extends Application {
      * 
      * <p>This method performs the following initialization steps:
      * <ol>
-     *   <li>Initializes the database manager and connections</li>
+     *   <li>Initializes the database manager and connections with automatic fallback</li>
      *   <li>Creates the main window layout with menu bar and tab pane</li>
      *   <li>Sets up the four main functional tabs (Duplicate Manager, Metadata Editor, Import & Organize, Configuration)</li>
      *   <li>Configures keyboard shortcuts and tooltips</li>
@@ -72,10 +74,15 @@ public class MP3OrgApplication extends Application {
         
         logger.info("Initializing MP3Org application");
         
-        // Initialize database
-        logger.debug("Initializing database manager");
-        DatabaseManager.initialize();
-        logger.info("Database manager initialized successfully");
+        try {
+            // Initialize database with automatic fallback for locked databases
+            logger.debug("Initializing database manager with automatic fallback");
+            initializeDatabaseWithAutomaticFallback();
+            logger.info("Database manager initialized successfully");
+        } catch (Exception e) {
+            handleStartupFailure(e, primaryStage);
+            return;
+        }
         
         // Create main layout
         BorderPane root = new BorderPane();
@@ -275,6 +282,85 @@ public class MP3OrgApplication extends Application {
         }
     }
 
+    // ================================================================================================
+    // DATABASE INITIALIZATION WITH FALLBACK
+    // Following self-documenting code philosophy: method names teach the startup strategy
+    // ================================================================================================
+    
+    /**
+     * Initializes database connection with automatic fallback to alternative profiles
+     * if the preferred database is locked. This ensures the application always starts
+     * successfully, even when multiple instances are running.
+     * 
+     * <p>This method implements the core startup strategy that embodies the principle
+     * of self-documenting code - the method name clearly communicates the automatic
+     * fallback behavior, and the implementation teaches the pattern through clear
+     * delegation to specialized methods.
+     * 
+     * <p><strong>Startup Strategy:</strong>
+     * <ol>
+     *   <li>Get the preferred profile from current configuration</li>
+     *   <li>Use DatabaseManager's fallback-enabled initialization</li>
+     *   <li>Log the results for user awareness and troubleshooting</li>
+     * </ol>
+     * 
+     * @throws RuntimeException if no database profiles can be activated
+     */
+    private void initializeDatabaseWithAutomaticFallback() {
+        DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+        String preferredProfileId = profileManager.getActiveProfileId();
+        
+        if (preferredProfileId == null) {
+            throw new RuntimeException("No database profile configuration found");
+        }
+        
+        DatabaseProfile resolvedProfile = DatabaseManager.initializeWithAutomaticFallback(preferredProfileId);
+        
+        System.out.println("Database initialized with profile: " + resolvedProfile.getName());
+        if (!resolvedProfile.getId().equals(preferredProfileId)) {
+            System.out.println("Note: Switched from preferred profile due to database lock");
+        }
+    }
+    
+    /**
+     * Handles startup failures by providing clear error messages to the user
+     * and gracefully shutting down the application.
+     * 
+     * <p>This method provides user-friendly error handling for database initialization
+     * problems. It shows informative error dialogs and ensures the application
+     * shuts down cleanly even when startup fails.
+     * 
+     * @param e the exception that caused startup to fail
+     * @param primaryStage the primary stage (may be used for error dialog positioning)
+     */
+    private void handleStartupFailure(Exception e, Stage primaryStage) {
+        System.err.println("Failed to start MP3Org application: " + e.getMessage());
+        e.printStackTrace();
+        
+        // Show user-friendly error dialog
+        Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+        errorAlert.setTitle("MP3Org Startup Error");
+        errorAlert.setHeaderText("Application Failed to Start");
+        errorAlert.setContentText(
+            "MP3Org could not initialize properly:\n\n" +
+            e.getMessage() + "\n\n" +
+            "Please check that:\n" +
+            "• No other MP3Org instances are running\n" +
+            "• Database files are not corrupted\n" +
+            "• You have write permissions to the database directory"
+        );
+        
+        try {
+            errorAlert.showAndWait();
+        } catch (Exception dialogException) {
+            // If we can't even show the error dialog, just log and exit
+            System.err.println("Could not display error dialog: " + dialogException.getMessage());
+        }
+        
+        // Graceful shutdown
+        System.exit(1);
+    }
+    
     /**
      * Performs cleanup operations when the application is shutting down.
      * 

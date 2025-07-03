@@ -34,6 +34,12 @@ public class ImportProgressDialog {
     private boolean cancelled = false;
     private Runnable onCancelCallback;
     
+    // Progress update throttling
+    private long lastUpdateTime = 0;
+    private static final long UPDATE_INTERVAL_MS = 100; // Update UI at most every 100ms
+    private int pendingLogEntries = 0;
+    private static final int LOG_BATCH_SIZE = 10; // Only add log entries every 10 updates
+    
     public ImportProgressDialog(Window owner) {
         createDialog(owner);
     }
@@ -171,6 +177,14 @@ public class ImportProgressDialog {
      * Updates progress based on MusicFileScanner.ScanProgress data.
      */
     public void updateProgress(MusicFileScanner.ScanProgress progress) {
+        long currentTime = System.currentTimeMillis();
+        
+        // Throttle UI updates to improve performance
+        if (currentTime - lastUpdateTime < UPDATE_INTERVAL_MS) {
+            return;
+        }
+        lastUpdateTime = currentTime;
+        
         Platform.runLater(() -> {
             // Update stage information
             String stageText = switch (progress.stage) {
@@ -206,16 +220,20 @@ public class ImportProgressDialog {
             
             updateStatistics();
             
-            // Add to log
-            String logEntry = String.format("[%s] Dir: %d/%d, Files: %d/%d - %s", 
-                progress.stage.toUpperCase(),
-                progress.directoriesProcessed + 1,
-                progress.totalDirectories,
-                progress.filesProcessed,
-                progress.filesFound,
-                progress.currentFile.isEmpty() ? progress.currentDirectory : progress.currentFile
-            );
-            addLogEntry(logEntry);
+            // Only add log entries periodically to reduce overhead
+            pendingLogEntries++;
+            if (pendingLogEntries >= LOG_BATCH_SIZE) {
+                String logEntry = String.format("[%s] Dir: %d/%d, Files: %d/%d - %s", 
+                    progress.stage.toUpperCase(),
+                    progress.directoriesProcessed + 1,
+                    progress.totalDirectories,
+                    progress.filesProcessed,
+                    progress.filesFound,
+                    progress.currentFile.isEmpty() ? progress.currentDirectory : progress.currentFile
+                );
+                addLogEntry(logEntry);
+                pendingLogEntries = 0;
+            }
         });
     }
     
@@ -283,17 +301,30 @@ public class ImportProgressDialog {
                 currentStageProgressBar.setProgress(1.0);
                 currentFileLabel.setText(message);
                 detailsLabel.setText("All files have been imported successfully.");
+                
+                addLogEntry("COMPLETED: Import finished successfully");
+                
+                // Auto-close after 2 seconds for successful imports
+                javafx.animation.Timeline timeline = new javafx.animation.Timeline(
+                    new javafx.animation.KeyFrame(
+                        javafx.util.Duration.seconds(2),
+                        e -> hide()
+                    )
+                );
+                timeline.play();
+                
             } else {
                 stageLabel.setText("Import Failed");
                 detailsLabel.setText("Error: " + message);
                 detailsLabel.setStyle("-fx-text-fill: red;");
+                
+                // For failed imports, show close button but don't auto-close
+                cancelButton.setText("Close");
+                cancelButton.setDisable(false);
+                cancelButton.setOnAction(e -> hide());
+                
+                addLogEntry("FAILED: " + message);
             }
-            
-            cancelButton.setText("Close");
-            cancelButton.setDisable(false);
-            cancelButton.setOnAction(e -> hide());
-            
-            addLogEntry(success ? "COMPLETED: Import finished successfully" : "FAILED: " + message);
         });
     }
 }
