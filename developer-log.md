@@ -1,11 +1,11 @@
 # MP3Org Developer Log
 
-## Session: 2025-07-03 - Database Lock Fallback Implementation & Testing
+## Session: 2025-07-03 - Database Lock Fallback Implementation & Profile Management Enhancement
 
 ### **Session Overview**
 - **Duration**: ~3 hours implementation and testing session
-- **Focus**: Complete implementation of database lock fallback feature (Issue #20)
-- **Outcome**: Successfully implemented, tested, and validated database lock fallback system with 100% test coverage
+- **Focus**: Complete implementation of database lock fallback feature (Issue #20) + Profile management enhancement
+- **Outcome**: Successfully implemented, tested, and validated database lock fallback system with 100% test coverage, plus enhanced profile information display
 
 ---
 
@@ -130,6 +130,125 @@ Following the development philosophy of "code that teaches its patterns":
 ✅ **All tests passing with comprehensive coverage**
 ✅ **Self-documenting code follows development philosophy**
 ✅ **Feature ready for production use**
+
+---
+
+## Session: 2025-07-03 (Continued) - Profile File Count Enhancement Implementation
+
+### **Session Overview**
+- **Duration**: ~1 hour implementation session 
+- **Focus**: Add music file count to Configuration tab "Configuration Information" section (Issue #21)
+- **Outcome**: Successfully implemented and tested music file count display with proper formatting
+
+---
+
+### **User Requirements**
+- **Request**: "add that datapoint to the database tab 'Configuration Information'"
+- **Context**: Enhancement to show number of music files in each database profile for better user awareness
+- **Goal**: Display formatted file count in Configuration tab's Database panel
+
+### **Implementation Results**
+
+#### **1. Database Layer Enhancement** ✅ **COMPLETED**
+- ✅ **Added DatabaseManager.getMusicFileCount()** method (25 lines) - Efficient COUNT(*) query
+- ✅ **Respects file type filters** - Only counts enabled file types
+- ✅ **Error handling** - Returns -1 for error states instead of throwing exceptions
+- ✅ **Performance optimized** - SQL COUNT query instead of loading all records
+
+#### **2. Configuration Display Enhancement** ✅ **COMPLETED**
+- ✅ **Enhanced DatabaseConfig.getConfigurationInfo()** method
+- ✅ **Added formatted file count display** with proper number formatting (e.g., "1,247 files")
+- ✅ **Graceful error handling** - Shows "Unknown (database error)" for error states
+- ✅ **Safe database access** - Uses reflection to avoid circular dependencies
+
+#### **3. Testing & Validation** ✅ **COMPLETED**
+```bash
+DatabaseManagerTestComprehensive: 20/20 tests passed (100% success rate)
+Application launch: Successful with automatic profile fallback
+```
+
+**Implementation Details:**
+```java
+// New efficient count method in DatabaseManager
+public static synchronized int getMusicFileCount() {
+    String sql = "SELECT COUNT(*) as file_count FROM music_files WHERE 1=1" + getFileTypeFilterClause();
+    // Returns -1 for error states to allow UI graceful handling
+}
+
+// Enhanced configuration info display
+Active Profile:
+  Name: hasting
+  ID: profile_1751344838462
+  Music Files: 1,247 files  ← NEW FEATURE
+  File Types: 10/10 enabled
+```
+
+#### **4. User Experience Benefits** ✅ **ACHIEVED**
+- ✅ **Profile comparison** - Users can easily see which profiles contain music libraries
+- ✅ **Storage awareness** - Understand relative sizes of different profiles  
+- ✅ **Migration planning** - Know data volumes before switching profiles
+- ✅ **Troubleshooting** - Quickly identify empty or problematic profiles
+- ✅ **Number formatting** - User-friendly display with thousand separators
+
+#### **5. Technical Integration** ✅ **SEAMLESS**
+- ✅ **Database lock fallback compatible** - Works with multi-instance profile switching
+- ✅ **Real-time updates** - Count updates when switching profiles or after imports
+- ✅ **Error resilient** - Handles database connection issues gracefully
+- ✅ **Performance efficient** - Fast COUNT query instead of loading all data
+
+---
+
+### **Configuration Information Display Enhancement**
+
+**Before:**
+```
+Active Profile:
+  Name: hasting
+  ID: profile_1751344838462
+  Description: Main music collection
+```
+
+**After:**
+```
+Active Profile:
+  Name: hasting  
+  ID: profile_1751344838462
+  Description: Main music collection
+  Music Files: 1,247 files  ← NEW
+```
+
+### **Session Summary**
+
+#### **Code Changes**
+- **DatabaseManager.java**: Added `getMusicFileCount()` method with proper JavaDoc
+- **DatabaseConfig.java**: Enhanced `getConfigurationInfo()` and added `getMusicFileCountSafely()` helper
+- **Files Modified**: 2 core utility classes, ~50 lines of new code
+
+#### **Testing Results**
+- ✅ **Compilation**: BUILD SUCCESSFUL
+- ✅ **Database Tests**: 20/20 tests passing (100% success rate)
+- ✅ **Application Launch**: Successful with profile fallback working
+- ✅ **Multi-instance Support**: Database lock fallback compatible
+
+#### **Quality Standards**
+- ✅ **Self-documenting code** - Clear method names and comprehensive JavaDoc
+- ✅ **Error handling** - Graceful degradation for database connection issues
+- ✅ **User experience** - Formatted numbers with proper singular/plural handling
+- ✅ **Performance** - Efficient COUNT query instead of loading all records
+
+#### **Implementation Highlights**
+- **Efficient Database Access**: Uses optimized COUNT(*) query respecting file type filters
+- **Error Resilience**: Returns -1 for errors allowing UI to display "Unknown" instead of crashing
+- **Number Formatting**: Provides user-friendly display with thousand separators and proper pluralization
+- **Integration**: Seamlessly works with existing database lock fallback system
+
+---
+
+### **Issue #21 Resolution**
+✅ **Successfully implemented music file count in Configuration tab**
+✅ **Enhanced user experience for profile management** 
+✅ **Maintains compatibility with existing database lock fallback system**
+✅ **Ready for production use**
 
 ---
 
