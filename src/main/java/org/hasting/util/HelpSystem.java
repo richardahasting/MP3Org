@@ -39,7 +39,7 @@ public class HelpSystem {
         tooltips.put("config.profile.new", "Create a new database profile with a custom name and location.");
         tooltips.put("config.profile.duplicate", "Create a copy of the currently active profile with identical settings.");
         tooltips.put("config.profile.rename", "Change the name of the currently active profile.");
-        tooltips.put("config.profile.delete", "Remove the selected profile. You cannot delete the last remaining profile.");
+        tooltips.put("config.profile.delete", "Remove the selected profile and delete its database files from disk. You cannot delete the last remaining profile.");
         tooltips.put("config.profile.name", "Enter a descriptive name for this database profile.");
         tooltips.put("config.profile.description", "Optional description to help identify this profile's purpose or contents.");
         

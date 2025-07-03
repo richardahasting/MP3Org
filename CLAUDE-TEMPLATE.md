@@ -22,6 +22,10 @@ This template contains universal Claude Code behaviors that should be included i
 - **Use TodoWrite/TodoRead** for any multi-step or complex tasks
 - **Update task statuses in real-time** as work progresses
 - **Mark tasks complete immediately** upon finishing each item
+- **ALWAYS include "Update work-in-progress.md" as the FIRST task** in every todo list
+- **ALWAYS include "Create feature branch for this work" as the SECOND task** (before any code changes)
+- **ALWAYS include a "Document work in developer-log.md" task** for any coding session
+- **Never consider work complete** until developer log documentation is finished
 
 ### 4. Issue Tracking for All Changes
 - **Check for existing issues** before making any bug fix or improvement

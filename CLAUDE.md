@@ -85,31 +85,50 @@ Uses fuzzy string matching with configurable thresholds:
 - **Update the log throughout each session**, not just at the end
 - **Include session statistics** and next steps for continuity
 
-### 2. GitHub Issues Management
+### 2. Work-in-Progress Tracking
+- **Maintain work-in-progress.md** as active status file between sessions
+- **Update current status** with completed work and active tasks
+- **Record blockers and context** for session continuity
+- **Track next priority items** and outstanding issues
+- **Update at start and end** of each session for proper handoff
+
+### 3. GitHub Issues Management
 - **Create missing labels automatically** when needed for proper categorization
 - **Apply comprehensive labeling** to all GitHub issues
 - **Create GitHub issues for every fix/improvement** if one doesn't already exist
 - **Reference related issues** and dependencies appropriately
 
-### 3. Todo List Management
+### 4. Todo List Management
 - **Use TodoWrite/TodoRead** for any multi-step or complex tasks
 - **Update task statuses in real-time** as work progresses
 - **Mark tasks complete immediately** upon finishing each item
+- **ALWAYS include "Update work-in-progress.md" as the FIRST task** in every todo list
+- **ALWAYS include "Create feature branch for this work" as the SECOND task** (before any code changes)
+- **ALWAYS include a "Document work in developer-log.md" task** for any coding session
+- **Never consider work complete** until developer log documentation is finished
 
-### 4. Issue Tracking for All Changes
+### 5. Issue Tracking for All Changes
 - **Check for existing issues** before making any bug fix or improvement
 - **Create new GitHub issue** if none exists for the work being done
 - **Properly describe the issue** with context and solution approach
 - **Reference issues in commits** when implementing fixes
 - **Close issues when validated** and working correctly
 
-### 5. Code Quality Standards
+### 6. Code Quality Standards
 - **Follow existing code conventions** and patterns in the codebase
 - **Add comprehensive JavaDoc** to new methods and classes
 - **Apply consistent formatting** following project standards
 - **Run linting and type checking** before completing tasks (when available)
 
-### 6. Testing and Validation
+### 7. Git Workflow and Branching
+- **ALWAYS create a feature branch** before starting any issue or improvement work
+- **Use descriptive branch names** like `feature/issue-12-test-cleanup` or `fix/database-config`
+- **Never work directly on main branch** unless explicitly instructed otherwise
+- **Create pull requests** for review when work is complete
+- **Reference issues in commit messages** for traceability
+- **Follow branch-per-issue approach** as outlined in DEVELOPMENT-PHILOSOPHY.md
+
+### 8. Testing and Validation
 - **Run existing tests** to ensure changes don't break functionality
 - **Create tests for new functionality** when appropriate
 - **Validate all changes compile** and work as expected

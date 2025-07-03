@@ -6,12 +6,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 /**
  * Manages multiple database profiles and handles profile switching.
  */
 public class DatabaseProfileManager {
     
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseProfileManager.class);
     private static final String PROFILES_CONFIG_FILE = "mp3org-profiles.properties";
     private static final String ACTIVE_PROFILE_KEY = "active.profile.id";
     private static final String PROFILE_PREFIX = "profile.";
@@ -225,7 +228,7 @@ public class DatabaseProfileManager {
     }
     
     /**
-     * Removes a profile.
+     * Removes a profile and its associated database files.
      */
     public synchronized boolean removeProfile(String profileId) {
         if (!profiles.containsKey(profileId)) {
@@ -237,7 +240,10 @@ public class DatabaseProfileManager {
             throw new IllegalStateException("Cannot remove the last profile");
         }
         
-        // If removing active profile, switch to another one
+        DatabaseProfile profileToRemove = profiles.get(profileId);
+        String databasePath = profileToRemove.getDatabasePath();
+        
+        // If removing active profile, switch to another one first
         if (profileId.equals(activeProfileId)) {
             String newActiveId = profiles.keySet().stream()
                     .filter(id -> !id.equals(profileId))
@@ -249,11 +255,92 @@ public class DatabaseProfileManager {
             }
         }
         
+        // Close any existing database connections to this database
+        try {
+            DatabaseManager.shutdown();
+            logger.debug("Closed database connection before profile deletion");
+        } catch (Exception e) {
+            logger.warning("Could not close database connection before profile deletion: {}", e.getMessage());
+        }
+        
+        // Remove profile from registry
         DatabaseProfile removed = profiles.remove(profileId);
         saveProfiles();
         
-        System.out.println("Removed profile: " + (removed != null ? removed.getName() : profileId));
+        // Delete the database directory and all its files
+        boolean databaseDeleted = deleteDatabaseFiles(databasePath);
+        
+        logger.info("Removed profile: {}", removed != null ? removed.getName() : profileId);
+        if (databaseDeleted) {
+            logger.info("Successfully deleted database files at: {}", databasePath);
+        } else {
+            logger.warning("Could not delete database files at: {}", databasePath);
+        }
+        
         return true;
+    }
+    
+    /**
+     * Deletes the database directory and all its files.
+     * Apache Derby databases are stored as directories with multiple files.
+     */
+    private boolean deleteDatabaseFiles(String databasePath) {
+        if (databasePath == null || databasePath.trim().isEmpty()) {
+            logger.warning("Cannot delete database files: path is null or empty");
+            return false;
+        }
+        
+        java.io.File databaseDir = new java.io.File(databasePath);
+        if (!databaseDir.exists()) {
+            // Database directory doesn't exist, consider this success
+            logger.debug("Database directory does not exist: {}", databasePath);
+            return true;
+        }
+        
+        if (!databaseDir.isDirectory()) {
+            // Path exists but is not a directory, try to delete as single file
+            logger.debug("Database path is a file, not directory: {}", databasePath);
+            boolean deleted = databaseDir.delete();
+            if (deleted) {
+                logger.debug("Successfully deleted database file: {}", databasePath);
+            } else {
+                logger.warning("Failed to delete database file: {}", databasePath);
+            }
+            return deleted;
+        }
+        
+        // Recursively delete the database directory and all its contents
+        logger.debug("Recursively deleting database directory: {}", databasePath);
+        return deleteDirectoryRecursively(databaseDir);
+    }
+    
+    /**
+     * Recursively deletes a directory and all its contents.
+     */
+    private boolean deleteDirectoryRecursively(java.io.File directory) {
+        if (directory == null || !directory.exists()) {
+            return true;
+        }
+        
+        if (directory.isDirectory()) {
+            java.io.File[] files = directory.listFiles();
+            if (files != null) {
+                for (java.io.File file : files) {
+                    if (!deleteDirectoryRecursively(file)) {
+                        logger.error("Failed to delete file: {}", file.getAbsolutePath());
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        boolean deleted = directory.delete();
+        if (deleted) {
+            logger.debug("Successfully deleted: {}", directory.getAbsolutePath());
+        } else {
+            logger.error("Failed to delete directory: {}", directory.getAbsolutePath());
+        }
+        return deleted;
     }
     
     /**

@@ -7,7 +7,8 @@ import org.hasting.model.MusicFile;
 import java.io.File;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
+import org.hasting.util.logging.Logger;
 
 /**
  * High-performance music file scanner for recursive directory traversal and metadata extraction.
@@ -62,7 +63,7 @@ import java.util.logging.Logger;
  * @since 1.0
  */
 public class MusicFileScanner {
-    private static final Logger logger = Logger.getLogger(MusicFileScanner.class.getName());
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(MusicFileScanner.class);
     // List of supported music file extensions
     private static final String[] SUPPORTED_EXTENSIONS = {
         "mp3", "flac", "ogg", "wav", "aac", "m4a", "wma", "aiff", "ape", "opus"
@@ -202,7 +203,7 @@ public class MusicFileScanner {
                 totalFilesProcessed += newFiles.size();
                 
             } catch (Exception e) {
-                logger.severe("Error scanning directory: " + e.getMessage());
+                logger.error("Error scanning directory: {}", e.getMessage(), e);
                 if (statusCallback != null) {
                     statusCallback.accept("Error scanning directory: " + e.getMessage());
                 }
@@ -260,7 +261,7 @@ public class MusicFileScanner {
             }
             
         } catch (Exception e) {
-            logger.severe("Error scanning directory: " + e.getMessage());
+            logger.error("Error scanning directory: {}", e.getMessage(), e);
             if (statusCallback != null) {
                 statusCallback.accept("Error scanning directory: " + e.getMessage());
             }
@@ -362,7 +363,7 @@ public class MusicFileScanner {
         // Test with a single directory
         List<String> singleDirectory = Arrays.asList("/Users/richard/Music");
         List<MusicFile> singleDirMusicFiles = scanner.scanMusicFiles(singleDirectory);
-        System.out.println("Music files found in single directory: " + singleDirMusicFiles.size());
+        logger.info("Music files found in single directory: {}", singleDirMusicFiles.size());
 
         // Test with multiple directories
         List<String> multipleDirectories = Arrays.asList(
@@ -370,6 +371,6 @@ public class MusicFileScanner {
             "/Users/richard/Music/Music/Media"
         );
         List<MusicFile> multipleDirMusicFiles = scanner.scanMusicFiles(multipleDirectories);
-        System.out.println("Music files found in multiple directories: " + multipleDirMusicFiles.size());
+        logger.info("Music files found in multiple directories: {}", multipleDirMusicFiles.size());
     }
 }
