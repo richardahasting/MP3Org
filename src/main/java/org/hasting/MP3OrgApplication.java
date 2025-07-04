@@ -79,6 +79,9 @@ public class MP3OrgApplication extends Application {
             logger.debug("Initializing database manager with automatic fallback");
             initializeDatabaseWithAutomaticFallback();
             logger.info("Database manager initialized successfully");
+            
+            // Reload logging configuration from database after initialization
+            MP3OrgLoggingManager.reloadConfigurationFromDatabase();
         } catch (Exception e) {
             handleStartupFailure(e, primaryStage);
             return;

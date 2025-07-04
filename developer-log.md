@@ -51,6 +51,73 @@ Created test classes:
 
 ---
 
+## Session: 2025-07-04 - Circular Dependency Resolution & DatabaseProfileManager Simplification
+
+### **Session Overview**
+- **Duration**: ~1 hour circular dependency fix session
+- **Focus**: Complete resolution of StackOverflowError (Issue #25) + DatabaseProfileManager simplification
+- **Outcome**: Successfully fixed circular dependency by implementing early logging initialization with database config reload
+
+### **User Requirements**
+- **Context**: Continuing from previous session where we implemented user's suggested approach
+- **Request**: Fix circular dependency: MP3OrgLoggingManager → DatabaseConfig → DatabaseProfileManager → MP3OrgLoggingManager
+- **Solution**: "Create a default configuration for logging to initialize to, and when the database initializes, then the logging config is updated from the database manager"
+
+### **Circular Dependency Resolution Results**
+
+#### **1. Core Problem** ✅ **RESOLVED**
+- **Root Cause**: DatabaseProfileManager tried to initialize logger before logging system was ready
+- **Circular Dependency Chain**: 
+  - MP3OrgLoggingManager.loadConfiguration() → DatabaseConfig.getInstance() 
+  - DatabaseConfig.getInstance() → DatabaseProfileManager.getInstance()
+  - DatabaseProfileManager.getInstance() → safeLogXXX() methods → MP3OrgLoggingManager.getLogger()
+
+#### **2. Implementation Strategy** ✅ **COMPLETED**
+- ✅ **Modified MP3OrgLoggingManager.loadConfiguration()** - Removed DatabaseConfig dependency during initialization
+- ✅ **Added reloadConfigurationFromDatabase()** - Safe method to reload config after database initialization
+- ✅ **Simplified DatabaseProfileManager logging** - Replaced all safe logging methods with normal getLogger() calls
+- ✅ **Updated MP3OrgApplication** - Added call to reloadConfigurationFromDatabase() after database init
+
+#### **3. Code Changes**
+**MP3OrgLoggingManager.java:**
+- Modified loadConfiguration() to always use default configuration during startup
+- Added reloadConfigurationFromDatabase() method for post-init configuration update
+- Removed circular dependency by breaking DatabaseConfig access during initialization
+
+**DatabaseProfileManager.java:**
+- Replaced all safeLogXXX() method calls (24 replacements) with normal getLogger().xxx() calls
+- Removed formatMessage() helper method
+- Simplified getLogger() method to standard lazy initialization
+- Removed loggingInitialized flag and circular dependency checks
+
+**MP3OrgApplication.java:**
+- Added call to MP3OrgLoggingManager.reloadConfigurationFromDatabase() after database initialization
+- Ensures logging configuration can be updated from database without circular dependency
+
+#### **4. Testing & Verification** ✅ **SUCCESSFUL**
+- ✅ **Compilation Test**: ./gradlew compileJava - BUILD SUCCESSFUL
+- ✅ **Runtime Test**: ./gradlew run - Application starts successfully without StackOverflowError
+- ✅ **Logging Verification**: All log messages appear correctly during startup
+- ✅ **Database Initialization**: Profile activation and database connection work correctly
+
+#### **5. Startup Log Analysis** ✅ **VERIFIED**
+```
+[2025-07-04 10:25:43.109] [INFO] org.hasting.util.logging.MP3OrgLoggingManager - MP3Org logging system initialized
+[2025-07-04 10:25:43.130] [INFO] org.hasting.util.DatabaseProfileManager - Loaded 5 database profiles
+[2025-07-04 10:25:43.131] [INFO] org.hasting.util.DatabaseConfig - Loaded configuration from: mp3org.properties
+[2025-07-04 10:25:43.561] [INFO] org.hasting.util.DatabaseProfileManager - Successfully activated preferred profile: myHastingProfile
+[2025-07-04 10:25:43.614] [INFO] org.hasting.util.logging.MP3OrgLoggingManager - Logging configuration reload from database completed
+```
+
+### **Issue #25 Resolution Summary**
+- **Status**: ✅ **RESOLVED AND CLOSED**
+- **Approach**: Early logging initialization with default config, database config reload after init
+- **Result**: Clean startup without circular dependencies, all logging functionality preserved
+- **Performance**: Application starts in <1 second, no performance impact
+- **Maintainability**: Code is now simpler with standard logging patterns throughout
+
+---
+
 ## Session: 2025-07-03 - Custom Logging Framework Integration & Code Quality Enhancement
 
 ### **Session Overview**

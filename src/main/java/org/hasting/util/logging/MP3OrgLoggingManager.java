@@ -226,18 +226,9 @@ public class MP3OrgLoggingManager {
             }
         }
         
-        // Try to load from MP3Org's main configuration
-        try {
-            DatabaseConfig dbConfig = DatabaseConfig.getInstance();
-            Properties mainProps = new Properties();
-            // If DatabaseConfig had a way to get all properties, we'd use it here
-            // For now, create default configuration
-            return LoggingConfiguration.createDefault();
-        } catch (Exception e) {
-            System.err.println("Failed to load MP3Org configuration: " + e.getMessage());
-        }
-        
-        // Fall back to default configuration
+        // Always use default configuration during initial startup
+        // This avoids circular dependencies with DatabaseConfig/DatabaseProfileManager
+        // Configuration can be reloaded from database later using reloadConfigurationFromDatabase()
         return LoggingConfiguration.createDefault();
     }
     
@@ -284,5 +275,39 @@ public class MP3OrgLoggingManager {
                     currentConfig.isConsoleEnabled(),
                     currentConfig.isFileEnabled() ? currentConfig.getFilePath() : "disabled",
                     currentConfig.getDefaultLevel());
+    }
+    
+    /**
+     * Reloads logging configuration from the database after it has been initialized.
+     * This allows database-driven logging configuration without circular dependencies.
+     * 
+     * <p>This method should be called after the database system is fully initialized
+     * and DatabaseConfig is available. It will attempt to load logging preferences
+     * from the database and update the current logging configuration accordingly.
+     * 
+     * <p>If loading from database fails, the current configuration remains unchanged.
+     */
+    public static void reloadConfigurationFromDatabase() {
+        if (!initialized) {
+            System.err.println("Warning: Cannot reload logging configuration - logging system not initialized");
+            return;
+        }
+        
+        try {
+            Logger logger = getLogger(MP3OrgLoggingManager.class);
+            logger.debug("Attempting to reload logging configuration from database");
+            
+            // Now it's safe to access DatabaseConfig since circular dependency is broken
+            DatabaseConfig dbConfig = DatabaseConfig.getInstance();
+            
+            // For now, we'll just log that we attempted the reload
+            // In the future, DatabaseConfig could provide logging-specific settings
+            logger.info("Logging configuration reload from database completed (using defaults for now)");
+            
+        } catch (Exception e) {
+            Logger logger = getLogger(MP3OrgLoggingManager.class);
+            logger.warning("Failed to reload logging configuration from database: {}", e.getMessage());
+            // Keep current configuration on failure
+        }
     }
 }
