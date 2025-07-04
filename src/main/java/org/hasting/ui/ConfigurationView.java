@@ -21,6 +21,7 @@ public class ConfigurationView extends BorderPane {
     private ProfileManagementPanel profileManagementPanel;
     private FuzzySearchConfigPanel fuzzySearchConfigPanel;
     private PathTemplateConfigPanel pathTemplateConfigPanel;
+    private LoggingConfigPanel loggingConfigPanel;
     
     // Shared status label
     private Label statusLabel;
@@ -52,6 +53,7 @@ public class ConfigurationView extends BorderPane {
         profileManagementPanel = new ProfileManagementPanel(statusLabel);
         fuzzySearchConfigPanel = new FuzzySearchConfigPanel(statusLabel);
         pathTemplateConfigPanel = new PathTemplateConfigPanel(statusLabel);
+        loggingConfigPanel = new LoggingConfigPanel();
         
         // Create tab container for better organization
         configTabPane = new TabPane();
@@ -80,6 +82,8 @@ public class ConfigurationView extends BorderPane {
             "Configure fuzzy matching for duplicates");
         Tab organizationTab = createTab("File Organization", pathTemplateConfigPanel, 
             "Configure file organization templates");
+        Tab loggingTab = createTab("Logging Configuration", loggingConfigPanel, 
+            "Configure logging levels and output settings");
         
         // Add tabs to tab pane
         configTabPane.getTabs().addAll(
@@ -87,7 +91,8 @@ public class ConfigurationView extends BorderPane {
             profilesTab, 
             fileTypesTab,
             duplicatesTab,
-            organizationTab
+            organizationTab,
+            loggingTab
         );
         
         // Create title section
@@ -201,6 +206,7 @@ public class ConfigurationView extends BorderPane {
             profileManagementPanel.loadCurrentSettings();
             fuzzySearchConfigPanel.loadCurrentSettings();
             pathTemplateConfigPanel.loadCurrentSettings();
+            loggingConfigPanel.loadCurrentSettings();
             
             statusLabel.setText("Configuration loaded successfully");
             statusLabel.setStyle("-fx-text-fill: green;");
@@ -222,6 +228,7 @@ public class ConfigurationView extends BorderPane {
             fuzzySearchConfigPanel.loadCurrentSettings();
             pathTemplateConfigPanel.loadCurrentSettings();
             profileManagementPanel.loadCurrentSettings();
+            loggingConfigPanel.loadCurrentSettings();
             
             statusLabel.setText("All panels refreshed successfully");
             statusLabel.setStyle("-fx-text-fill: green;");
@@ -257,6 +264,9 @@ public class ConfigurationView extends BorderPane {
                     break;
                 case "File Organization":
                     pathTemplateConfigPanel.loadCurrentSettings();
+                    break;
+                case "Logging Configuration":
+                    loggingConfigPanel.loadCurrentSettings();
                     break;
             }
         } catch (Exception e) {
@@ -316,6 +326,15 @@ public class ConfigurationView extends BorderPane {
      */
     public PathTemplateConfigPanel getPathTemplateConfigPanel() {
         return pathTemplateConfigPanel;
+    }
+    
+    /**
+     * Gets the logging configuration panel for external access if needed.
+     * 
+     * @return The LoggingConfigPanel
+     */
+    public LoggingConfigPanel getLoggingConfigPanel() {
+        return loggingConfigPanel;
     }
     
     /**

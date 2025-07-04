@@ -433,10 +433,6 @@ public class DatabaseManager {
      */
     public static synchronized void saveMusicFile(MusicFile musicFile) {
         // Check if the music file already exists by file_path
-        if (findByPath(musicFile.getFilePath()) != null) {
-            logger.info("Music file with path {} already exists. Skipping insertion", musicFile.getFilePath());
-            return;
-        }
 
         String sql = "INSERT INTO music_files (file_path, title, artist, album, genre, track_number, " +
                 "yr, duration_seconds, file_size_bytes, bit_rate, sample_rate, file_type, last_modified) " +
@@ -504,6 +500,70 @@ public class DatabaseManager {
         } catch (SQLException e) {
             logger.error("Failed to save music file to database: {}", musicFile.getFilePath(), e);
             throw new RuntimeException("Failed to save music file", e);
+        }
+    }
+
+    /**
+     * Saves a music file to the database, updating the existing record if the file path already exists.
+     * 
+     * <p>This method implements upsert functionality to handle duplicate file paths gracefully:
+     * <ol>
+     *   <li>First checks if a record with the same file_path already exists</li>
+     *   <li>If exists: updates the existing record with new metadata</li>
+     *   <li>If not exists: inserts a new record</li>
+     * </ol>
+     * 
+     * <p>This approach prevents constraint violations on the unique file_path column while
+     * ensuring that updated metadata for existing files is properly saved. The method is
+     * particularly useful during directory rescanning where files may have been modified
+     * but their paths remain the same.
+     * 
+     * <p><strong>Key Benefits:</strong>
+     * <ul>
+     *   <li>Prevents database constraint violations</li>
+     *   <li>Handles metadata updates for existing files</li>
+     *   <li>Maintains referential integrity by preserving existing IDs</li>
+     *   <li>Supports both new file imports and file rescanning scenarios</li>
+     * </ul>
+     * 
+     * @param musicFile the MusicFile object to save or update (must not be null, must have a valid file path)
+     * @throws RuntimeException if database operation fails or connection is unavailable
+     * @throws IllegalArgumentException if musicFile is null or has no file path
+     */
+    public static synchronized void saveOrUpdateMusicFile(MusicFile musicFile) {
+        if (musicFile == null) {
+            throw new IllegalArgumentException("MusicFile cannot be null");
+        }
+        
+        if (musicFile.getFilePath() == null || musicFile.getFilePath().trim().isEmpty()) {
+            throw new IllegalArgumentException("MusicFile must have a valid file path");
+        }
+        
+        logger.debug("saveOrUpdateMusicFile() - entry: {}", musicFile.getFilePath());
+        
+        // Check if a record with this file path already exists
+        MusicFile existingFile = findByPath(musicFile.getFilePath());
+        
+        if (existingFile != null) {
+            // File exists - update the existing record
+            logger.debug("File path already exists, updating record ID {}: {}", existingFile.getId(), musicFile.getFilePath());
+            
+            // Preserve the existing ID and transfer updated metadata
+            musicFile.setId(existingFile.getId());
+            musicFile.setModified(true); // Ensure the update will be performed
+            
+            // Use the existing update method
+            updateMusicFile(musicFile);
+            
+            logger.debug("saveOrUpdateMusicFile() - exit: updated existing record");
+        } else {
+            // File doesn't exist - insert new record
+            logger.debug("File path is new, inserting record: {}", musicFile.getFilePath());
+            
+            // Use the existing save method
+            saveMusicFile(musicFile);
+            
+            logger.debug("saveOrUpdateMusicFile() - exit: inserted new record with ID {}", musicFile.getId());
         }
     }
 

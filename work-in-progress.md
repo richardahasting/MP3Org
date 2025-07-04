@@ -24,14 +24,28 @@
   - Fixed Duplicate Manager requiring manual refresh
   - **Status**: User tested and verified working
 
+### **Recently Completed (Current Session)**
+- ✅ **Issue #28 - Database Enhancement**: COMPLETED (2025-07-04)
+  - Implemented upsert functionality with saveOrUpdateMusicFile() method
+  - Added selective directory rescanning to Import tab with DirectoryItem management
+  - Enhanced ImportOrganizeView with TableView-based directory selection
+  - Database now gracefully handles duplicate filepath constraints with updates
+  - **Status**: Committed to feature branch, tested and verified working
+
+- ✅ **Issue #29 - Logging Configuration UI**: COMPLETED (2025-07-04)
+  - Created comprehensive LoggingConfigPanel with runtime configuration
+  - Integrated panel into ConfigurationView as new "Logging Configuration" tab
+  - Provides global settings, component-specific levels, and runtime controls
+  - Supports file logging path selection, test logging, and reset to defaults
+  - **Status**: Committed to feature branch, compilation verified
+
 ### **Active Work Items**
-**Current Task**: Issue #26 - Config Tab StackOverflowError
+**Current Task**: Documentation and cleanup
 
-**Problem**: Switching to config tab throws StackOverflowError with circular call pattern:
-- getMusicFileCount() → updateProfileInfo() → switchToSelectedProfile() → (loops back)
-- Error occurs in ProfileManagementPanel profile switching logic
-
-**Progress**: Investigation started - todo list created, work-in-progress.md updated
+**Next Steps**: 
+- Create pull requests for both feature branches
+- Update developer-log.md with detailed implementation notes
+- Test both features end-to-end
 
 ### **Next Priority Tasks**
 1. **Issue #1 - JavaDoc Documentation** (Partially Complete)

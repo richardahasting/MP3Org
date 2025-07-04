@@ -310,4 +310,76 @@ public class MP3OrgLoggingManager {
             // Keep current configuration on failure
         }
     }
+    
+    /**
+     * Checks if the current log file needs rotation and performs backup if needed.
+     * This method should be called periodically or after significant logging activity.
+     */
+    public static void checkAndRotateLogFile() {
+        if (!initialized || currentConfig == null || !currentConfig.isFileEnabled() || !currentConfig.isBackupEnabled()) {
+            return;
+        }
+        
+        try {
+            String logFilePath = currentConfig.getFilePath();
+            int maxSizeMB = currentConfig.getBackupMaxSizeMB();
+            
+            if (LogBackupManager.shouldRotateLogFile(logFilePath, maxSizeMB)) {
+                Logger logger = getLogger(MP3OrgLoggingManager.class);
+                logger.info("Log file size threshold reached, performing rotation...");
+                
+                boolean success = LogBackupManager.rotateLogFile(currentConfig);
+                if (success) {
+                    logger.info("Log file rotation completed successfully");
+                } else {
+                    logger.warning("Log file rotation failed - check backup configuration");
+                }
+            }
+        } catch (Exception e) {
+            Logger logger = getLogger(MP3OrgLoggingManager.class);
+            logger.error("Error during log rotation check: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Forces an immediate backup of the current log file.
+     * 
+     * @return true if backup was successful, false otherwise
+     */
+    public static boolean backupLogFile() {
+        if (!initialized || currentConfig == null || !currentConfig.isFileEnabled()) {
+            return false;
+        }
+        
+        try {
+            Logger logger = getLogger(MP3OrgLoggingManager.class);
+            logger.info("Performing manual log file backup...");
+            
+            boolean success = LogBackupManager.forceBackup(currentConfig);
+            if (success) {
+                logger.info("Manual log backup completed successfully");
+            } else {
+                logger.warning("Manual log backup failed");
+            }
+            
+            return success;
+        } catch (Exception e) {
+            Logger logger = getLogger(MP3OrgLoggingManager.class);
+            logger.error("Error during manual backup: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+    
+    /**
+     * Gets information about existing backup files.
+     * 
+     * @return A list of backup file information
+     */
+    public static java.util.List<LogBackupManager.BackupFileInfo> getBackupFileInfo() {
+        if (!initialized || currentConfig == null) {
+            return new java.util.ArrayList<>();
+        }
+        
+        return LogBackupManager.getBackupFileInfo(currentConfig);
+    }
 }
