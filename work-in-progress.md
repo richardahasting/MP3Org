@@ -2,31 +2,36 @@
 
 *This file tracks active work, current context, and session-to-session continuity*
 
-## Current Status: Session 2025-07-01
+## Current Status: Session 2025-07-04
 
 ### **Recently Completed (Previous Sessions)**
-- ✅ **Major Performance Optimization - Parallel Duplicate Detection**: COMPLETED
-  - Eliminated 3+ minute duplicate detection wait with 8,500 file database
-  - Implemented parallel streams with callback-based result streaming
-  - Added real-time progress updates and cancellation support
-  - User tested and confirmed excellent performance improvement
-  - **Status**: Code complete, compilation verified, user tested successfully
+- ✅ **Issue #25 - Circular Dependency Fix**: COMPLETED (2025-07-04)
+  - Resolved StackOverflowError in logging initialization
+  - Implemented early logging with default config, database config reload after init
+  - Simplified DatabaseProfileManager logging patterns
+  - Application now starts cleanly without circular dependencies
+  - **Status**: Tested, committed (9bf5d42), pushed, GitHub issue closed
 
-- ✅ **Systematic Workflow Improvements**: COMPLETED  
-  - Updated CLAUDE.md to require work-in-progress.md updates as first todo task
-  - Updated CLAUDE.md to require feature branch creation as second todo task
-  - Updated CLAUDE.md to require developer log documentation as final task
-  - Applied changes to CLAUDE-TEMPLATE.md for future project propagation
-  - **Status**: Process improvements established and documented
+- ✅ **printStackTrace() Replacement**: COMPLETED (Previous session)
+  - Replaced all 27 printStackTrace() calls with proper logging framework usage
+  - Added missing logger imports to 6 files
+  - Enhanced error handling with appropriate log levels
+  - **Status**: Code complete, compilation verified
+
+- ✅ **Tab Refresh Implementation**: COMPLETED (Previous session)
+  - Fixed database count display showing "0" in Configuration tab
+  - Added automatic tab selection listeners for content refresh
+  - Fixed Duplicate Manager requiring manual refresh
+  - **Status**: User tested and verified working
 
 ### **Active Work Items**
-**Current Task**: Duplicate Manager Display Toggle Enhancement
+**Current Task**: Issue #26 - Config Tab StackOverflowError
 
-**Objective**: Add toggle functionality allowing users to switch between:
-1. **All Files Mode** (default) - Shows complete database in left pane on startup  
-2. **Duplicates Only Mode** - Shows only potential duplicates using parallel detection
+**Problem**: Switching to config tab throws StackOverflowError with circular call pattern:
+- getMusicFileCount() → updateProfileInfo() → switchToSelectedProfile() → (loops back)
+- Error occurs in ProfileManagementPanel profile switching logic
 
-**Progress**: Planning phase - todo list created, work-in-progress.md updated
+**Progress**: Investigation started - todo list created, work-in-progress.md updated
 
 ### **Next Priority Tasks**
 1. **Issue #1 - JavaDoc Documentation** (Partially Complete)
