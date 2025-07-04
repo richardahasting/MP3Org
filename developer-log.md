@@ -115,6 +115,94 @@ Created test classes:
 - **Result**: Clean startup without circular dependencies, all logging functionality preserved
 - **Performance**: Application starts in <1 second, no performance impact
 - **Maintainability**: Code is now simpler with standard logging patterns throughout
+- **Commit**: 9bf5d42 - "Fix circular dependency in logging initialization - Issue #25"
+- **GitHub Issue**: Closed with detailed resolution summary and verification steps
+
+---
+
+## Session: 2025-07-04 - Config Tab StackOverflowError Fix (Issue #26)
+
+### **Session Overview**
+- **Duration**: ~1 hour circular dependency investigation and fix
+- **Focus**: Resolve StackOverflowError when switching to config tab (Issue #26)
+- **Outcome**: Successfully identified and fixed recursive profile switching causing infinite loop
+
+### **User Requirements**
+- **Context**: New defect reported - switching to config tab throws StackOverflowError
+- **Problem**: Circular call pattern in ProfileManagementPanel profile switching logic
+- **Goal**: Fix the circular dependency to allow normal config tab operation
+
+### **Issue #26 Investigation Results**
+
+#### **1. Root Cause Analysis** ✅ **COMPLETED**
+**Error Pattern Identified:**
+```
+getMusicFileCount() → updateProfileInfo() → switchToSelectedProfile() → (loops back)
+```
+
+**Complete Circular Dependency Chain:**
+1. User selects profile in ProfileManagementPanel.profileComboBox
+2. profileComboBox.setOnAction() triggers switchToSelectedProfile()
+3. switchToSelectedProfile() calls DatabaseManager.switchToProfileByName()
+4. Database profile switch calls DatabaseProfileManager.setActiveProfile()
+5. setActiveProfile() calls ProfileChangeNotifier.notifyProfileChanged()
+6. ConfigurationView.onProfileChanged() callback triggers refreshAllPanels()
+7. refreshAllPanels() calls profileManagementPanel.loadCurrentSettings()
+8. loadCurrentSettings() calls refreshProfileComboBox()
+9. refreshProfileComboBox() calls profileComboBox.setValue()
+10. **🔄 INFINITE LOOP**: setValue() triggers setOnAction() event handler again
+
+#### **2. Key Finding** ✅ **IDENTIFIED**
+- **ConfigurationView.java:173-175**: Sets up callback that triggers refreshAllPanels() on profile changes
+- **ProfileManagementPanel.java:62**: ComboBox.setOnAction() triggers even for programmatic setValue() calls
+- **Missing Guard**: No protection against recursive profile switching calls
+
+#### **3. Solution Implementation** ✅ **COMPLETED**
+**Changes Made to ProfileManagementPanel.java:**
+- ✅ **Added isUpdatingProfile flag** to prevent recursive calls
+- ✅ **Enhanced switchToSelectedProfile()** with:
+  - Recursive call guard (returns immediately if isUpdatingProfile = true)
+  - Profile comparison check (skips if same profile already active)
+  - Proper try/finally block to ensure flag is reset
+- ✅ **Enhanced refreshProfileComboBox()** with:
+  - Temporary flag setting during ComboBox updates
+  - Protected setValue() calls to prevent action event triggers
+  - Exception handling to ensure flag is always reset
+
+#### **4. Code Changes Summary**
+```java
+// Added recursive protection flag
+private boolean isUpdatingProfile = false;
+
+// Enhanced switchToSelectedProfile() with guards
+if (isUpdatingProfile) {
+    return; // Prevent recursive calls
+}
+
+// Check if actually switching to different profile
+if (currentActive != null && selectedProfileName.equals(currentActive.getName())) {
+    return; // No need to switch to same profile
+}
+
+// Protected refreshProfileComboBox() with temporary flag
+isUpdatingProfile = true;
+profileComboBox.setValue(activeProfile.getName()); // Safe from recursion
+isUpdatingProfile = false;
+```
+
+#### **5. Testing & Verification** ✅ **SUCCESSFUL**
+- ✅ **Compilation Test**: ./gradlew compileJava - BUILD SUCCESSFUL
+- ✅ **Runtime Test**: ./gradlew run - Application starts without StackOverflowError
+- ✅ **Config Tab Access**: No more circular dependency when switching to config tab
+- ✅ **Profile Switching**: Maintains normal profile switching functionality
+
+### **Issue #26 Resolution Summary**
+- **Status**: ✅ **RESOLVED**
+- **Approach**: Added recursive call protection with isUpdatingProfile flag
+- **Result**: Config tab now accessible without StackOverflowError, profile switching works normally
+- **Performance**: No performance impact, adds minimal guard logic
+- **Maintainability**: Clear guard pattern that's easy to understand and maintain
+- **Branch**: fix/issue-26-config-tab-stackoverflow (ready for PR)
 
 ---
 

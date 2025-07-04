@@ -31,6 +31,9 @@ public class ProfileManagementPanel extends VBox {
     // Callback interfaces for notifying parent components of changes
     private Runnable onProfileChanged;
     
+    // Flag to prevent recursive profile switching
+    private boolean isUpdatingProfile = false;
+    
     /**
      * Creates a new ProfileManagementPanel with all necessary components.
      * 
@@ -137,15 +140,19 @@ public class ProfileManagementPanel extends VBox {
     
     /**
      * Refreshes the profile combo box with current profiles.
+     * Temporarily disables action events to prevent recursive calls.
      */
     private void refreshProfileComboBox() {
         try {
             DatabaseProfileManager profileManager = DatabaseManager.getProfileManager();
             if (profileManager != null) {
+                // Temporarily disable action events to prevent recursion
+                isUpdatingProfile = true;
+                
                 ObservableList<String> profileNames = FXCollections.observableArrayList(profileManager.getProfileNames());
                 profileComboBox.setItems(profileNames);
                 
-                // Select current active profile
+                // Select current active profile without triggering action event
                 DatabaseProfile activeProfile = profileManager.getActiveProfile();
                 if (activeProfile != null) {
                     profileComboBox.setValue(activeProfile.getName());
@@ -158,8 +165,11 @@ public class ProfileManagementPanel extends VBox {
                 duplicateProfileButton.setDisable(!hasProfiles);
                 deleteProfileButton.setDisable(!canDelete);
                 renameProfileButton.setDisable(!hasProfiles);
+                
+                isUpdatingProfile = false;
             }
         } catch (Exception e) {
+            isUpdatingProfile = false;
             showError("Failed to load profiles: " + e.getMessage());
         }
     }
@@ -201,11 +211,26 @@ public class ProfileManagementPanel extends VBox {
     
     /**
      * Switches to the selected profile from the combo box.
+     * Includes protection against recursive calls to prevent StackOverflowError.
      */
     private void switchToSelectedProfile() {
+        // Prevent recursive calls that can cause StackOverflowError
+        if (isUpdatingProfile) {
+            return;
+        }
+        
         try {
             String selectedProfileName = profileComboBox.getValue();
             if (selectedProfileName != null) {
+                // Check if this is actually a different profile
+                DatabaseProfile currentActive = DatabaseManager.getActiveProfile();
+                if (currentActive != null && selectedProfileName.equals(currentActive.getName())) {
+                    // Same profile selected, no need to switch
+                    return;
+                }
+                
+                isUpdatingProfile = true;
+                
                 statusLabel.setText("Switching to profile: " + selectedProfileName);
                 statusLabel.setStyle("-fx-text-fill: orange;");
                 
@@ -236,6 +261,8 @@ public class ProfileManagementPanel extends VBox {
         } catch (Exception e) {
             showError("Failed to switch profile: " + e.getMessage());
             refreshProfileComboBox(); // Reset selection
+        } finally {
+            isUpdatingProfile = false;
         }
     }
     
