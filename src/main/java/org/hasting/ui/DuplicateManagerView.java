@@ -476,6 +476,14 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
     }
     
     /**
+     * Public method to refresh the content when this tab becomes active.
+     * This ensures that database-dependent content is always up-to-date.
+     */
+    public void refreshContent() {
+        loadFilesForCurrentMode();
+    }
+    
+    /**
      * Loads all files from the database quickly and displays them.
      * This provides immediate access to the complete music collection.
      */

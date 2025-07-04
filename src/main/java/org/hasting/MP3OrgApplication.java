@@ -133,6 +133,13 @@ public class MP3OrgApplication extends Application {
         // Set duplicate manager as default selected tab
         tabPane.getSelectionModel().select(duplicateTab);
         
+        // Add tab selection listener to refresh content when switching tabs
+        tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            if (newTab != null) {
+                refreshTabContent(newTab);
+            }
+        });
+        
         // Add tab pane to main layout
         root.setCenter(tabPane);
         root.setPadding(new Insets(10));
@@ -188,6 +195,42 @@ public class MP3OrgApplication extends Application {
         
         menuBar.getMenus().add(helpMenu);
         return menuBar;
+    }
+    
+    /**
+     * Refreshes the content of the specified tab when it becomes active.
+     * This ensures that database-dependent content is always up-to-date.
+     * 
+     * @param tab the tab that was just selected
+     */
+    private void refreshTabContent(Tab tab) {
+        try {
+            String tabText = tab.getText();
+            switch (tabText) {
+                case "Duplicate Manager":
+                    // Refresh duplicate manager content
+                    if (tab.getContent() instanceof DuplicateManagerView) {
+                        DuplicateManagerView duplicateView = (DuplicateManagerView) tab.getContent();
+                        duplicateView.refreshContent();
+                    }
+                    break;
+                case "Metadata Editor":
+                    // Metadata editor typically doesn't need refreshing - it loads on demand
+                    break;
+                case "Import & Organize":
+                    // Import view typically doesn't need refreshing - it's file-based
+                    break;
+                case "Config":
+                    // Configuration view refreshes automatically when switching internal tabs
+                    if (tab.getContent() instanceof ConfigurationView) {
+                        ConfigurationView configView = (ConfigurationView) tab.getContent();
+                        configView.updateDisplayedInfo();
+                    }
+                    break;
+            }
+        } catch (Exception e) {
+            logger.error("Error refreshing tab content for tab '{}': {}", tab.getText(), e.getMessage(), e);
+        }
     }
     
     /**

@@ -56,6 +56,13 @@ public class ConfigurationView extends BorderPane {
         // Create tab container for better organization
         configTabPane = new TabPane();
         configTabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        
+        // Add tab selection listener to refresh data when switching tabs
+        configTabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            if (newTab != null) {
+                refreshCurrentTab();
+            }
+        });
     }
     
     /**
@@ -214,6 +221,7 @@ public class ConfigurationView extends BorderPane {
             fileTypeFilterPanel.loadCurrentSettings();
             fuzzySearchConfigPanel.loadCurrentSettings();
             pathTemplateConfigPanel.loadCurrentSettings();
+            profileManagementPanel.loadCurrentSettings();
             
             statusLabel.setText("All panels refreshed successfully");
             statusLabel.setStyle("-fx-text-fill: green;");
@@ -222,6 +230,37 @@ public class ConfigurationView extends BorderPane {
             statusLabel.setText("Error refreshing panels: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
             logger.error("Error loading configuration tab content: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Refreshes the currently selected tab's content.
+     */
+    private void refreshCurrentTab() {
+        Tab selectedTab = configTabPane.getSelectionModel().getSelectedItem();
+        if (selectedTab == null) return;
+        
+        try {
+            String tabText = selectedTab.getText();
+            switch (tabText) {
+                case "Database":
+                    databaseLocationPanel.loadCurrentSettings();
+                    break;
+                case "Profiles":
+                    profileManagementPanel.loadCurrentSettings();
+                    break;
+                case "File Types":
+                    fileTypeFilterPanel.loadCurrentSettings();
+                    break;
+                case "Duplicate Detection":
+                    fuzzySearchConfigPanel.loadCurrentSettings();
+                    break;
+                case "File Organization":
+                    pathTemplateConfigPanel.loadCurrentSettings();
+                    break;
+            }
+        } catch (Exception e) {
+            logger.error("Error refreshing current tab: {}", e.getMessage(), e);
         }
     }
     
