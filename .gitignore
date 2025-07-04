@@ -39,6 +39,9 @@ mp3org.properties
 mp3org-profiles.properties
 derby.log
 
+# Test databases
+temp-test-db-*/
+
 # Temporary files
 *.tmp
 *.temp
