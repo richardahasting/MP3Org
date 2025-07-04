@@ -661,14 +661,22 @@ public class LoggingConfigPanel extends VBox {
      */
     private void viewLogs() {
         try {
-            // This would open the existing LogViewerDialog
-            // For now, just show a status message
-            statusLabel.setText("Log viewer functionality - to be integrated with existing LogViewerDialog");
-            statusLabel.setStyle("-fx-text-fill: #2196F3;");
+            // Get the parent stage for proper dialog ownership
+            javafx.stage.Stage parentStage = (javafx.stage.Stage) getScene().getWindow();
+            
+            // Create and show the log viewer dialog
+            org.hasting.ui.LogViewerDialog logViewer = new org.hasting.ui.LogViewerDialog(parentStage);
+            logViewer.show();
+            
+            statusLabel.setText("Log viewer opened successfully");
+            statusLabel.setStyle("-fx-text-fill: #4CAF50;");
+            
+            logger.info("Log viewer dialog opened from logging configuration panel");
             
         } catch (Exception e) {
             statusLabel.setText("Error opening log viewer: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: #f44336;");
+            logger.error("Failed to open log viewer dialog: {}", e.getMessage(), e);
         }
     }
     
