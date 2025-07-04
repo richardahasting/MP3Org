@@ -77,6 +77,13 @@ public class ImportOrganizeView extends BorderPane {
     private TextField organizeFolderField;
     private Button browseFolderButton;
     
+    // Selective rescanning components
+    private TableView<DirectoryItem> directoryTable;
+    private ObservableList<DirectoryItem> directoryData;
+    private CheckBox selectAllDirectoriesCheckBox;
+    private Button rescanSelectedButton;
+    private Button addNewDirectoryButton;
+    
     // File selection components for Issue #6
     private TableView<MusicFileSelection> fileSelectionTable;
     private ObservableList<MusicFileSelection> fileSelectionData;
@@ -114,6 +121,36 @@ public class ImportOrganizeView extends BorderPane {
         public void setSelected(boolean selected) { this.selected.set(selected); }
     }
     
+    /**
+     * Helper class to represent directory items for selective rescanning (Issue #28)
+     */
+    public static class DirectoryItem {
+        private final String path;
+        private javafx.beans.property.BooleanProperty selected;
+        private javafx.beans.property.StringProperty status;
+        private javafx.beans.property.StringProperty lastScanned;
+        
+        public DirectoryItem(String path) {
+            this.path = path;
+            this.selected = new javafx.beans.property.SimpleBooleanProperty(false);
+            this.status = new SimpleStringProperty("Ready");
+            this.lastScanned = new SimpleStringProperty("Never");
+        }
+        
+        public String getPath() { return path; }
+        public javafx.beans.property.BooleanProperty selectedProperty() { return selected; }
+        public boolean isSelected() { return selected.get(); }
+        public void setSelected(boolean selected) { this.selected.set(selected); }
+        
+        public javafx.beans.property.StringProperty statusProperty() { return status; }
+        public String getStatus() { return status.get(); }
+        public void setStatus(String status) { this.status.set(status); }
+        
+        public javafx.beans.property.StringProperty lastScannedProperty() { return lastScanned; }
+        public String getLastScanned() { return lastScanned.get(); }
+        public void setLastScanned(String lastScanned) { this.lastScanned.set(lastScanned); }
+    }
+    
     private void initializeComponents() {
         selectedDirectoriesArea = new TextArea();
         selectedDirectoriesArea.setPromptText("Selected directories will appear here...");
@@ -147,6 +184,9 @@ public class ImportOrganizeView extends BorderPane {
         
         // Initialize file selection components for Issue #6
         initializeFileSelectionComponents();
+        
+        // Initialize selective directory rescanning components for Issue #28
+        initializeDirectorySelectionComponents();
     }
     
     private void initializeFileSelectionComponents() {
@@ -164,6 +204,73 @@ public class ImportOrganizeView extends BorderPane {
         
         // Load initial file list
         refreshFileSelection();
+    }
+    
+    /**
+     * Initializes components for selective directory rescanning functionality (Issue #28).
+     */
+    private void initializeDirectorySelectionComponents() {
+        directoryData = FXCollections.observableArrayList();
+        directoryTable = createDirectorySelectionTable();
+        directoryTable.setItems(directoryData);
+        
+        selectAllDirectoriesCheckBox = new CheckBox("Select All");
+        selectAllDirectoriesCheckBox.setOnAction(e -> toggleSelectAllDirectories());
+        
+        rescanSelectedButton = new Button("Rescan Selected Directories");
+        rescanSelectedButton.setOnAction(e -> rescanSelectedDirectories());
+        rescanSelectedButton.setDisable(true);
+        
+        addNewDirectoryButton = new Button("Add New Directory");
+        addNewDirectoryButton.setOnAction(e -> addNewDirectory());
+        
+        // Update button state when selection changes
+        directoryData.addListener((javafx.collections.ListChangeListener<DirectoryItem>) change -> {
+            updateRescanButtonState();
+        });
+        
+        // Load directories from previous scans
+        loadPreviouslyScannedDirectories();
+    }
+    
+    /**
+     * Creates the table view for directory selection and management.
+     */
+    private TableView<DirectoryItem> createDirectorySelectionTable() {
+        TableView<DirectoryItem> table = new TableView<>();
+        table.setPrefHeight(200);
+        table.setEditable(true);
+        
+        // Selection column
+        TableColumn<DirectoryItem, Boolean> selectCol = new TableColumn<>("Select");
+        selectCol.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
+        selectCol.setCellFactory(CheckBoxTableCell.forTableColumn(selectCol));
+        selectCol.setPrefWidth(60);
+        selectCol.setEditable(true);
+        
+        // Directory path column
+        TableColumn<DirectoryItem, String> pathCol = new TableColumn<>("Directory Path");
+        pathCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getPath()));
+        pathCol.setPrefWidth(400);
+        
+        // Status column
+        TableColumn<DirectoryItem, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cellData -> cellData.getValue().statusProperty());
+        statusCol.setPrefWidth(100);
+        
+        // Last scanned column
+        TableColumn<DirectoryItem, String> lastScannedCol = new TableColumn<>("Last Scanned");
+        lastScannedCol.setCellValueFactory(cellData -> cellData.getValue().lastScannedProperty());
+        lastScannedCol.setPrefWidth(120);
+        
+        table.getColumns().addAll(selectCol, pathCol, statusCol, lastScannedCol);
+        
+        // Update button state when selection changes
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            updateRescanButtonState();
+        });
+        
+        return table;
     }
     
     private TableView<MusicFileSelection> createFileSelectionTable() {
@@ -282,6 +389,29 @@ public class ImportOrganizeView extends BorderPane {
             selectedDirectoriesArea
         );
         
+        // Directory management section for Issue #28
+        VBox directorySection = new VBox(10);
+        
+        Label directoryTitle = new Label("Directory Management & Selective Rescanning");
+        directoryTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        
+        Label directoryInstructions = new Label(
+            "Manage previously scanned directories and selectively rescan specific directories for updated files."
+        );
+        directoryInstructions.setWrapText(true);
+        
+        HBox directoryControlsBox = new HBox(10);
+        directoryControlsBox.getChildren().addAll(
+            selectAllDirectoriesCheckBox, addNewDirectoryButton, rescanSelectedButton
+        );
+        
+        directorySection.getChildren().addAll(
+            directoryTitle,
+            directoryInstructions,
+            directoryControlsBox,
+            directoryTable
+        );
+        
         // File selection section for Issue #6
         VBox fileSelectionSection = new VBox(10);
         
@@ -342,6 +472,8 @@ public class ImportOrganizeView extends BorderPane {
         mainContent.getChildren().addAll(
             importSection, 
             new Separator(), 
+            directorySection,
+            new Separator(), 
             fileSelectionSection, 
             new Separator(), 
             organizeSection
@@ -350,8 +482,9 @@ public class ImportOrganizeView extends BorderPane {
         setCenter(mainContent);
         setBottom(new VBox(10, progressSection, statusSection));
         
-        // Make text area and file selection table grow
+        // Make text area and tables grow
         VBox.setVgrow(selectedDirectoriesArea, Priority.ALWAYS);
+        VBox.setVgrow(directoryTable, Priority.ALWAYS);
         VBox.setVgrow(fileSelectionTable, Priority.ALWAYS);
     }
     
@@ -658,5 +791,220 @@ public class ImportOrganizeView extends BorderPane {
         if (!message.isEmpty()) {
             progressLabel.setText(message);
         }
+    }
+    
+    // ================================================================================================
+    // SELECTIVE DIRECTORY RESCANNING METHODS (Issue #28)
+    // ================================================================================================
+    
+    /**
+     * Toggles selection state for all directories in the table.
+     */
+    private void toggleSelectAllDirectories() {
+        boolean selectAll = selectAllDirectoriesCheckBox.isSelected();
+        for (DirectoryItem item : directoryData) {
+            item.setSelected(selectAll);
+        }
+        updateRescanButtonState();
+    }
+    
+    /**
+     * Updates the rescan button state based on directory selections.
+     */
+    private void updateRescanButtonState() {
+        boolean hasSelected = directoryData.stream().anyMatch(DirectoryItem::isSelected);
+        rescanSelectedButton.setDisable(!hasSelected);
+    }
+    
+    /**
+     * Loads previously scanned directories from the selectedDirectoriesArea.
+     */
+    private void loadPreviouslyScannedDirectories() {
+        String directoriesText = selectedDirectoriesArea.getText().trim();
+        if (!directoriesText.isEmpty()) {
+            String[] directories = directoriesText.split("\n");
+            for (String directory : directories) {
+                if (!directory.trim().isEmpty()) {
+                    DirectoryItem item = new DirectoryItem(directory.trim());
+                    item.setLastScanned("Previously scanned");
+                    directoryData.add(item);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Adds a new directory to the scanning list.
+     */
+    private void addNewDirectory() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Directory to Add");
+        
+        File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
+        if (selectedDirectory != null) {
+            String directoryPath = selectedDirectory.getAbsolutePath();
+            
+            // Check if directory is already in the list
+            boolean alreadyExists = directoryData.stream()
+                    .anyMatch(item -> item.getPath().equals(directoryPath));
+            
+            if (!alreadyExists) {
+                DirectoryItem item = new DirectoryItem(directoryPath);
+                directoryData.add(item);
+                
+                // Also add to the legacy text area for backward compatibility
+                String currentText = selectedDirectoriesArea.getText();
+                if (!currentText.isEmpty()) {
+                    currentText += "\n";
+                }
+                currentText += directoryPath;
+                selectedDirectoriesArea.setText(currentText);
+                
+                statusLabel.setText("Added directory: " + directoryPath);
+            } else {
+                statusLabel.setText("Directory already in list: " + directoryPath);
+            }
+        }
+    }
+    
+    /**
+     * Rescans only the selected directories using the new upsert functionality.
+     */
+    private void rescanSelectedDirectories() {
+        List<DirectoryItem> selectedItems = directoryData.stream()
+                .filter(DirectoryItem::isSelected)
+                .collect(Collectors.toList());
+        
+        if (selectedItems.isEmpty()) {
+            statusLabel.setText("No directories selected for rescanning");
+            return;
+        }
+        
+        // Disable buttons during rescan
+        rescanSelectedButton.setDisable(true);
+        addNewDirectoryButton.setDisable(true);
+        scanButton.setDisable(true);
+        clearDatabaseButton.setDisable(true);
+        organizeButton.setDisable(true);
+        
+        progressBar.setVisible(true);
+        progressLabel.setText("Rescanning selected directories...");
+        statusLabel.setText("Rescan in progress...");
+        
+        // Update status for selected items
+        for (DirectoryItem item : selectedItems) {
+            item.setStatus("Scanning...");
+        }
+        
+        Task<Integer> rescanTask = new Task<Integer>() {
+            @Override
+            protected Integer call() throws Exception {
+                MusicFileScanner scanner = new MusicFileScanner();
+                int totalProcessed = 0;
+                
+                // Set up progress callbacks
+                scanner.setDetailedProgressCallback(progress -> {
+                    Platform.runLater(() -> {
+                        // Calculate progress percentage from the scan progress data
+                        double progressPercent = 0.0;
+                        if (progress.totalDirectories > 0) {
+                            progressPercent = (double) progress.directoriesProcessed / progress.totalDirectories;
+                        }
+                        progressBar.setProgress(progressPercent);
+                        progressLabel.setText(progress.currentFile != null ? progress.currentFile : progress.currentDirectory);
+                    });
+                });
+                
+                for (DirectoryItem item : selectedItems) {
+                    if (isCancelled()) break;
+                    
+                    Platform.runLater(() -> item.setStatus("Scanning..."));
+                    
+                    try {
+                        // Scan the directory using the correct method
+                        List<MusicFile> foundFiles = scanner.findAllMusicFiles(item.getPath());
+                        
+                        // Use the new saveOrUpdateMusicFile method for upsert functionality
+                        for (MusicFile musicFile : foundFiles) {
+                            if (isCancelled()) break;
+                            
+                            try {
+                                DatabaseManager.saveOrUpdateMusicFile(musicFile);
+                                totalProcessed++;
+                            } catch (Exception e) {
+                                logger.error("Failed to save/update music file: {}", musicFile.getFilePath(), e);
+                            }
+                        }
+                        
+                        // Update status and timestamp
+                        Platform.runLater(() -> {
+                            item.setStatus("Completed");
+                            item.setLastScanned(java.time.LocalDateTime.now().format(
+                                java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm")));
+                        });
+                        
+                    } catch (Exception e) {
+                        Platform.runLater(() -> item.setStatus("Error"));
+                        logger.error("Failed to rescan directory: {}", item.getPath(), e);
+                    }
+                }
+                
+                return totalProcessed;
+            }
+            
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    // Re-enable buttons
+                    rescanSelectedButton.setDisable(false);
+                    addNewDirectoryButton.setDisable(false);
+                    scanButton.setDisable(false);
+                    clearDatabaseButton.setDisable(false);
+                    organizeButton.setDisable(false);
+                    
+                    progressBar.setVisible(false);
+                    progressLabel.setText("");
+                    
+                    int processed = getValue();
+                    statusLabel.setText("Rescan completed: " + processed + " files processed");
+                    
+                    // Refresh file selection to show updated data
+                    refreshFileSelection();
+                    
+                    // Update organizeButton state
+                    organizeButton.setDisable(DatabaseManager.getMusicFileCount() <= 0);
+                });
+            }
+            
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    // Re-enable buttons
+                    rescanSelectedButton.setDisable(false);
+                    addNewDirectoryButton.setDisable(false);
+                    scanButton.setDisable(false);
+                    clearDatabaseButton.setDisable(false);
+                    organizeButton.setDisable(false);
+                    
+                    progressBar.setVisible(false);
+                    progressLabel.setText("");
+                    
+                    String errorMessage = getException().getMessage();
+                    statusLabel.setText("Rescan failed: " + errorMessage);
+                    
+                    // Reset status for failed items
+                    for (DirectoryItem item : selectedItems) {
+                        if (item.getStatus().equals("Scanning...")) {
+                            item.setStatus("Error");
+                        }
+                    }
+                });
+            }
+        };
+        
+        // Run the rescan task in background
+        Thread rescanThread = new Thread(rescanTask);
+        rescanThread.setDaemon(true);
+        rescanThread.start();
     }
 }

@@ -25,13 +25,19 @@
   - **Status**: User tested and verified working
 
 ### **Active Work Items**
-**Current Task**: Issue #26 - Config Tab StackOverflowError
+**Current Task**: Issues #28 & #29 - Database Enhancement & Logging Configuration UI
 
-**Problem**: Switching to config tab throws StackOverflowError with circular call pattern:
-- getMusicFileCount() → updateProfileInfo() → switchToSelectedProfile() → (loops back)
-- Error occurs in ProfileManagementPanel profile switching logic
+**Issue #28 - Database Enhancement**: 
+- Implement upsert functionality for duplicate filepath handling
+- Add selective directory rescanning to Import tab
+- Handle constraint violations gracefully with update operations
 
-**Progress**: Investigation started - todo list created, work-in-progress.md updated
+**Issue #29 - Logging Configuration UI**:
+- Add comprehensive logging configuration panel to Config tab
+- Enable runtime adjustment of all logging parameters
+- Support component-specific log level management
+
+**Progress**: Planning phase - todo list created, work-in-progress.md updated
 
 ### **Next Priority Tasks**
 1. **Issue #1 - JavaDoc Documentation** (Partially Complete)
