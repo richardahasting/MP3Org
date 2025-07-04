@@ -140,7 +140,7 @@ public class DatabaseManager {
             return resolvedProfile;
             
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Failed to initialize database connection with fallback: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to initialize database connection with fallback: " + e.getMessage(), e);
         }
     }
@@ -588,13 +588,27 @@ public class DatabaseManager {
             pstmt.setLong(14, musicFile.getId());
 
             pstmt.executeUpdate();
+            musicFile.setModified(false);
+            logger.debug("updateMusicFile() - exit: successfully updated {}", musicFile.getFilePath());
         } catch (SQLException e) {
-            logger.error("Failed to update music file in database: {}", musicFile.getFilePath(), e);
-            throw new RuntimeException("Failed to update music file", e);
+            logger.error("Failed to update music file: {} - SQL error: {}", musicFile.getFilePath(), e.getMessage(), e);
+            throw new RuntimeException("Failed to update music file: " + musicFile.getFilePath(), e);
         }
     }
 
     public static synchronized boolean deleteMusicFile(MusicFile musicFile) {
+        logger.debug("deleteMusicFile() - entry: {}", musicFile != null ? musicFile.getFilePath() : "null");
+        
+        if (musicFile == null) {
+            logger.error("deleteMusicFile() - musicFile parameter is null");
+            throw new IllegalArgumentException("MusicFile cannot be null");
+        }
+        
+        if (musicFile.getId() == null) {
+            logger.error("deleteMusicFile() - musicFile has no ID: {}", musicFile.getFilePath());
+            throw new IllegalStateException("Cannot delete MusicFile without ID");
+        }
+        
         String sql = "DELETE FROM music_files WHERE id = ?";
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
@@ -602,14 +616,23 @@ public class DatabaseManager {
             pstmt.executeUpdate();
             musicFile.setId(null); // Clear the ID to indicate it's deleted'
             musicFile.setModified(false); // Clear the modified flag to indicate it's not modified
-            return musicFile.deleteFile();
+            boolean fileDeleted = musicFile.deleteFile();
+            logger.debug("deleteMusicFile() - exit: database record deleted, file deletion: {}", fileDeleted);
+            return fileDeleted;
         } catch (SQLException e) {
-            logger.error("Failed to delete music file: {}", musicFile.getTitle(), e);
+            logger.error("Failed to delete music file from database: {} - SQL error: {}", musicFile.getTitle(), e.getMessage(), e);
         }
         return false;
     }
 
     public static MusicFile getMusicFileById(Long id) {
+        logger.debug("getMusicFileById() - entry: {}", id);
+        
+        if (id == null) {
+            logger.debug("getMusicFileById() - null ID provided");
+            return null;
+        }
+        
         String sql = "SELECT * FROM music_files WHERE id = ?";
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
@@ -617,14 +640,17 @@ public class DatabaseManager {
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    return extractMusicFileFromResultSet(rs);
+                    MusicFile result = extractMusicFileFromResultSet(rs);
+                    logger.debug("getMusicFileById() - exit: found music file {}", result.getFilePath());
+                    return result;
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to retrieve music file by ID: {}", id, e);
-            throw new RuntimeException("Failed to get music file by ID", e);
+            logger.error("Failed to retrieve music file by ID: {} - SQL error: {}", id, e.getMessage(), e);
+            throw new RuntimeException("Failed to get music file by ID: " + id, e);
         }
 
+        logger.debug("getMusicFileById() - exit: no music file found with ID {}", id);
         return null;
     }
 
@@ -643,18 +669,23 @@ public class DatabaseManager {
      *         or -1 if database query fails (allowing UI to display "Unknown")
      */
     public static synchronized int getMusicFileCount() {
+        logger.debug("getMusicFileCount() - entry");
         String sql = "SELECT COUNT(*) as file_count FROM music_files WHERE 1=1" + getFileTypeFilterClause();
         
         try (Statement stmt = getConnection().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             
             if (rs.next()) {
-                return rs.getInt("file_count");
+                int count = rs.getInt("file_count");
+                logger.debug("getMusicFileCount() - exit: found {} files", count);
+                return count;
             }
+            logger.debug("getMusicFileCount() - exit: no results, returning 0");
             return 0;
             
         } catch (SQLException e) {
-            System.err.println("Error getting music file count: " + e.getMessage());
+            logger.error("getMusicFileCount() - SQL error: {}", e.getMessage(), e);
+            logger.error("Error getting music file count: {}", e.getMessage(), e);
             // Return -1 to indicate error state rather than throwing exception
             // This allows the UI to display "Unknown" or "Error" instead of crashing
             return -1;

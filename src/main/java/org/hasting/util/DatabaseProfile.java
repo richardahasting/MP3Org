@@ -8,12 +8,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 /**
  * Represents a database profile configuration containing database location,
  * file type filters, and metadata about the database.
  */
 public class DatabaseProfile {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseProfile.class);
     
     private String id;
     private String name;
@@ -188,7 +192,7 @@ public class DatabaseProfile {
                 Files.createDirectories(parentDir);
             }
         } catch (IOException e) {
-            System.err.println("Warning: Could not create database directory: " + e.getMessage());
+            logger.warning("Could not create database directory: {}", e.getMessage());
         }
         
         return dbPath.toString();
@@ -329,7 +333,7 @@ public class DatabaseProfile {
                 FuzzySearchConfig fuzzyConfig = FuzzySearchConfig.fromProperties(fuzzySearchProps);
                 profile.setFuzzySearchConfig(fuzzyConfig);
             } catch (Exception e) {
-                System.err.println("Warning: Could not load fuzzy search configuration, using defaults: " + e.getMessage());
+                logger.warning("Could not load fuzzy search configuration, using defaults: {}", e.getMessage());
                 profile.setFuzzySearchConfig(new FuzzySearchConfig());
             }
         }

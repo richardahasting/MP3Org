@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.LoggerFactory;
 
 /**
  * Centralized configuration management for database connectivity and application settings.
@@ -85,6 +87,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class DatabaseConfig {
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
     
     // Configuration keys
     private static final String SYSTEM_PROPERTY_DB_PATH = "mp3org.database.path";
@@ -141,9 +144,9 @@ public class DatabaseConfig {
         // Load configuration from active profile
         loadFromActiveProfile();
         
-        System.out.println("MP3Org Database configured at: " + databasePath);
-        System.out.println("Enabled file types: " + enabledFileTypes);
-        System.out.println("Active profile: " + (profileManager.getActiveProfile() != null ? profileManager.getActiveProfile().getName() : "None"));
+        logger.info("MP3Org Database configured at: " + databasePath);
+        logger.info("Enabled file types: " + enabledFileTypes);
+        logger.info("Active profile: " + (profileManager.getActiveProfile() != null ? profileManager.getActiveProfile().getName() : "None"));
     }
     
     /**
@@ -157,9 +160,9 @@ public class DatabaseConfig {
         if (Files.exists(configPath)) {
             try (InputStream input = Files.newInputStream(configPath)) {
                 configProperties.load(input);
-                System.out.println("Loaded configuration from: " + configPath.toAbsolutePath());
+                logger.info("Loaded configuration from: " + configPath.toAbsolutePath());
             } catch (IOException e) {
-                System.err.println("Warning: Could not load configuration file: " + e.getMessage());
+                logger.warning("Could not load configuration file: " + e.getMessage());
             }
         }
         
@@ -169,9 +172,9 @@ public class DatabaseConfig {
             if (Files.exists(homeConfigPath)) {
                 try (InputStream input = Files.newInputStream(homeConfigPath)) {
                     configProperties.load(input);
-                    System.out.println("Loaded configuration from: " + homeConfigPath.toAbsolutePath());
+                    logger.info("Loaded configuration from: " + homeConfigPath.toAbsolutePath());
                 } catch (IOException e) {
-                    System.err.println("Warning: Could not load configuration file from home: " + e.getMessage());
+                    logger.warning("Could not load configuration file from home: " + e.getMessage());
                 }
             }
         }
@@ -184,26 +187,26 @@ public class DatabaseConfig {
         // 1. System property (highest precedence)
         String path = System.getProperty(SYSTEM_PROPERTY_DB_PATH);
         if (path != null && !path.trim().isEmpty()) {
-            System.out.println("Using database path from system property: " + path);
+            logger.info("Using database path from system property: " + path);
             return path.trim();
         }
         
         // 2. Environment variable
         path = System.getenv(ENV_VAR_DB_PATH);
         if (path != null && !path.trim().isEmpty()) {
-            System.out.println("Using database path from environment variable: " + path);
+            logger.info("Using database path from environment variable: " + path);
             return path.trim();
         }
         
         // 3. Configuration file
         path = configProperties.getProperty(CONFIG_KEY_DB_PATH);
         if (path != null && !path.trim().isEmpty()) {
-            System.out.println("Using database path from configuration file: " + path);
+            logger.info("Using database path from configuration file: " + path);
             return path.trim();
         }
         
         // 4. Default location
-        System.out.println("Using default database path: " + DEFAULT_DB_PATH);
+        logger.info("Using default database path: " + DEFAULT_DB_PATH);
         return DEFAULT_DB_PATH;
     }
     
@@ -263,10 +266,10 @@ public class DatabaseConfig {
             Path parentDir = dbPath.getParent();
             if (parentDir != null && !Files.exists(parentDir)) {
                 Files.createDirectories(parentDir);
-                System.out.println("Created database directory: " + parentDir);
+                logger.info("Created database directory: " + parentDir);
             }
         } catch (IOException e) {
-            System.err.println("Warning: Could not create database directory: " + e.getMessage());
+            logger.warning("Could not create database directory: " + e.getMessage());
         }
         
         return dbPath.toString();
@@ -320,7 +323,7 @@ public class DatabaseConfig {
         this.databasePath = normalizePath(newPath);
         this.jdbcUrl = JDBC_URL_PREFIX + this.databasePath + JDBC_URL_SUFFIX;
         
-        System.out.println("Database path changed from: " + oldPath + " to: " + this.databasePath);
+        logger.info("Database path changed from: " + oldPath + " to: " + this.databasePath);
         
         // Update active profile
         updateActiveProfile();
@@ -357,7 +360,7 @@ public class DatabaseConfig {
                     .collect(Collectors.toSet());
         }
         
-        System.out.println("File type filters updated: " + this.enabledFileTypes);
+        logger.info("File type filters updated: " + this.enabledFileTypes);
         
         // Update active profile
         updateActiveProfile();
@@ -393,10 +396,10 @@ public class DatabaseConfig {
             Path configPath = Paths.get(CONFIG_FILE_NAME);
             try (OutputStream output = Files.newOutputStream(configPath)) {
                 configProperties.store(output, "MP3Org Database Configuration");
-                System.out.println("Saved configuration to: " + configPath.toAbsolutePath());
+                logger.info("Saved configuration to: " + configPath.toAbsolutePath());
             }
         } catch (IOException e) {
-            System.err.println("Warning: Could not save configuration file: " + e.getMessage());
+            logger.warning("Could not save configuration file: " + e.getMessage());
         }
     }
     
@@ -430,11 +433,11 @@ public class DatabaseConfig {
                         "# database.path=/Users/username/Music/mp3org-database\n" +
                         "# database.path=C:\\\\Music\\\\mp3org-database\n");
                     
-                    System.out.println("Created sample configuration file: " + configPath.toAbsolutePath());
+                    logger.info("Created sample configuration file: " + configPath.toAbsolutePath());
                 }
             }
         } catch (IOException e) {
-            System.err.println("Warning: Could not create sample configuration file: " + e.getMessage());
+            logger.warning("Could not create sample configuration file: " + e.getMessage());
         }
     }
     
@@ -494,7 +497,7 @@ public class DatabaseConfig {
      * Reloads the configuration from all sources.
      */
     public synchronized void reload() {
-        System.out.println("Reloading database configuration...");
+        logger.info("Reloading database configuration...");
         loadConfiguration();
     }
     
@@ -524,7 +527,7 @@ public class DatabaseConfig {
         if (success) {
             // Reload configuration from new active profile
             loadFromActiveProfile();
-            System.out.println("Switched to profile: " + profileId);
+            logger.info("Switched to profile: " + profileId);
         }
         return success;
     }
@@ -541,7 +544,7 @@ public class DatabaseConfig {
         if (success) {
             // Reload configuration from new active profile
             loadFromActiveProfile();
-            System.out.println("Switched to profile: " + profileName);
+            logger.info("Switched to profile: " + profileName);
         }
         return success;
     }
@@ -593,7 +596,7 @@ public class DatabaseConfig {
         } catch (Exception e) {
             // Log the error but don't throw - return -1 to indicate error state
             // This is especially important during config reloads when connection might be temporarily unavailable
-            System.err.println("Warning: Could not retrieve music file count (possibly during config reload): " + e.getMessage());
+            logger.warning("Could not retrieve music file count (possibly during config reload): " + e.getMessage());
             return -1;
         }
     }

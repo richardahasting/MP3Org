@@ -96,14 +96,14 @@ public class DatabaseProfileManager {
                     DatabaseProfile profile = DatabaseProfile.fromProperties(entry.getValue());
                     profiles.put(profile.getId(), profile);
                 } catch (Exception e) {
-                    System.err.println("Warning: Could not load profile " + entry.getKey() + ": " + e.getMessage());
+                    logger.warning("Could not load profile {}: {}", entry.getKey(), e.getMessage());
                 }
             }
             
-            System.out.println("Loaded " + profiles.size() + " database profiles");
+            logger.info("Loaded {} database profiles", profiles.size());
             
         } catch (IOException e) {
-            System.err.println("Warning: Could not load profiles configuration: " + e.getMessage());
+            logger.warning("Could not load profiles configuration: {}", e.getMessage());
         }
     }
     
@@ -132,11 +132,11 @@ public class DatabaseProfileManager {
             Path configPath = Paths.get(PROFILES_CONFIG_FILE);
             try (OutputStream output = Files.newOutputStream(configPath)) {
                 profilesProperties.store(output, "MP3Org Database Profiles Configuration");
-                System.out.println("Saved " + profiles.size() + " profiles to: " + configPath.toAbsolutePath());
+                logger.info("Saved {} profiles to: {}", profiles.size(), configPath.toAbsolutePath());
             }
             
         } catch (IOException e) {
-            System.err.println("Warning: Could not save profiles configuration: " + e.getMessage());
+            logger.warning("Could not save profiles configuration: {}", e.getMessage());
         }
     }
     
@@ -210,7 +210,7 @@ public class DatabaseProfileManager {
         profiles.put(profile.getId(), profile);
         saveProfiles();
         
-        System.out.println("Added profile: " + profile.getName() + " (ID: " + profile.getId() + ")");
+        logger.info("Added profile: {} (ID: {})", profile.getName(), profile.getId());
     }
     
     /**
@@ -224,7 +224,7 @@ public class DatabaseProfileManager {
         profiles.put(profile.getId(), profile);
         saveProfiles();
         
-        System.out.println("Updated profile: " + profile.getName());
+        logger.info("Updated profile: {}", profile.getName());
     }
     
     /**
@@ -363,7 +363,7 @@ public class DatabaseProfileManager {
         
         saveProfiles();
         
-        System.out.println("Switched from profile " + oldActiveId + " to " + profileId);
+        logger.info("Switched from profile {} to {}", oldActiveId, profileId);
         
         // Notify listeners of profile change
         ProfileChangeNotifier.getInstance().notifyProfileChanged(oldActiveId, profileId, activeProfile);
@@ -531,7 +531,7 @@ public class DatabaseProfileManager {
         
         DatabaseProfile preferredProfile = getProfile(preferredProfileId);
         if (preferredProfile == null) {
-            System.out.println("Warning: Preferred profile '" + preferredProfileId + "' not found, searching for alternatives");
+            logger.warning("Preferred profile '{}' not found, searching for alternatives", preferredProfileId);
             return activateFirstAvailableProfileOrCreateTemporary();
         }
         
@@ -539,7 +539,7 @@ public class DatabaseProfileManager {
         if (DatabaseConnectionManager.isDatabaseAvailableForProfile(preferredProfile)) {
             boolean activated = setActiveProfile(preferredProfileId);
             if (activated) {
-                System.out.println("Successfully activated preferred profile: " + preferredProfile.getName());
+                logger.info("Successfully activated preferred profile: {}", preferredProfile.getName());
                 return preferredProfile;
             }
         }
@@ -570,12 +570,12 @@ public class DatabaseProfileManager {
     private DatabaseProfile findFirstAvailableProfile() {
         for (DatabaseProfile profile : profiles.values()) {
             if (DatabaseConnectionManager.isDatabaseAvailableForProfile(profile)) {
-                System.out.println("Found available fallback profile: " + profile.getName());
+                logger.info("Found available fallback profile: {}", profile.getName());
                 return profile;
             }
         }
         
-        System.out.println("No existing profiles have available databases");
+        logger.warning("No existing profiles have available databases");
         return null;
     }
     
@@ -594,10 +594,10 @@ public class DatabaseProfileManager {
                                                                 DatabaseProfile originalProfile) {
         boolean activated = setActiveProfile(fallbackProfile.getId());
         if (activated) {
-            System.out.println("Automatically switched to profile '" + fallbackProfile.getName() + 
-                             "' because '" + originalProfile.getName() + "' database was locked");
-            System.out.println("You can switch back to '" + originalProfile.getName() + 
-                             "' later when it becomes available");
+            logger.warning("Automatically switched to profile '{}' because '{}' database was locked", 
+                             fallbackProfile.getName(), originalProfile.getName());
+            logger.info("You can switch back to '{}' later when it becomes available", 
+                             originalProfile.getName());
             return fallbackProfile;
         } else {
             throw new RuntimeException("Failed to activate fallback profile: " + fallbackProfile.getName());
@@ -640,9 +640,9 @@ public class DatabaseProfileManager {
         boolean activated = setActiveProfile(tempProfile.getId());
         
         if (activated) {
-            System.out.println("Created temporary profile '" + tempProfile.getName() + 
-                             "' with database at: " + tempDbPath);
-            System.out.println("This temporary profile will be available for future use");
+            logger.warning("Created temporary profile '{}' with database at: {}", 
+                             tempProfile.getName(), tempDbPath);
+            logger.info("This temporary profile will be available for future use");
             return tempProfile;
         } else {
             throw new RuntimeException("Failed to activate temporary profile: " + tempProfile.getName());
@@ -663,7 +663,7 @@ public class DatabaseProfileManager {
         if (available != null) {
             boolean activated = setActiveProfile(available.getId());
             if (activated) {
-                System.out.println("Activated first available profile: " + available.getName());
+                logger.info("Activated first available profile: {}", available.getName());
                 return available;
             }
         }
@@ -673,7 +673,7 @@ public class DatabaseProfileManager {
         addProfile(tempProfile);
         setActiveProfile(tempProfile.getId());
         
-        System.out.println("Created basic temporary profile as no alternatives were available");
+        logger.warning("Created basic temporary profile as no alternatives were available");
         return tempProfile;
     }
     
@@ -735,7 +735,7 @@ public class DatabaseProfileManager {
         if (DatabaseConnectionManager.isDatabaseAvailableForProfile(preferredProfile)) {
             boolean switched = setActiveProfile(preferredProfileId);
             if (switched) {
-                System.out.println("Successfully returned to preferred profile: " + preferredProfile.getName());
+                logger.info("Successfully returned to preferred profile: {}", preferredProfile.getName());
                 return true;
             }
         }

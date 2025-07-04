@@ -316,9 +316,9 @@ public class MP3OrgApplication extends Application {
         
         DatabaseProfile resolvedProfile = DatabaseManager.initializeWithAutomaticFallback(preferredProfileId);
         
-        System.out.println("Database initialized with profile: " + resolvedProfile.getName());
+        logger.info("Database initialized with profile: {}", resolvedProfile.getName());
         if (!resolvedProfile.getId().equals(preferredProfileId)) {
-            System.out.println("Note: Switched from preferred profile due to database lock");
+            logger.warning("Switched from preferred profile due to database lock - now using profile: {}", resolvedProfile.getName());
         }
     }
     
@@ -334,8 +334,7 @@ public class MP3OrgApplication extends Application {
      * @param primaryStage the primary stage (may be used for error dialog positioning)
      */
     private void handleStartupFailure(Exception e, Stage primaryStage) {
-        System.err.println("Failed to start MP3Org application: " + e.getMessage());
-        e.printStackTrace();
+        logger.critical("Failed to start MP3Org application: {}", e.getMessage(), e);
         
         // Show user-friendly error dialog
         Alert errorAlert = new Alert(Alert.AlertType.ERROR);
@@ -354,7 +353,7 @@ public class MP3OrgApplication extends Application {
             errorAlert.showAndWait();
         } catch (Exception dialogException) {
             // If we can't even show the error dialog, just log and exit
-            System.err.println("Could not display error dialog: " + dialogException.getMessage());
+            logger.critical("Could not display error dialog: {}", dialogException.getMessage(), dialogException);
         }
         
         // Graceful shutdown

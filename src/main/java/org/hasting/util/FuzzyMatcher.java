@@ -1,6 +1,8 @@
 package org.hasting.util;
 
 import org.hasting.model.MusicFile;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -67,6 +69,8 @@ import java.util.stream.IntStream;
  */
 public class FuzzyMatcher {
     
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(FuzzyMatcher.class);
+    
     // Common patterns for text normalization
     private static final Pattern PUNCTUATION_PATTERN = Pattern.compile("[\\p{Punct}\\s]+");
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
@@ -86,8 +90,13 @@ public class FuzzyMatcher {
      */
     public static double calculateSimilarity(MusicFile file1, MusicFile file2, FuzzySearchConfig config) {
         if (file1 == null || file2 == null || config == null) {
+            logger.debug("calculateSimilarity() - null parameters provided");
             return 0.0;
         }
+        
+        logger.debug("calculateSimilarity() - comparing: {} vs {}", 
+                   file1.getTitle() + " by " + file1.getArtist(),
+                   file2.getTitle() + " by " + file2.getArtist());
         
         double titleSim = calculateFieldSimilarity(file1.getTitle(), file2.getTitle(), config, FieldType.TITLE);
         double artistSim = calculateFieldSimilarity(file1.getArtist(), file2.getArtist(), config, FieldType.ARTIST);
@@ -117,13 +126,22 @@ public class FuzzyMatcher {
         }
         
         // Calculate weighted average (equal weights for now)
-        return (titleSim + artistSim + albumSim) / 3.0;
+        double similarity = (titleSim + artistSim + albumSim) / 3.0;
+        
+        logger.debug("calculateSimilarity() - result: {:.2f}% (title: {:.1f}%, artist: {:.1f}%, album: {:.1f}%, {} matching fields)", 
+                   similarity * 100, titleSim, artistSim, albumSim, matchingFields);
+        
+        return similarity;
     }
     
     /**
      * Checks if two music files are duplicates based on fuzzy search configuration.
      */
     public static boolean areDuplicates(MusicFile file1, MusicFile file2, FuzzySearchConfig config) {
+        logger.debug("areDuplicates() - checking: {} vs {}", 
+                   file1 != null ? file1.getTitle() + " by " + file1.getArtist() : "null",
+                   file2 != null ? file2.getTitle() + " by " + file2.getArtist() : "null");
+                   
         double similarity = calculateSimilarity(file1, file2, config);
         
         // Consider duplicates if:
@@ -150,10 +168,16 @@ public class FuzzyMatcher {
         // Check track number requirement
         if (config.isTrackNumberMustMatch()) {
             boolean trackMatches = checkTrackNumberMatch(file1, file2, config);
-            if (!trackMatches) return false;
+            if (!trackMatches) {
+                logger.debug("areDuplicates() - exit: false (track numbers don't match)");
+                return false;
+            }
         }
         
-        return matchingFields >= config.getMinimumFieldsToMatch();
+        boolean result = matchingFields >= config.getMinimumFieldsToMatch();
+        logger.debug("areDuplicates() - exit: {} ({} matching fields, {} required)", 
+                   result, matchingFields, config.getMinimumFieldsToMatch());
+        return result;
     }
     
     /**

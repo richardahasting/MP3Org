@@ -17,6 +17,8 @@ import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.ProfileChangeListener;
 import org.hasting.util.ProfileChangeNotifier;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -60,6 +62,8 @@ import java.util.List;
  * @since 1.0
  */
 public class MetadataEditorView extends BorderPane implements ProfileChangeListener {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(MetadataEditorView.class);
     
     private TextField searchField;
     private ComboBox<String> searchTypeCombo;
@@ -701,7 +705,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
                 
             } catch (Exception e) {
                 errorCount++;
-                System.err.println("Error updating file: " + file.getTitle() + " - " + e.getMessage());
+                logger.error("Error updating file: {} - {}", file.getTitle(), e.getMessage(), e);
             }
         }
         
@@ -1025,7 +1029,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
         // Clear search field
         searchField.clear();
         
-        System.out.println("MetadataEditorView: All data reset due to database change");
+        logger.info("MetadataEditorView: All data reset due to database change");
     }
     
     /**

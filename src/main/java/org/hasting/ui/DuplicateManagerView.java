@@ -17,6 +17,8 @@ import org.hasting.util.FuzzyMatcher;
 import org.hasting.util.HelpSystem;
 import org.hasting.util.ProfileChangeListener;
 import org.hasting.util.ProfileChangeNotifier;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -62,6 +64,8 @@ import java.util.concurrent.Executors;
  * @since 1.0
  */
 public class DuplicateManagerView extends BorderPane implements ProfileChangeListener {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(DuplicateManagerView.class);
     
     /**
      * Enumeration for different display modes in the duplicate manager.
@@ -1010,7 +1014,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         progressBar.setVisible(false);
         cancelButton.setVisible(false);
         
-        System.out.println("DuplicateManagerView: All data reset due to database change");
+        logger.info("DuplicateManagerView: All data reset due to database change");
     }
     
     /**

@@ -1,11 +1,16 @@
 package org.hasting.util;
 
 import org.hasting.model.MusicFile;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.util.Date;
 import java.util.List;
 
 public class DatabaseManagerTestMain {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseManagerTestMain.class);
+    
     /**
      * The main method serves as the entry point for the application.
      * It demonstrates the basic operations of initializing a database,
@@ -36,24 +41,24 @@ public class DatabaseManagerTestMain {
 
         // Save the music file to the database
         DatabaseManager.saveMusicFile(musicFile);
-        System.out.println("Saved music file with ID: " + musicFile.getId());
+        logger.info("Saved music file with ID: {}", musicFile.getId());
 
         // Retrieve the music file by ID
         MusicFile retrievedMusicFile = DatabaseManager.getMusicFileById(musicFile.getId());
-        System.out.println("Retrieved music file: " + retrievedMusicFile.getTitle());
+        logger.info("Retrieved music file: {}", retrievedMusicFile.getTitle());
 
         // Update the music file
         retrievedMusicFile.setTitle("Updated Test Song");
         DatabaseManager.updateMusicFile(retrievedMusicFile);
-        System.out.println("Updated music file title to: " + retrievedMusicFile.getTitle());
+        logger.info("Updated music file title to: {}", retrievedMusicFile.getTitle());
 
         // Retrieve all music files
         List<MusicFile> allMusicFiles = DatabaseManager.getAllMusicFiles();
-        System.out.println("Total music files in database: " + allMusicFiles.size());
+        logger.info("Total music files in database: {}", allMusicFiles.size());
 
         // Delete the music file
         DatabaseManager.deleteMusicFile(retrievedMusicFile);
-        System.out.println("Deleted music file with ID: " + retrievedMusicFile.getId());
+        logger.info("Deleted music file with ID: {}", retrievedMusicFile.getId());
 
         // Shutdown the database
         DatabaseManager.shutdown();

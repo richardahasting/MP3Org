@@ -101,6 +101,7 @@ public class MusicFileScanner {
     
     
     public List<MusicFile> scanMusicFiles(List<String> directoryPaths) {
+        logger.debug("scanMusicFiles() - entry: {} directories to scan", directoryPaths != null ? directoryPaths.size() : 0);
         List<MusicFile> musicFiles = new ArrayList<>();
         musicFiles = DatabaseManager.getAllMusicFiles();   // Add this line to load music files from the database
         if (musicFiles.isEmpty()) {
@@ -116,6 +117,7 @@ public class MusicFileScanner {
             .map(this::findAllMusicFiles)
             .forEach(musicFiles::addAll);
         
+        logger.debug("scanMusicFiles() - exit: found {} music files", musicFiles.size());
         return musicFiles;
     }
     
@@ -123,6 +125,7 @@ public class MusicFileScanner {
      * Enhanced method for scanning with detailed progress feedback.
      */
     public List<MusicFile> findAllMusicFilesWithProgress(List<String> directoryPaths) {
+        logger.info("Starting enhanced music file scan with progress tracking for {} directories", directoryPaths != null ? directoryPaths.size() : 0);
         List<MusicFile> allMusicFiles = new ArrayList<>();
         int totalDirectories = directoryPaths.size();
         int directoriesProcessed = 0;
@@ -134,9 +137,11 @@ public class MusicFileScanner {
             
             File directory = new File(directoryPath.trim());
             if (!directory.exists() || !directory.isDirectory()) {
-                logger.warning("Invalid directory: " + directoryPath);
+                logger.warning("Invalid directory: {}", directoryPath);
                 continue;
             }
+            
+            logger.debug("Scanning directory: {}", directoryPath);
             
             // Stage 1: Directory scanning
             if (detailedProgressCallback != null) {

@@ -16,6 +16,8 @@ import org.hasting.model.PathTemplate;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.MusicFileScanner;
 import org.hasting.util.PathTemplateManager;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -62,6 +64,8 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public class ImportOrganizeView extends BorderPane {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(ImportOrganizeView.class);
     
     private TextArea selectedDirectoriesArea;
     private ProgressBar progressBar;
@@ -575,13 +579,12 @@ public class ImportOrganizeView extends BorderPane {
                         
                         // Copy the file to the new location
                         java.nio.file.Files.copy(sourcePath, destinationFilePath);
-                        System.out.println("Copying file..." + sourcePath + " -> " + destinationFilePath);
+                        logger.debug("Copying file: {} -> {}", sourcePath, destinationFilePath);
                         
                         successfulCopies++;
                         
                     } catch (Exception e) {
-                        System.err.println("Failed to copy file: " + musicFile.getFilePath() + 
-                                         " - " + e.getMessage());
+                        logger.error("Failed to copy file: {} - {}", musicFile.getFilePath(), e.getMessage(), e);
                     }
                     
                     processedFiles++;

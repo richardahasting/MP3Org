@@ -6,6 +6,8 @@ import javafx.stage.DirectoryChooser;
 import org.hasting.util.DatabaseConfig;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.HelpSystem;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.io.File;
 import java.awt.Desktop;
@@ -15,6 +17,8 @@ import java.awt.Desktop;
  * Provides functionality to view, change, and reload database configuration.
  */
 public class DatabaseLocationPanel extends VBox {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseLocationPanel.class);
     
     private TextField currentPathField;
     private TextArea configInfoArea;
@@ -251,8 +255,7 @@ public class DatabaseLocationPanel extends VBox {
             }
             
             showError(errorMessage);
-            System.err.println("Configuration reload failed: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Configuration reload failed: {}", e.getMessage(), e);
             
             // Try to at least update the display with current info
             try {
