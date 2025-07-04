@@ -6,12 +6,16 @@ import javafx.scene.layout.*;
 import org.hasting.model.PathTemplate;
 import org.hasting.util.HelpSystem;
 import org.hasting.util.PathTemplateManager;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 /**
  * UI panel for configuring path templates for file organization.
  * Provides controls for selecting predefined templates or creating custom ones.
  */
 public class PathTemplateConfigPanel extends VBox {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(PathTemplateConfigPanel.class);
     
     // Template selection
     private ComboBox<String> templateComboBox;
@@ -380,7 +384,7 @@ public class PathTemplateConfigPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to apply path template: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error applying template configuration changes: {}", e.getMessage(), e);
         }
     }
     

@@ -407,7 +407,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
                     statusLabel.setText("Error loading duplicates: " + errorMsg);
                     updateUIAfterLoad(0, true);
-                    exception.printStackTrace();
+                    logger.error("Failed to detect duplicates: {}", errorMsg, exception);
                 });
             }
             
@@ -519,7 +519,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     Throwable exception = getException();
                     String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
                     statusLabel.setText("Error loading files: " + errorMsg);
-                    exception.printStackTrace();
+                    logger.error("Failed to load all music files: {}", errorMsg, exception);
                 });
             }
             
@@ -621,7 +621,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     Throwable exception = getException();
                     String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
                     statusLabel.setText("Error loading similar files: " + errorMsg);
-                    exception.printStackTrace();
+                    logger.error("Failed to load similar files: {}", errorMsg, exception);
                 });
             }
             
@@ -660,7 +660,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                         }
                     } catch (Exception e) {
                         statusLabel.setText("Error deleting file: " + e.getMessage());
-                        e.printStackTrace();
+                        logger.error("Failed to delete selected file: {}", e.getMessage(), e);
                     }
                 }
             });
@@ -698,7 +698,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                         }
                     } catch (Exception e) {
                         statusLabel.setText("Error deleting file: " + e.getMessage());
-                        e.printStackTrace();
+                        logger.error("Failed to delete file during keep better quality operation: {}", e.getMessage(), e);
                     }
                 }
             });
@@ -823,7 +823,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     }
                 } catch (Exception e) {
                     statusLabel.setText("Error deleting file: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Failed to delete file: {}", e.getMessage(), e);
                 }
             }
         });
@@ -890,7 +890,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
             }
         } catch (Exception e) {
             statusLabel.setText("Error opening file location: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to open file location: {}", e.getMessage(), e);
         }
     }
     

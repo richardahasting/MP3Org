@@ -489,7 +489,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             
         } catch (Exception e) {
             statusLabel.setText("Search error: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error performing search with term '{}' and type '{}'", searchTerm, searchTypeCombo.getValue(), e);
         }
     }
     
@@ -573,7 +573,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             
         } catch (Exception e) {
             statusLabel.setText("Error saving changes: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error saving metadata changes for file: {}", currentFile != null ? currentFile.getFilePath() : "unknown", e);
         }
     }
     
@@ -610,7 +610,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
                     }
                 } catch (Exception e) {
                     statusLabel.setText("Error deleting file: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Error deleting current file: {}", currentFile != null ? currentFile.getFilePath() : "unknown", e);
                 }
             }
         });
@@ -890,7 +890,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
                     }
                 } catch (Exception e) {
                     statusLabel.setText("Error deleting file: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Error deleting file: {}", file.getFilePath(), e);
                 }
             }
         });
@@ -914,7 +914,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             }
         } catch (Exception e) {
             statusLabel.setText("Error opening file location: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error opening file location for file: {}", file.getFilePath(), e);
         }
     }
     

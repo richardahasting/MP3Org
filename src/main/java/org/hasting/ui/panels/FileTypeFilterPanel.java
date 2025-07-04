@@ -5,6 +5,8 @@ import javafx.scene.layout.*;
 import org.hasting.util.DatabaseConfig;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.HelpSystem;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -14,6 +16,8 @@ import java.util.Set;
  * Allows users to select which audio file types should be processed during scanning.
  */
 public class FileTypeFilterPanel extends VBox {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(FileTypeFilterPanel.class);
     
     private ListView<CheckBox> fileTypesList;
     private Button selectAllButton;
@@ -163,7 +167,7 @@ public class FileTypeFilterPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to apply file type filters: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error applying file type filter configuration: {}", e.getMessage(), e);
         }
     }
     

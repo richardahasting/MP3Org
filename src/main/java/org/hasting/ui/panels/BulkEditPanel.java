@@ -287,7 +287,7 @@ public class BulkEditPanel extends VBox {
             
         } catch (Exception e) {
             updateStatus("Bulk update failed: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Bulk update failed: {}", e.getMessage(), e);
         }
     }
     

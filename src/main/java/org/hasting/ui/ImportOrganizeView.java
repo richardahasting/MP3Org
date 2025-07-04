@@ -240,7 +240,7 @@ public class ImportOrganizeView extends BorderPane {
             statusLabel.setText("Loaded " + allFiles.size() + " files for selection");
         } catch (Exception e) {
             statusLabel.setText("Error loading files: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error loading files for selection: {}", e.getMessage(), e);
         }
     }
     
@@ -498,7 +498,7 @@ public class ImportOrganizeView extends BorderPane {
                     String errorMessage = getException().getMessage();
                     statusLabel.setText("Import failed: " + errorMessage);
                     progressDialog.setCompleted(false, errorMessage);
-                    getException().printStackTrace();
+                    logger.error("Import operation failed: {}", errorMessage, getException());
                 });
             }
         };
@@ -619,7 +619,7 @@ public class ImportOrganizeView extends BorderPane {
                     progressBar.setVisible(false);
                     progressLabel.setText("");
                     statusLabel.setText("Organization failed: " + getException().getMessage());
-                    getException().printStackTrace();
+                    logger.error("File organization failed: {}", getException().getMessage(), getException());
                 });
             }
         };
@@ -647,7 +647,7 @@ public class ImportOrganizeView extends BorderPane {
                     statusLabel.setText("Database cleared successfully");
                 } catch (Exception e) {
                     statusLabel.setText("Error clearing database: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Error clearing database: {}", e.getMessage(), e);
                 }
             }
         });

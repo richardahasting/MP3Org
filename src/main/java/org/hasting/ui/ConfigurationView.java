@@ -4,12 +4,16 @@ import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.hasting.ui.panels.*;
+import org.hasting.util.logging.Logger;
+import org.hasting.util.logging.MP3OrgLoggingManager;
 
 /**
  * Main configuration view that orchestrates all configuration panels.
  * This view has been refactored to use specialized panels for better maintainability.
  */
 public class ConfigurationView extends BorderPane {
+    
+    private static final Logger logger = MP3OrgLoggingManager.getLogger(ConfigurationView.class);
     
     // Configuration panels
     private DatabaseLocationPanel databaseLocationPanel;
@@ -197,7 +201,7 @@ public class ConfigurationView extends BorderPane {
         } catch (Exception e) {
             statusLabel.setText("Error loading configuration: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
-            e.printStackTrace();
+            logger.error("Error loading configuration tab content: {}", e.getMessage(), e);
         }
     }
     
@@ -217,7 +221,7 @@ public class ConfigurationView extends BorderPane {
         } catch (Exception e) {
             statusLabel.setText("Error refreshing panels: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
-            e.printStackTrace();
+            logger.error("Error loading configuration tab content: {}", e.getMessage(), e);
         }
     }
     

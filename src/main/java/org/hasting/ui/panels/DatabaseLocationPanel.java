@@ -134,7 +134,7 @@ public class DatabaseLocationPanel extends VBox {
         } catch (Exception e) {
             statusLabel.setText("Error loading configuration: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
-            e.printStackTrace();
+            logger.error("Error loading configuration: {}", e.getMessage(), e);
         }
     }
     
@@ -153,7 +153,7 @@ public class DatabaseLocationPanel extends VBox {
                 directoryChooser.setInitialDirectory(parentDir);
             }
         } catch (Exception e) {
-            // Use default if there's an issue
+            logger.debug("Could not set initial directory, using default: {}", e.getMessage());
         }
         
         File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
@@ -183,7 +183,7 @@ public class DatabaseLocationPanel extends VBox {
                 
             } catch (Exception e) {
                 showError("Failed to change database location: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("Failed to validate new database location: {}", e.getMessage(), e);
             }
         }
     }
@@ -216,7 +216,7 @@ public class DatabaseLocationPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to change database location: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to change database location: {}", e.getMessage(), e);
         }
     }
     
@@ -296,7 +296,7 @@ public class DatabaseLocationPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to open database location: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to open database location in file manager: {}", e.getMessage(), e);
         }
     }
     
