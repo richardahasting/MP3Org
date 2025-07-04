@@ -32,7 +32,7 @@ public class ProfileManagementPanel extends VBox {
     private Runnable onProfileChanged;
     
     // Flag to prevent recursive profile switching
-    private boolean isUpdatingProfile = false;
+    private volatile boolean isUpdatingProfile = false;
     
     /**
      * Creates a new ProfileManagementPanel with all necessary components.
