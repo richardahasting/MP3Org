@@ -8,6 +8,7 @@ import javafx.scene.control.cell.ComboBoxTableCell;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import org.hasting.util.HelpSystem;
+import org.hasting.util.logging.LogBackupManager;
 import org.hasting.util.logging.LogLevel;
 import org.hasting.util.logging.LoggingConfiguration;
 import org.hasting.util.logging.MP3OrgLoggingManager;
@@ -62,6 +63,18 @@ public class LoggingConfigPanel extends VBox {
     private ObservableList<ComponentLogLevel> componentData;
     private TextField customComponentField;
     private Button addComponentButton;
+    
+    // Backup and rotation controls
+    private CheckBox backupEnabledCheckBox;
+    private Spinner<Integer> backupMaxSizeSpinner;
+    private Spinner<Integer> backupCountSpinner;
+    private CheckBox compressionEnabledCheckBox;
+    private Slider compressionLevelSlider;
+    private Label compressionLevelLabel;
+    private TextField backupDirectoryField;
+    private Button browseBackupDirButton;
+    private Button backupNowButton;
+    private Label backupStatusLabel;
     
     // Runtime control buttons
     private Button applyChangesButton;
@@ -143,6 +156,9 @@ public class LoggingConfigPanel extends VBox {
         
         addComponentButton = new Button("Add Component");
         addComponentButton.setOnAction(e -> addCustomComponent());
+        
+        // Backup and rotation controls
+        initializeBackupControls();
         
         // Runtime controls
         applyChangesButton = new Button("Apply Changes");
@@ -228,6 +244,93 @@ public class LoggingConfigPanel extends VBox {
     }
     
     /**
+     * Initializes backup and rotation control components.
+     */
+    private void initializeBackupControls() {
+        // Backup enabled checkbox
+        backupEnabledCheckBox = new CheckBox("Enable Automatic Backup");
+        backupEnabledCheckBox.setSelected(true);
+        HelpSystem.setTooltip(backupEnabledCheckBox, "config.logging.backup.enabled");
+        
+        // Backup max size spinner
+        backupMaxSizeSpinner = new Spinner<>(1, 1000, 10); // 1MB to 1000MB, default 10MB
+        backupMaxSizeSpinner.setEditable(true);
+        backupMaxSizeSpinner.setPrefWidth(80);
+        HelpSystem.setTooltip(backupMaxSizeSpinner, "config.logging.backup.maxSize");
+        
+        // Backup count spinner
+        backupCountSpinner = new Spinner<>(1, 50, 5); // 1 to 50 backups, default 5
+        backupCountSpinner.setEditable(true);
+        backupCountSpinner.setPrefWidth(80);
+        HelpSystem.setTooltip(backupCountSpinner, "config.logging.backup.count");
+        
+        // Compression enabled checkbox
+        compressionEnabledCheckBox = new CheckBox("Enable Compression");
+        compressionEnabledCheckBox.setSelected(true);
+        HelpSystem.setTooltip(compressionEnabledCheckBox, "config.logging.backup.compression");
+        
+        // Compression level slider
+        compressionLevelSlider = new Slider(1, 9, 6);
+        compressionLevelSlider.setMajorTickUnit(1);
+        compressionLevelSlider.setMinorTickCount(0);
+        compressionLevelSlider.setSnapToTicks(true);
+        compressionLevelSlider.setShowTickLabels(true);
+        compressionLevelSlider.setPrefWidth(200);
+        
+        compressionLevelLabel = new Label("Level: 6");
+        compressionLevelSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            compressionLevelLabel.setText("Level: " + newVal.intValue());
+        });
+        
+        // Enable/disable compression level based on compression checkbox
+        compressionEnabledCheckBox.setOnAction(e -> {
+            boolean compressionEnabled = compressionEnabledCheckBox.isSelected();
+            compressionLevelSlider.setDisable(!compressionEnabled);
+            compressionLevelLabel.setDisable(!compressionEnabled);
+        });
+        
+        // Backup directory controls
+        backupDirectoryField = new TextField();
+        backupDirectoryField.setPromptText("backup");
+        backupDirectoryField.setPrefWidth(200);
+        backupDirectoryField.setText("backup");
+        HelpSystem.setTooltip(backupDirectoryField, "config.logging.backup.directory");
+        
+        browseBackupDirButton = new Button("Browse...");
+        browseBackupDirButton.setOnAction(e -> selectBackupDirectory());
+        
+        // Backup now button
+        backupNowButton = new Button("Backup Now");
+        backupNowButton.setOnAction(e -> performManualBackup());
+        backupNowButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+        
+        // Backup status label
+        backupStatusLabel = new Label("No recent backup activity");
+        backupStatusLabel.setStyle("-fx-text-fill: #666666;");
+        
+        // Enable/disable backup controls based on backup enabled checkbox
+        backupEnabledCheckBox.setOnAction(e -> updateBackupControlsState());
+    }
+    
+    /**
+     * Updates the state of backup controls based on whether backup is enabled.
+     */
+    private void updateBackupControlsState() {
+        boolean backupEnabled = backupEnabledCheckBox.isSelected();
+        backupMaxSizeSpinner.setDisable(!backupEnabled);
+        backupCountSpinner.setDisable(!backupEnabled);
+        compressionEnabledCheckBox.setDisable(!backupEnabled);
+        
+        boolean compressionEnabled = compressionEnabledCheckBox.isSelected() && backupEnabled;
+        compressionLevelSlider.setDisable(!compressionEnabled);
+        compressionLevelLabel.setDisable(!compressionEnabled);
+        
+        backupDirectoryField.setDisable(!backupEnabled);
+        browseBackupDirButton.setDisable(!backupEnabled);
+        backupNowButton.setDisable(!backupEnabled);
+    }
+    
+    /**
      * Arranges all components in the panel layout.
      */
     private void layoutComponents() {
@@ -270,6 +373,47 @@ public class LoggingConfigPanel extends VBox {
             addComponentButton
         );
         
+        // Backup and Rotation Section
+        Label backupTitle = new Label("Backup and Rotation Settings");
+        backupTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        
+        Label backupInstructions = new Label(
+            "Configure automatic backup and compression settings for log files. " +
+            "Backups are created when log files exceed the specified size threshold."
+        );
+        backupInstructions.setWrapText(true);
+        backupInstructions.setStyle("-fx-text-fill: #666666;");
+        
+        GridPane backupGrid = new GridPane();
+        backupGrid.setHgap(10);
+        backupGrid.setVgap(8);
+        
+        // Row 0: Backup enabled
+        backupGrid.add(backupEnabledCheckBox, 0, 0, 2, 1);
+        
+        // Row 1: Max size and backup count
+        backupGrid.add(new Label("Max Log Size (MB):"), 0, 1);
+        backupGrid.add(backupMaxSizeSpinner, 1, 1);
+        backupGrid.add(new Label("Keep Backups:"), 2, 1);
+        backupGrid.add(backupCountSpinner, 3, 1);
+        
+        // Row 2: Compression settings
+        backupGrid.add(compressionEnabledCheckBox, 0, 2, 2, 1);
+        HBox compressionBox = new HBox(10);
+        compressionBox.getChildren().addAll(compressionLevelSlider, compressionLevelLabel);
+        backupGrid.add(new Label("Compression Level:"), 2, 2);
+        backupGrid.add(compressionBox, 3, 2);
+        
+        // Row 3: Backup directory
+        backupGrid.add(new Label("Backup Directory:"), 0, 3);
+        HBox backupDirBox = new HBox(5);
+        backupDirBox.getChildren().addAll(backupDirectoryField, browseBackupDirButton);
+        backupGrid.add(backupDirBox, 1, 3, 3, 1);
+        
+        // Backup controls box
+        HBox backupControlsBox = new HBox(10);
+        backupControlsBox.getChildren().addAll(backupNowButton, backupStatusLabel);
+        
         // Runtime Controls Section
         Label controlsTitle = new Label("Runtime Controls");
         controlsTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
@@ -291,6 +435,11 @@ public class LoggingConfigPanel extends VBox {
             componentInstructions,
             addComponentBox,
             componentTable,
+            new Separator(),
+            backupTitle,
+            backupInstructions,
+            backupGrid,
+            backupControlsBox,
             new Separator(),
             controlsTitle,
             controlsBox,
@@ -319,6 +468,18 @@ public class LoggingConfigPanel extends VBox {
             boolean fileLoggingEnabled = fileLoggingCheckBox.isSelected();
             logFilePathField.setDisable(!fileLoggingEnabled);
             browseLogFileButton.setDisable(!fileLoggingEnabled);
+            
+            // Load backup settings
+            backupEnabledCheckBox.setSelected(currentConfig.isBackupEnabled());
+            backupMaxSizeSpinner.getValueFactory().setValue(currentConfig.getBackupMaxSizeMB());
+            backupCountSpinner.getValueFactory().setValue(currentConfig.getBackupCount());
+            compressionEnabledCheckBox.setSelected(currentConfig.isCompressionEnabled());
+            compressionLevelSlider.setValue(currentConfig.getCompressionLevel());
+            compressionLevelLabel.setText("Level: " + currentConfig.getCompressionLevel());
+            backupDirectoryField.setText(currentConfig.getBackupDirectory());
+            
+            // Update backup control states
+            updateBackupControlsState();
             
             // Load component-specific settings
             loadComponentSettings(currentConfig);
@@ -422,6 +583,9 @@ public class LoggingConfigPanel extends VBox {
                 newConfig.setFilePath(logFilePathField.getText().trim());
             }
             
+            // Set backup settings
+            updateConfigurationFromUI(newConfig);
+            
             // Set component-specific levels
             for (ComponentLogLevel component : componentData) {
                 newConfig.setLoggerLevel(component.getComponent(), component.getLevel());
@@ -506,5 +670,84 @@ public class LoggingConfigPanel extends VBox {
             statusLabel.setText("Error opening log viewer: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: #f44336;");
         }
+    }
+    
+    /**
+     * Handles backup directory selection.
+     */
+    private void selectBackupDirectory() {
+        javafx.stage.DirectoryChooser directoryChooser = new javafx.stage.DirectoryChooser();
+        directoryChooser.setTitle("Select Backup Directory");
+        
+        // Set initial directory to current backup directory or log directory
+        try {
+            LoggingConfiguration currentConfig = MP3OrgLoggingManager.getCurrentConfiguration();
+            String currentBackupDir = currentConfig.getFullBackupDirectoryPath();
+            java.io.File initialDir = new java.io.File(currentBackupDir);
+            if (initialDir.exists()) {
+                directoryChooser.setInitialDirectory(initialDir);
+            } else {
+                // Fall back to log directory
+                String logFilePath = currentConfig.getFilePath();
+                if (logFilePath != null) {
+                    java.io.File logFile = new java.io.File(logFilePath);
+                    java.io.File logDir = logFile.getParentFile();
+                    if (logDir != null && logDir.exists()) {
+                        directoryChooser.setInitialDirectory(logDir);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not set initial directory for backup directory chooser: {}", e.getMessage());
+        }
+        
+        java.io.File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
+        if (selectedDirectory != null) {
+            backupDirectoryField.setText(selectedDirectory.getName()); // Use relative name
+        }
+    }
+    
+    /**
+     * Performs a manual backup of the current log file.
+     */
+    private void performManualBackup() {
+        try {
+            backupStatusLabel.setText("Creating backup...");
+            backupStatusLabel.setStyle("-fx-text-fill: #2196F3;");
+            
+            // Get current configuration and apply current UI settings
+            LoggingConfiguration config = MP3OrgLoggingManager.getCurrentConfiguration();
+            updateConfigurationFromUI(config);
+            
+            // Perform the backup
+            boolean success = LogBackupManager.forceBackup(config);
+            
+            if (success) {
+                backupStatusLabel.setText("Backup created successfully");
+                backupStatusLabel.setStyle("-fx-text-fill: #4CAF50;");
+                logger.info("Manual backup completed successfully");
+            } else {
+                backupStatusLabel.setText("Backup failed - check log for details");
+                backupStatusLabel.setStyle("-fx-text-fill: #f44336;");
+            }
+            
+        } catch (Exception e) {
+            backupStatusLabel.setText("Error during backup: " + e.getMessage());
+            backupStatusLabel.setStyle("-fx-text-fill: #f44336;");
+            logger.error("Manual backup failed: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Updates a LoggingConfiguration object with current UI settings.
+     */
+    private void updateConfigurationFromUI(LoggingConfiguration config) {
+        // Update backup settings from UI
+        config.setBackupEnabled(backupEnabledCheckBox.isSelected());
+        config.setBackupMaxSizeMB(backupMaxSizeSpinner.getValue());
+        config.setBackupCount(backupCountSpinner.getValue());
+        config.setCompressionEnabled(compressionEnabledCheckBox.isSelected());
+        config.setCompressionLevel((int) compressionLevelSlider.getValue());
+        config.setBackupDirectory(backupDirectoryField.getText().trim());
     }
 }

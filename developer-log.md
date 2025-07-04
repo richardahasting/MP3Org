@@ -1,5 +1,118 @@
 # MP3Org Developer Log
 
+## Session: 2025-07-04 - Database Upsert & Logging Configuration UI Implementation
+
+### **Session Overview**
+- **Duration**: ~2 hours implementation session
+- **Focus**: Complete implementation of Issues #28 & #29 - Database enhancement with upsert functionality and comprehensive logging configuration UI
+- **Outcome**: Successfully implemented both features with full integration and compilation verification
+
+---
+
+### **User Requirements**
+- **Request**: "please address those issues" (referring to Issues #28 & #29)
+- **Context**: User requested implementation of two GitHub issues for database and logging enhancements
+- **Goal**: Implement upsert functionality for database and create comprehensive logging configuration UI
+
+### **Issue #28 - Database Enhancement Implementation** ✅ **COMPLETED**
+
+#### **Core Implementation**
+- ✅ **DatabaseManager.java** - Added `saveOrUpdateMusicFile()` method with upsert logic
+- ✅ **ImportOrganizeView.java** - Enhanced with DirectoryItem class and selective rescanning
+- ✅ **Feature Branch**: `feature/issue-28-database-upsert-enhancements`
+
+#### **Key Technical Details**
+```java
+// DatabaseManager.java - Upsert implementation
+public static synchronized void saveOrUpdateMusicFile(MusicFile musicFile) {
+    MusicFile existingFile = findByPath(musicFile.getFilePath());
+    if (existingFile != null) {
+        // Update existing record
+        musicFile.setId(existingFile.getId());
+        musicFile.setModified(true);
+        updateMusicFile(musicFile);
+    } else {
+        // Insert new record
+        saveMusicFile(musicFile);
+    }
+}
+```
+
+#### **Import UI Enhancements**
+- ✅ **DirectoryItem class** - Manages directory selection state and scanning history
+- ✅ **TableView integration** - Selective directory rescanning with status tracking
+- ✅ **Rescan functionality** - Uses new upsert method to handle duplicate files gracefully
+- ✅ **Status tracking** - Real-time progress and completion timestamps
+
+#### **Compilation Fixes**
+- ✅ **Fixed ScanProgress access** - Used public fields instead of non-existent getter methods
+- ✅ **Fixed MusicFileScanner calls** - Used `findAllMusicFiles()` instead of `scanDirectory()`
+- ✅ **All compilation errors resolved** - Clean build achieved
+
+### **Issue #29 - Logging Configuration UI Implementation** ✅ **COMPLETED**
+
+#### **Core Implementation**
+- ✅ **LoggingConfigPanel.java** - 510-line comprehensive logging configuration panel
+- ✅ **ConfigurationView.java** - Integration as new "Logging Configuration" tab
+- ✅ **Feature Branch**: `feature/issue-29-logging-config-ui`
+
+#### **Key Features Implemented**
+```java
+// LoggingConfigPanel.java - Component structure
+public class LoggingConfigPanel extends VBox {
+    // Global settings controls
+    private ComboBox<LogLevel> defaultLevelComboBox;
+    private CheckBox consoleLoggingCheckBox;
+    private CheckBox fileLoggingCheckBox;
+    private TextField logFilePathField;
+    
+    // Component-specific controls
+    private TableView<ComponentLogLevel> componentTable;
+    private TextField customComponentField;
+    
+    // Runtime controls
+    private Button applyChangesButton;
+    private Button resetDefaultsButton;
+    private Button testLoggingButton;
+    private Button viewLogsButton;
+}
+```
+
+#### **Configuration Features**
+- ✅ **Global Settings** - Default log level, console/file output toggles
+- ✅ **File Configuration** - Log file path selection with file chooser
+- ✅ **Component Levels** - Per-package/class log level overrides with editable table
+- ✅ **Runtime Controls** - Apply changes, reset defaults, test logging
+- ✅ **Add/Remove Components** - Dynamic component management
+- ✅ **Status Feedback** - Real-time configuration status display
+
+#### **Integration Details**
+- ✅ **Tab Integration** - Added as 6th tab in ConfigurationView
+- ✅ **Refresh Workflow** - Integrated into loadCurrentSettings() and refresh methods
+- ✅ **Public API** - Made loadCurrentSettings() public for external access
+- ✅ **Getter Method** - Added getLoggingConfigPanel() for external access
+
+### **Implementation Statistics**
+- **Files Created**: 1 (LoggingConfigPanel.java - 510 lines)
+- **Files Modified**: 2 (ConfigurationView.java, DatabaseManager.java, ImportOrganizeView.java)
+- **Feature Branches**: 2 (issue-28, issue-29)
+- **Compilation Status**: ✅ Clean build achieved
+- **Test Status**: Manual verification pending
+
+### **Next Steps**
+1. Create pull requests for both feature branches
+2. End-to-end testing of both features
+3. Merge branches after approval
+4. Close GitHub issues #28 and #29
+
+### **Development Notes**
+- **Branch Strategy**: Followed branch-per-issue approach as required by CLAUDE.md
+- **Code Quality**: Maintained existing patterns and comprehensive JavaDoc
+- **Integration**: Seamless integration with existing UI framework
+- **Error Handling**: Comprehensive exception handling and user feedback
+
+---
+
 ## Session: 2025-07-03 - Database Lock Fallback Implementation & Profile Management Enhancement
 
 ### **Session Overview**
