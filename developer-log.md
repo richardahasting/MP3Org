@@ -1662,4 +1662,73 @@ private void createFallbackProfile()
 **Achievement**: Complete professional logging framework integration with zero printStackTrace() calls remaining in the codebase.
 
 ---
+
+## Session: 2025-07-04 (Continued) - Logger Initialization Order Fix
+
+### **Additional User Issue Reported**
+- **Problem**: Application startup showing logger errors:
+  ```
+  Failed to load MP3Org configuration: Cannot invoke "org.hasting.util.logging.Logger.info(String, Object[])" because "org.hasting.util.DatabaseProfileManager.logger" is null
+  ```
+- **Root Cause**: DatabaseProfileManager tried to initialize static final logger before logging system was ready
+- **Impact**: NullPointerException during application startup, multiple error messages
+
+### **Logger Initialization Order Fix** ✅ **COMPLETED**
+
+#### **Technical Problem Analysis**
+**Initialization Sequence Issue:**
+1. DatabaseProfileManager class loaded during startup
+2. Static final logger field tried to initialize via `MP3OrgLoggingManager.getLogger()`
+3. Logging system not yet initialized (happens later in MP3OrgApplication.start())
+4. NullPointerException when logger methods called
+
+**Files Affected:**
+- DatabaseProfileManager.java - Static logger initialization causing startup failures
+
+#### **Solution Implementation**
+**Safe Logging Pattern Created:**
+```java
+// Before (problematic)
+private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseProfileManager.class);
+
+// After (safe)
+private static Logger logger;
+
+private static void safeLogInfo(String message, Object... params) {
+    try {
+        if (logger == null) {
+            logger = MP3OrgLoggingManager.getLogger(DatabaseProfileManager.class);
+        }
+        logger.info(message, params);
+    } catch (Exception e) {
+        // Fall back to System.err if logging not available
+        System.err.println("[INFO] DatabaseProfileManager: " + formatMessage(message, params));
+    }
+}
+```
+
+**Implementation Details:**
+- ✅ **Lazy Logger Initialization** - Logger created on first use, not at class load
+- ✅ **Safe Logging Methods** - safeLogDebug(), safeLogInfo(), safeLogWarning(), safeLogError()
+- ✅ **Graceful Fallback** - System.err output when logging system unavailable
+- ✅ **Parameter Formatting** - formatMessage() helper for {} placeholder replacement
+- ✅ **Exception Handling** - Try-catch blocks prevent startup failures
+
+#### **Benefits Achieved**
+✅ **Clean Startup** - No more logger NullPointerException errors during application launch  
+✅ **Graceful Degradation** - System continues to work with fallback logging during early startup  
+✅ **Full Logging Restored** - Normal logging functionality once system fully initialized  
+✅ **Robust Error Handling** - Application resilient to logging system initialization timing  
+
+### **Updated Session Statistics**
+- 🕒 **Total Duration**: ~60 minutes (including logger fix)
+- 📝 **Exception Handling**: 27 printStackTrace() calls replaced + logger initialization fix
+- 🔧 **Tab Refresh System**: Automatic database content refresh on tab switching
+- 🐛 **Startup Issue**: Logger initialization order problem resolved
+- ✅ **Compilation**: BUILD SUCCESSFUL after all fixes
+- 📦 **Git Commits**: 4 commits with comprehensive fixes
+
+**Achievement**: Complete logging framework integration with zero startup errors and automatic UI refresh system.
+
+---
 *Session Completed: 2025-07-04*
