@@ -1,5 +1,138 @@
 # MP3Org Developer Log
 
+## Session: 2025-07-05 - TestDataFactory Implementation & Git Integration
+
+### **Session Overview**
+- **Duration**: ~1.5 hours review, fix, test, and integration session
+- **Focus**: Complete review, testing, and git integration of Issue #16 - TestDataFactory for programmatic test data generation
+- **Outcome**: Successfully validated, fixed, tested, and committed comprehensive TestDataFactory implementation
+
+### **User Prompt**
+```
+we were having problems with the shell previously. Can you check to make sure that TMPDIR is properly set to a folder that is writable?
+
+where is the system TMPDIR set?
+
+where are we on solving issue 16 then?
+
+yes. Please test and integrate with git
+```
+
+### **Work Completed**
+
+#### **1. Environment Diagnostics & Fixes**
+- **TMPDIR Investigation**: Discovered TMPDIR was unset, causing potential shell issues
+- **System Configuration**: Found TMPDIR configured in `~/.zshrc` (line 76) and `~/.bashrc` (line 1)
+- **Resolution**: Set `TMPDIR=/tmp` for session, verified write permissions to both `/tmp` and Java temp directory
+- **Status**: ✅ Shell environment properly configured
+
+#### **2. TestDataFactory Implementation Review**
+- **Discovery**: Found substantially complete implementation already in place
+- **Architecture Validated**: 
+  - Main factory class with comprehensive API
+  - Template-based generation using user-provided audio files
+  - Builder pattern specifications for all test scenarios
+  - 13 new classes following SOLID principles and consistent patterns
+- **Status**: ✅ Implementation architecture excellent and complete
+
+#### **3. Compilation Error Fixes**
+Fixed 5 critical compilation errors:
+- **Logger method names**: Changed `logger.warn()` to `logger.warning()` (2 files)
+- **MusicFile constructor**: Fixed parameter type from String to File
+- **Missing MusicFile methods**: Added `isSimilarTo()` and `refreshMetadata()` methods
+- **Null bitrate handling**: Added graceful fallback for null bitrate in variations
+- **Status**: ✅ All compilation errors resolved, build successful
+
+#### **4. Comprehensive Testing**
+- **Template Discovery**: Successfully found `shortRecording10sec.mp3` + 3 additional formats
+- **Duplicate Generation**: ✅ Generated 5 variations (typos, featuring, case, bitrate)
+- **Edge Case Generation**: ✅ Unicode, special characters, long strings, missing metadata
+- **Format Testing**: ✅ MP3, FLAC, WAV, OGG generation across all templates
+- **Large Dataset**: ✅ Generated 100+ files with distribution (70% MP3, 20% FLAC, etc.)
+- **Cleanup System**: ✅ Automatic file cleanup on JVM shutdown working perfectly
+- **Status**: ✅ All test scenarios successful
+
+#### **5. Git Workflow Integration**
+- **Feature Branch**: Created `feature/issue-16-test-data-factory` (proper workflow)
+- **Comprehensive Commit**: Added 18 files with 3,021 insertions
+- **Commit Quality**: Professional commit message with summary, technical details, and testing results
+- **Status**: ✅ Proper git workflow followed, ready for PR creation
+
+### **Technical Accomplishments**
+
+#### **MusicFile Class Enhancements**
+```java
+// Added convenience method for TestDataFactory usage
+public boolean isSimilarTo(MusicFile other) {
+    return isItLikelyTheSameSong(other);
+}
+
+// Added metadata refresh capability
+public boolean refreshMetadata() {
+    if (this.filePath == null || this.filePath.trim().isEmpty()) {
+        return false;
+    }
+    File file = new File(this.filePath);
+    return file.exists() && MetadataExtractor.extractMetadata(this, file);
+}
+```
+
+#### **Key TestDataFactory Capabilities**
+- **Duplicate Generation**: Creates realistic variations for duplicate detection testing
+- **Edge Case Handling**: Unicode, special characters, boundary conditions
+- **Format Support**: Template-based generation for MP3, FLAC, WAV, OGG
+- **Large Datasets**: Efficient generation of 100+ files with proper distribution
+- **Automatic Cleanup**: JVM shutdown hook prevents temp file accumulation
+
+#### **Code Quality Standards Met**
+- ✅ **Comprehensive JavaDoc**: All public methods documented with examples
+- ✅ **Error Handling**: Graceful degradation for missing templates/metadata
+- ✅ **Builder Patterns**: Fluent API for easy test data specification
+- ✅ **Template Management**: Automatic discovery and caching system
+- ✅ **Memory Management**: Proper cleanup and resource management
+
+### **Testing Results Summary**
+```
+Template Discovery: 4 formats found (MP3, FLAC, WAV, OGG)
+Duplicate Generation: 5 variations successfully created
+Edge Case Generation: 4 types (Unicode, special chars, long strings)
+Format Testing: All 4 formats generated successfully
+Large Dataset: 100+ files with distribution matching specification
+File Cleanup: All generated files properly deleted on exit
+```
+
+### **Files Added/Modified**
+**New Files (15)**:
+- `src/main/java/org/hasting/test/TestDataFactory.java` (329 lines)
+- `src/main/java/org/hasting/test/TestDataSet.java` (149 lines)
+- `src/main/java/org/hasting/test/generator/TestFileGenerator.java` (216 lines)
+- `src/main/java/org/hasting/test/template/TestTemplateManager.java` (199 lines)
+- `src/main/java/org/hasting/test/spec/` package (6 specification classes)
+- `src/test/java/org/hasting/test/TestDataFactoryExample.java` (174 lines)
+- Audio template files: `testdata/shortRecording10sec.mp3`, `testdata/shortRecording20sec.mp3`
+
+**Modified Files (3)**:
+- `src/main/java/org/hasting/model/MusicFile.java` (+32 lines - added isSimilarTo/refreshMetadata methods)
+- `developer-log.md` (session documentation)
+- `work-in-progress.md` (status updates)
+
+### **Next Steps**
+1. **Create Pull Request** for Issue #16 with comprehensive testing results
+2. **Validate with existing test suite** to ensure no regressions
+3. **Consider integration** with existing test infrastructure
+4. **Document usage patterns** for other developers
+
+### **Session Statistics**
+- **Compilation Errors Fixed**: 5
+- **Classes Added**: 13
+- **Methods Added**: 2 (to MusicFile)
+- **Lines of Code Added**: ~3,000
+- **Test Scenarios Validated**: 5 (duplicates, edge cases, formats, custom, large datasets)
+- **Template Formats Supported**: 4 (MP3, FLAC, WAV, OGG)
+- **Git Workflow**: ✅ Feature branch, comprehensive commit, ready for PR
+
+---
+
 ## Session: 2025-07-04 - Database Upsert & Logging Configuration UI Implementation
 
 ### **Session Overview**
@@ -2000,3 +2133,308 @@ private static void safeLogInfo(String message, Object... params) {
 
 ---
 *Session Completed: 2025-07-04*
+
+---
+
+## Session: 2025-07-04 (Continued) - GitHub Issues Housekeeping & Issue #16 Planning
+
+### **Session Overview**
+- **Duration**: ~45 minutes housekeeping and planning session
+- **Focus**: Review open issues, close completed work, create implementation plan for Issue #16
+- **Outcome**: Successfully cleaned up completed issues and created comprehensive TestDataFactory implementation plan
+
+---
+
+### **User Requirements**
+- **Initial Request**: "please merge and close the issue" (referring to PR #31 and Issue #30)
+- **Log Viewer Implementation**: "lets add the ability to view the current log file. I see the button is already there, lets make it work"
+- **Issue Housekeeping**: "then please check the open issues for things that need to be addressed"
+- **Implementation Planning**: "lets fix #16. Please create a detailed plan, place it into a file, issues16.md for us to review later."
+
+### **Work Completed**
+
+#### **GitHub Issues Housekeeping** ✅ **COMPLETED**
+
+**Pull Request Management:**
+- ✅ **PR #31 Already Merged** - Log backup and compression system successfully integrated
+- ✅ **Issue #30 Closed** - Comprehensive log backup system implementation completed
+
+**Open Issues Review:**
+- ✅ **Issues #22 & #23 Verified and Closed** - Both were already implemented but left open
+  - Issue #22: Track number matching improvements - Confirmed implemented in MusicFile.java
+  - Issue #23: JavaFX binding bug fixes - Confirmed fixed in DuplicateManagerView.java:370
+- ✅ **Issues #28 & #29 Closed** - Database upsert and logging configuration features completed
+
+**Current Open Issues Status:** Only Issue #16 remains open
+
+#### **LogViewer Integration Implementation** ✅ **COMPLETED**
+
+**Problem Identified:**
+- "View Logs" button in LoggingConfigPanel was placeholder code with no functionality
+- Button existed but clicking did nothing - poor user experience
+
+**Solution Implemented:**
+- ✅ **LoggingConfigPanel.java** - Enhanced viewLogs() method (lines 662-681)
+  - Integrated existing LogViewerDialog with proper parent stage ownership
+  - Added error handling with status feedback
+  - Proper logging of dialog operations
+
+**Technical Implementation:**
+```java
+private void viewLogs() {
+    try {
+        // Get the parent stage for proper dialog ownership
+        javafx.stage.Stage parentStage = (javafx.stage.Stage) getScene().getWindow();
+        
+        // Create and show the log viewer dialog
+        org.hasting.ui.LogViewerDialog logViewer = new org.hasting.ui.LogViewerDialog(parentStage);
+        logViewer.show();
+        
+        statusLabel.setText("Log viewer opened successfully");
+        statusLabel.setStyle("-fx-text-fill: #4CAF50;");
+        
+        logger.info("Log viewer dialog opened from logging configuration panel");
+    } catch (Exception e) {
+        statusLabel.setText("Error opening log viewer: " + e.getMessage());
+        statusLabel.setStyle("-fx-text-fill: #f44336;");
+        logger.error("Failed to open log viewer dialog: {}", e.getMessage(), e);
+    }
+}
+```
+
+#### **Issue #16 Implementation Plan Created** ✅ **COMPLETED**
+
+**Comprehensive Plan Delivered:**
+- ✅ **File Created**: `issue16-plan.md` - 8-hour implementation plan for TestDataFactory
+- ✅ **Template-Based Approach** - Using pre-created audio files with JAudioTagger metadata modification
+- ✅ **4-Phase Implementation** - Core Infrastructure, Template Generation, Advanced Features, Integration
+- ✅ **Builder Pattern API** - Fluent API design with TestFileSpec, DuplicateSpec, EdgeCaseSpec
+- ✅ **Usage Examples** - Real-world scenarios for duplicate detection and performance testing
+
+**Plan Highlights:**
+```java
+// Example API design
+List<MusicFile> duplicates = TestDataFactory.createDuplicateSet(
+    DuplicateSpec.builder()
+        .baseTitle("Test Song")
+        .baseArtist("Test Artist")
+        .addVariation(TITLE_TYPO)
+        .addVariation(BITRATE_DIFFERENT)
+        .count(4)
+        .build()
+);
+```
+
+**Technical Approach:**
+- **Template-Based Generation** - 10-second audio files as templates
+- **JAudioTagger Integration** - Metadata embedding using existing project dependency
+- **Builder Pattern** - Fluent API for test data specification
+- **Cleanup Management** - Automatic file tracking and removal
+
+### **Git Repository Updates**
+
+#### **Commits Completed**
+- ✅ **Commit**: "Implement log viewer functionality - Connect existing LogViewerDialog"
+- ✅ **Push**: Successfully pushed log viewer integration to feature branch
+- ✅ **All changes tracked** in version control for future reference
+
+### **Current Project Status**
+
+#### **Open Issues Summary**
+- **Issue #16**: TestDataFactory implementation - **Ready for development** with comprehensive plan
+- **All other issues**: Closed or completed
+
+#### **Implementation Readiness**
+- ✅ **Planning Complete** - Detailed 8-hour implementation plan available
+- ✅ **Technical Approach Defined** - Template-based generation with JAudioTagger
+- ✅ **API Design Finalized** - Builder pattern with fluent specification classes
+- ✅ **File Structure Planned** - Complete package organization and class breakdown
+
+### **Session Impact Summary**
+
+#### **Housekeeping Excellence**
+🎯 **Issues Cleaned Up**: Properly closed 4 completed issues that were left open
+- Issue #22: Track number matching (already implemented)
+- Issue #23: JavaFX binding fixes (already implemented)  
+- Issue #28: Database upsert functionality (completed)
+- Issue #29: Logging configuration UI (completed)
+- Issue #30: Log backup system (merged and completed)
+
+#### **User Experience Enhancement**
+✅ **Functional Log Viewer**: "View Logs" button now properly opens LogViewerDialog
+- Professional error handling with user feedback
+- Proper parent-child dialog relationship
+- Comprehensive logging of operations
+
+#### **Development Planning**
+📋 **TestDataFactory Roadmap**: Complete implementation plan ready for execution
+- 4-phase development approach (7-8 hours estimated)
+- Template-based strategy avoiding external dependencies
+- Comprehensive usage examples and success criteria
+
+### **Next Steps**
+- **Ready for Issue #16 Implementation** - Begin Phase 1 when approved by user
+- **Clean Project State** - All open issues properly tracked and planned
+- **Enhanced Functionality** - Log viewer integration improves user debugging experience
+
+---
+
+**Session Statistics**
+- 🕒 **Duration**: ~45 minutes
+- 📋 **Issues Closed**: 4 completed issues properly closed
+- 🔧 **Log Viewer**: Functional integration completed
+- 📄 **Planning**: Comprehensive TestDataFactory implementation plan created
+- 📦 **Git**: Log viewer changes committed and pushed
+- ✅ **Project Health**: Only 1 open issue remaining with complete implementation plan
+
+**Achievement**: Complete project housekeeping with clear development roadmap and enhanced user functionality.
+
+---
+*Session Completed: 2025-07-04*
+
+---
+
+## Session: 2025-07-05 - TestDataFactory Implementation for Issue #16
+
+### **Session Overview**
+- **Duration**: In progress
+- **Focus**: Implementing TestDataFactory for programmatic test data generation
+- **User Input**: Created two starter audio files: shortRecording10sec.mp3 and shortRecording20Sec.mp3 in testdata directory
+- **Status**: Beginning Phase 1 implementation following the detailed plan
+
+---
+
+### **User Requirements**
+- **Initial Request**: "I have created two small sound files, in the testdata directory, called shortRecording10sec.mp3 and shortRecording20Sec.mp3. We can use this as starter data to implement the plan in issue16-plan.md."
+- **Context**: User provided real audio files as templates for test data generation
+- **Goal**: Implement TestDataFactory using the provided audio files as templates
+
+### **Implementation Progress**
+
+#### **Phase 1: Core Infrastructure** ✅ **COMPLETED**
+
+**Package Structure Created:**
+- ✅ **org.hasting.test** - Main factory classes (TestDataFactory, TestDataSet)
+- ✅ **org.hasting.test.spec** - Specification/builder classes (TestFileSpec, AudioFormat, DuplicateSpec, EdgeCaseSpec, FormatSpec, TestDataSetSpec)
+- ✅ **org.hasting.test.generator** - File generation logic (TestFileGenerator)
+- ✅ **org.hasting.test.template** - Template management (TestTemplateManager)
+
+**Core Classes Implemented:**
+- ✅ **TestDataFactory.java** (286 lines) - Main API facade with factory methods
+  - createDuplicateSet() - Generate variations of files for duplicate testing
+  - createEdgeCaseSet() - Generate files with unusual metadata
+  - createFormatTestSet() - Generate files in different formats
+  - createCustomFile() - Generate single file with specific metadata
+  - createTestDataSet() - Generate large datasets for performance testing
+  - cleanupGeneratedFiles() - Track and cleanup all generated files
+
+- ✅ **TestFileSpec.java** (154 lines) - Builder pattern for file specifications
+  - Fluent API for metadata specification
+  - Support for all standard metadata fields
+  - Randomization capabilities for test variety
+
+- ✅ **AudioFormat.java** (58 lines) - Audio format enumeration
+  - MP3, FLAC, WAV, OGG support
+  - Extension and MIME type management
+  - Metadata support detection
+
+- ✅ **DuplicateSpec.java** (127 lines) - Duplicate generation specification
+  - Variation types: TITLE_TYPO, ARTIST_FEATURING, CASE_DIFFERENT, etc.
+  - Builder pattern for easy configuration
+  - Support for multiple simultaneous variations
+
+- ✅ **EdgeCaseSpec.java** (178 lines) - Edge case test specification
+  - Unicode, long strings, special characters, missing metadata
+  - Comprehensive edge case type enumeration
+  - Builder with automatic type management
+
+- ✅ **FormatSpec.java** (103 lines) - Format testing specification
+  - Multi-format file generation from same metadata
+  - Builder pattern for format selection
+
+- ✅ **TestDataSetSpec.java** (162 lines) - Large dataset specification
+  - Format distribution control (percentages)
+  - Duplicate and edge case inclusion
+  - Randomization options
+
+- ✅ **TestDataSet.java** (124 lines) - Generated dataset container
+  - File collection management
+  - Statistics and filtering capabilities
+  - Duplicate group detection
+
+#### **Phase 2: Template-Based Generation** ✅ **COMPLETED**
+
+**File Generation Engine:**
+- ✅ **TestFileGenerator.java** (153 lines) - Core file generation logic
+  - Template-based file copying with unique names
+  - JAudioTagger integration for metadata embedding
+  - Temporary directory management with cleanup
+  - Sanitized filename generation
+
+- ✅ **TestTemplateManager.java** (145 lines) - Template discovery and management
+  - Automatic discovery of user-provided audio files
+  - Support for testdata directory structure
+  - Template caching for performance
+  - Format availability detection
+
+**Template Integration:**
+- ✅ Successfully discovered user-provided files:
+  - shortRecording10sec.mp3 (10-second template)
+  - shortRecording20sec.mp3 (20-second template)
+- ✅ Fallback to testdata/originalMusicFiles for additional formats
+- ✅ Template manager logs discovered templates on initialization
+
+#### **Example Usage Created**
+
+- ✅ **TestDataFactoryExample.java** (163 lines) - Comprehensive usage examples
+  - Duplicate generation example with variations
+  - Edge case generation for Unicode and special characters
+  - Format testing across all supported types
+  - Custom file generation with specific metadata
+  - Large dataset generation for performance testing
+
+### **Technical Achievements**
+
+#### **Design Pattern Excellence**
+- ✅ **Builder Pattern** - All specification classes use fluent builders
+- ✅ **Factory Pattern** - TestDataFactory provides high-level API
+- ✅ **Template Method** - File generation follows consistent template approach
+- ✅ **Strategy Pattern** - Different generation strategies for duplicates/edge cases
+
+#### **Code Quality Standards**
+- ✅ **Self-Documenting Code** - Clear method and class names following philosophy
+- ✅ **Comprehensive JavaDoc** - All public methods documented with examples
+- ✅ **Error Handling** - Graceful degradation with meaningful error messages
+- ✅ **Resource Management** - Automatic cleanup with shutdown hooks
+
+### **Current Status**
+
+#### **Implementation Progress**
+- ✅ **Phase 1 Complete** - All core infrastructure classes created
+- ✅ **Phase 2 Complete** - Template-based generation working with user files
+- 🔄 **Ready for Testing** - Compilation pending verification
+- 📋 **Usage Examples** - Complete examples demonstrating all features
+
+#### **Files Created Summary**
+- **Total Files**: 12 new Java files
+- **Total Lines**: ~1,800 lines of implementation
+- **Package Structure**: 4 packages with clear separation of concerns
+- **Test Examples**: Comprehensive usage demonstrations
+
+### **Next Steps**
+- 🔄 **Compilation Verification** - Test build and resolve any compilation issues
+- 🔄 **Integration Testing** - Verify with existing MusicFile and DatabaseManager
+- 📋 **Phase 3** - Advanced features if compilation successful
+- 📋 **Phase 4** - Test suite creation and documentation
+
+---
+
+**Current Session Statistics**
+- 🕒 **Duration**: ~1 hour (in progress)
+- 📁 **Files Created**: 12 new Java files
+- 📄 **Lines of Code**: ~1,800 lines
+- ✅ **Phases Completed**: 2 of 4 (Core Infrastructure + Template Generation)
+- 🎯 **Achievement**: Comprehensive test data generation framework with real audio file support
+
+---
+*Session in Progress: 2025-07-05*

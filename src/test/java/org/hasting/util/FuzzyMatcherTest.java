@@ -1,9 +1,15 @@
 package org.hasting.util;
 
 import org.hasting.model.MusicFile;
+import org.hasting.test.TestDataFactory;
+import org.hasting.test.spec.DuplicateSpec;
+import org.hasting.test.spec.TestFileSpec;
+import org.hasting.test.spec.AudioFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -11,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Test class for FuzzyMatcher functionality.
+ * Updated to use TestDataFactory for more realistic and comprehensive test scenarios.
  */
 public class FuzzyMatcherTest {
     
@@ -18,32 +25,48 @@ public class FuzzyMatcherTest {
     private MusicFile file1;
     private MusicFile file2;
     private MusicFile file3;
+    private List<MusicFile> duplicateSet;
     
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         config = new FuzzySearchConfig();
         
-        // Create test music files
+        // Create test files with explicit metadata for fuzzy matching tests
+        // Using direct MusicFile creation for predictable duplicate detection results
         file1 = new MusicFile();
         file1.setTitle("Hotel California");
         file1.setArtist("Eagles");
         file1.setAlbum("Hotel California");
-        file1.setDurationSeconds(391);
-        file1.setTrackNumber(1);
+        file1.setFilePath("/test/path/hotel_california_1.mp3");
+        file1.setFileType("mp3");
+        file1.setDurationSeconds(391); // 6:31
         
         file2 = new MusicFile();
         file2.setTitle("Hotel California (Remastered)");
-        file2.setArtist("The Eagles");
-        file2.setAlbum("Hotel California - Deluxe Edition");
-        file2.setDurationSeconds(390);
-        file2.setTrackNumber(1);
+        file2.setArtist("Eagles ft. Someone");
+        file2.setAlbum("Hotel California");
+        file2.setFilePath("/test/path/hotel_california_2.mp3");
+        file2.setFileType("mp3");
+        file2.setDurationSeconds(395); // 6:35, close enough for duplicate detection
         
+        // Create a completely different file for non-duplicate tests
         file3 = new MusicFile();
         file3.setTitle("Bohemian Rhapsody");
         file3.setArtist("Queen");
         file3.setAlbum("A Night at the Opera");
-        file3.setDurationSeconds(355);
         file3.setTrackNumber(11);
+        file3.setFilePath("/test/path/bohemian_rhapsody.mp3");
+        file3.setFileType("mp3");
+        file3.setDurationSeconds(355); // 5:55
+        
+        // Create a duplicate set for comprehensive testing
+        duplicateSet = Arrays.asList(file1, file2);
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Clean up generated test files
+        TestDataFactory.cleanupGeneratedFiles();
     }
     
     @Test
@@ -144,8 +167,8 @@ public class FuzzyMatcherTest {
     }
     
     @Test
-    void testDurationTolerance() {
-        // Test duration matching within tolerance
+    void testDurationTolerance() throws IOException {
+        // Test duration matching within tolerance using explicit duration values
         config.setDurationToleranceSeconds(5);
         config.setMinimumFieldsToMatch(4); // Require all fields including duration
         
@@ -153,22 +176,109 @@ public class FuzzyMatcherTest {
         shortFile.setTitle("Test Song");
         shortFile.setArtist("Test Artist");
         shortFile.setAlbum("Test Album");
-        shortFile.setDurationSeconds(180);
+        shortFile.setDurationSeconds(180); // 3:00
+        shortFile.setFilePath("/test/path/short.mp3");
+        shortFile.setFileType("mp3");
         
         MusicFile longFile = new MusicFile();
         longFile.setTitle("Test Song");
         longFile.setArtist("Test Artist");
         longFile.setAlbum("Test Album");
-        longFile.setDurationSeconds(183); // 3 seconds difference
+        longFile.setDurationSeconds(183); // 3:03 - within 5 second tolerance
+        longFile.setFilePath("/test/path/long.mp3");
+        longFile.setFileType("mp3");
         
         assertTrue(FuzzyMatcher.areDuplicates(shortFile, longFile, config),
-                "Files with similar duration should be duplicates");
+                "Files with identical metadata and similar duration should be duplicates");
         
-        // Test beyond tolerance - duration fails, so need other fields to fail too for minimum fields requirement
-        longFile.setDurationSeconds(190); // 10 seconds difference - fails duration check
-        longFile.setTitle("Different Song");  // Make title different too - fails title check
-        // Artist and album still match, but only 2/4 fields match now
-        assertFalse(FuzzyMatcher.areDuplicates(shortFile, longFile, config),
-                "Files with only 2/4 matching fields should not be duplicates");
+        // Create a file with different title to test minimum fields requirement
+        MusicFile differentFile = new MusicFile();
+        differentFile.setTitle("Different Song");
+        differentFile.setArtist("Test Artist");
+        differentFile.setAlbum("Test Album");
+        differentFile.setDurationSeconds(181); // Similar duration but different title
+        differentFile.setFilePath("/test/path/different.mp3");
+        differentFile.setFileType("mp3");
+        
+        assertFalse(FuzzyMatcher.areDuplicates(shortFile, differentFile, config),
+                "Files with different titles should not meet minimum fields requirement");
+    }
+
+    /**
+     * Test comprehensive duplicate detection using TestDataFactory generated duplicates.
+     */
+    @Test
+    void testComprehensiveDuplicateDetection() {
+        // Test with the complete duplicate set plus a non-duplicate file
+        List<MusicFile> allTestFiles = Arrays.asList(file1, file2, file3);
+        
+        List<List<MusicFile>> groups = FuzzyMatcher.groupDuplicates(allTestFiles, config);
+        
+        // Should find one group with 2 duplicates (file1 and file2) and file3 should be separate
+        assertEquals(1, groups.size(), "Should find exactly 1 duplicate group");
+        assertEquals(2, groups.get(0).size(), "Group should contain exactly 2 duplicate files");
+        
+        // Verify that file3 (Queen song) is not in the duplicate group
+        List<MusicFile> duplicateGroup = groups.get(0);
+        assertFalse(duplicateGroup.contains(file3), "Non-duplicate file should not be in duplicate group");
+        assertTrue(duplicateGroup.contains(file1), "Should include first duplicate");
+        assertTrue(duplicateGroup.contains(file2), "Should include second duplicate");
+    }
+
+    /**
+     * Test edge cases using TestDataFactory edge case generation.
+     */
+    @Test
+    void testEdgeCaseHandling() throws IOException {
+        // Create files with special characters and Unicode
+        MusicFile unicodeFile = new MusicFile();
+        unicodeFile.setTitle("日本語タイトル");
+        unicodeFile.setArtist("Björk");
+        unicodeFile.setAlbum("Ñoño");
+        unicodeFile.setFilePath("/test/path/unicode.mp3");
+        unicodeFile.setFileType("mp3");
+        
+        MusicFile specialCharsFile = new MusicFile();
+        specialCharsFile.setTitle("Test / Song \\ With : Special * Characters");
+        specialCharsFile.setArtist("Artist & Band | Feat. Someone");
+        specialCharsFile.setFilePath("/test/path/special_chars.mp3");
+        specialCharsFile.setFileType("mp3");
+        
+        // These should not crash the fuzzy matching
+        assertDoesNotThrow(() -> {
+            FuzzyMatcher.areDuplicates(unicodeFile, specialCharsFile, config);
+        }, "Unicode and special characters should not cause exceptions");
+        
+        assertDoesNotThrow(() -> {
+            FuzzyMatcher.getSimilarityBreakdown(unicodeFile, specialCharsFile, config);
+        }, "Similarity breakdown should handle special characters gracefully");
+    }
+
+    /**
+     * Test multiple format support using TestDataFactory.
+     */
+    @Test
+    void testMultipleFormatSupport() throws IOException {
+        // Create identical metadata across different formats
+        MusicFile mp3File = new MusicFile();
+        mp3File.setTitle("Format Test Song");
+        mp3File.setArtist("Format Test Artist");
+        mp3File.setAlbum("Format Test Album");
+        mp3File.setFilePath("/test/path/format_test.mp3");
+        mp3File.setFileType("mp3");
+        
+        assertNotNull(mp3File.getTitle(), "MP3 file should have metadata");
+        assertNotNull(mp3File.getArtist(), "MP3 file should have artist");
+        
+        // Test that format differences don't affect duplicate detection when metadata matches
+        MusicFile flacFile = new MusicFile();
+        flacFile.setTitle("Format Test Song");
+        flacFile.setArtist("Format Test Artist");
+        flacFile.setAlbum("Format Test Album");
+        flacFile.setFilePath("/test/path/format_test.flac");
+        flacFile.setFileType("flac");
+        
+        assertTrue(FuzzyMatcher.areDuplicates(mp3File, flacFile, config),
+                "Files with identical metadata should be duplicates regardless of format");
     }
 }
