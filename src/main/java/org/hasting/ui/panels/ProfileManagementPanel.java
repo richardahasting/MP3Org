@@ -299,10 +299,16 @@ public class ProfileManagementPanel extends VBox {
                     String databasePath = new File(selectedDirectory, "mp3org").getAbsolutePath();
                     profileManager.createProfile(profileName, databasePath);
                     
+                    // Profile is now automatically activated, so refresh UI
                     refreshProfileComboBox();
                     updateProfileInfo();
-                    statusLabel.setText("Created new profile: " + profileName);
+                    statusLabel.setText("Created and activated new profile: " + profileName);
                     statusLabel.setStyle("-fx-text-fill: green;");
+                    
+                    // Notify parent of profile change since we switched to the new profile
+                    if (onProfileChanged != null) {
+                        onProfileChanged.run();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -344,8 +350,15 @@ public class ProfileManagementPanel extends VBox {
                 }
                 
                 profileManager.duplicateProfile(activeProfile.getId(), newName);
+                
+                // Profile is now automatically activated, so refresh UI
                 refreshProfileComboBox();
                 updateProfileInfo();
+                
+                // Notify parent of profile change since we switched to the new profile
+                if (onProfileChanged != null) {
+                    onProfileChanged.run();
+                }
                 
                 statusLabel.setText("Duplicated profile: " + newName);
                 statusLabel.setStyle("-fx-text-fill: green;");
