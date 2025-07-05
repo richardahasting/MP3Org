@@ -27,7 +27,9 @@
       "Bash(sed:*)",
       "Bash(find:*)",
       "Bash(command -v:*)",
-      "Bash(ffmpeg:*)"
+      "Bash(ffmpeg:*)",
+      "Bash(git checkout:*)",
+      "Bash(java:*)"
     ],
     "deny": []
   }

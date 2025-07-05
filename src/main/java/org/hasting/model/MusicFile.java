@@ -609,4 +609,35 @@ public class MusicFile {
     public String generateOrganizationalPath(String basePath, PathTemplate template) {
         return FileOrganizer.generateOrganizationalPath(this, basePath, template);
     }
+
+    /**
+     * Determines if this music file is similar to another music file.
+     * This is an alias for {@link #isItLikelyTheSameSong(MusicFile)} to provide
+     * a more intuitive method name for test data factory usage.
+     * 
+     * @param other The other MusicFile to compare with
+     * @return true if the files are similar, false otherwise
+     * @see #isItLikelyTheSameSong(MusicFile)
+     */
+    public boolean isSimilarTo(MusicFile other) {
+        return isItLikelyTheSameSong(other);
+    }
+
+    /**
+     * Refreshes the metadata for this music file by re-reading from the file system.
+     * This method re-extracts all metadata from the audio file on disk and updates
+     * this MusicFile object with the current information.
+     * 
+     * @return true if metadata was successfully refreshed, false if the file doesn't exist or extraction failed
+     */
+    public boolean refreshMetadata() {
+        if (this.filePath == null || this.filePath.trim().isEmpty()) {
+            return false;
+        }
+        File file = new File(this.filePath);
+        if (!file.exists()) {
+            return false;
+        }
+        return MetadataExtractor.extractMetadata(this, file);
+    }
 }
