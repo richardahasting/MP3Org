@@ -72,26 +72,27 @@ public class ConfigurationView extends BorderPane {
      */
     private void layoutComponents() {
         // Create tabs for each configuration area
-        Tab databaseTab = createTab("Database", databaseLocationPanel, 
-            "Configure database location and settings");
         Tab profilesTab = createTab("Profiles", profileManagementPanel, 
             "Manage database profiles");
+        Tab databaseTab = createTab("Database", databaseLocationPanel, 
+            "Configure database location and settings");
         Tab fileTypesTab = createTab("File Types", fileTypeFilterPanel, 
             "Select supported audio file types");
-        Tab duplicatesTab = createTab("Duplicate Detection", fuzzySearchConfigPanel, 
-            "Configure fuzzy matching for duplicates");
         Tab organizationTab = createTab("File Organization", pathTemplateConfigPanel, 
             "Configure file organization templates");
+        Tab duplicatesTab = createTab("Duplicate Detection", fuzzySearchConfigPanel, 
+            "Configure fuzzy matching for duplicates");
         Tab loggingTab = createTab("Logging Configuration", loggingConfigPanel, 
             "Configure logging levels and output settings");
         
-        // Add tabs to tab pane
+        // Add tabs to tab pane in optimized user workflow order:
+        // Profiles → Database → File Types → File Organization → Duplicate Detection → Logging
         configTabPane.getTabs().addAll(
+            profilesTab,
             databaseTab,
-            profilesTab, 
             fileTypesTab,
-            duplicatesTab,
             organizationTab,
+            duplicatesTab,
             loggingTab
         );
         
