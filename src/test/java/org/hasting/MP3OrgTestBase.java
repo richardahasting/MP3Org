@@ -14,7 +14,7 @@ import java.util.logging.Logger;
  * 
  * <p>This class now uses the new TestHarness infrastructure to provide:</p>
  * <ul>
- * <li><strong>TESTING-HARNESS profile</strong> - Standardized test profile shared across all tests</li>
+ * <li><strong>TEST-HARNESS profile</strong> - Standardized test profile shared across all tests</li>
  * <li><strong>Consistent test data</strong> - Pre-loaded data from /Users/richard/mp3s directory</li>
  * <li><strong>Automatic cleanup</strong> - Removes temporary profiles and restores user settings</li>
  * <li><strong>Profile isolation</strong> - No interference with user's production profiles</li>
@@ -30,7 +30,7 @@ import java.util.logging.Logger;
  *         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
  *         assertFalse(allFiles.isEmpty());
  *         
- *         // Test runs in TESTING-HARNESS profile with consistent data
+ *         // Test runs in TEST-HARNESS profile with consistent data
  *         ensureTestEnvironment(); // Verify isolation
  *     }
  * }
@@ -43,7 +43,7 @@ public abstract class MP3OrgTestBase extends BaseTest {
     private static final Logger logger = Logger.getLogger(MP3OrgTestBase.class.getName());
     
     /**
-     * Gets the test data available in the TESTING-HARNESS profile.
+     * Gets the test data available in the TEST-HARNESS profile.
      * 
      * @return List of music files from the test database
      */

@@ -11,7 +11,7 @@ import java.util.List;
  * 
  * <p>This class provides a standardized testing infrastructure that:
  * <ul>
- * <li>Creates a dedicated TESTING-HARNESS profile for all tests</li>
+ * <li>Creates a dedicated TEST-HARNESS profile for all tests</li>
  * <li>Imports known test data from /Users/richard/mp3s directory</li>
  * <li>Isolates tests from user's production profiles</li>
  * <li>Provides automatic cleanup of test artifacts</li>
@@ -39,7 +39,7 @@ import java.util.List;
  */
 public class TestHarness {
     
-    private static final String TEST_PROFILE_NAME = "TESTING-HARNESS";
+    private static final String TEST_PROFILE_NAME = "TEST-HARNESS";
     private static final String TEST_PROFILE_DESCRIPTION = "Dedicated test profile with standardized test data";
     private static final String TEST_MP3_DIRECTORY = "/Users/richard/mp3s";
     
@@ -53,7 +53,7 @@ public class TestHarness {
      */
     public static void setupTestingProfile() {
         try {
-            System.out.println("Setting up TESTING-HARNESS profile...");
+            System.out.println("Setting up TEST-HARNESS profile...");
             
             // Save the current active profile to restore later
             DatabaseProfile currentProfile = DatabaseManager.getActiveProfile();
@@ -64,7 +64,7 @@ public class TestHarness {
             
             DatabaseProfileManager profileManager = DatabaseManager.getProfileManager();
             
-            // Check if TESTING-HARNESS profile already exists
+            // Check if TEST-HARNESS profile already exists
             DatabaseProfile existingTestProfile = null;
             for (DatabaseProfile profile : profileManager.getAllProfiles()) {
                 if (TEST_PROFILE_NAME.equals(profile.getName())) {
@@ -76,13 +76,13 @@ public class TestHarness {
             if (existingTestProfile != null) {
                 // Use existing test profile
                 testProfileId = existingTestProfile.getId();
-                System.out.println("Using existing TESTING-HARNESS profile");
+                System.out.println("Using existing TEST-HARNESS profile");
             } else {
                 // Create new test profile with temporary database location
                 String testDatabasePath = System.getProperty("java.io.tmpdir") + File.separator + "mp3org-test-harness";
                 DatabaseProfile newProfile = profileManager.createProfile(TEST_PROFILE_NAME, testDatabasePath, TEST_PROFILE_DESCRIPTION);
                 testProfileId = newProfile.getId();
-                System.out.println("Created new TESTING-HARNESS profile at: " + testDatabasePath);
+                System.out.println("Created new TEST-HARNESS profile at: " + testDatabasePath);
             }
             
             // Switch to test profile
@@ -94,10 +94,10 @@ public class TestHarness {
             if (existingFiles.isEmpty()) {
                 importTestData();
             } else {
-                System.out.println("TESTING-HARNESS profile already contains " + existingFiles.size() + " files");
+                System.out.println("TEST-HARNESS profile already contains " + existingFiles.size() + " files");
             }
             
-            System.out.println("TESTING-HARNESS setup complete");
+            System.out.println("TEST-HARNESS setup complete");
             
         } catch (Exception e) {
             System.err.println("Failed to setup testing profile: " + e.getMessage());
@@ -129,7 +129,7 @@ public class TestHarness {
                 for (MusicFile musicFile : musicFiles) {
                     DatabaseManager.saveMusicFile(musicFile);
                 }
-                System.out.println("Imported " + musicFiles.size() + " test files into TESTING-HARNESS");
+                System.out.println("Imported " + musicFiles.size() + " test files into TEST-HARNESS");
             } else {
                 System.out.println("No music files found in test directory");
             }
@@ -154,7 +154,7 @@ public class TestHarness {
     /**
      * Gets the test profile ID for use in tests.
      * 
-     * @return The TESTING-HARNESS profile ID
+     * @return The TEST-HARNESS profile ID
      */
     public static String getTestProfileId() {
         return testProfileId;
@@ -163,7 +163,7 @@ public class TestHarness {
     /**
      * Gets the test profile name.
      * 
-     * @return The TESTING-HARNESS profile name
+     * @return The TEST-HARNESS profile name
      */
     public static String getTestProfileName() {
         return TEST_PROFILE_NAME;
@@ -171,7 +171,7 @@ public class TestHarness {
     
     /**
      * Performs cleanup after tests complete.
-     * Removes ALL test profiles except TESTING-HARNESS and user's production profiles.
+     * Removes ALL test profiles except TEST-HARNESS and user's production profiles.
      * This should be called in @AfterAll of test classes.
      */
     public static void cleanup() {
@@ -180,7 +180,7 @@ public class TestHarness {
             
             DatabaseProfileManager profileManager = DatabaseManager.getProfileManager();
             
-            // Remove ALL additional profiles created during testing (but keep TESTING-HARNESS)
+            // Remove ALL additional profiles created during testing (but keep TEST-HARNESS)
             for (String profileId : profilesCreatedDuringTesting) {
                 if (!profileId.equals(testProfileId)) {
                     try {
@@ -201,7 +201,7 @@ public class TestHarness {
                         DatabaseManager.reloadConfig();
                         System.out.println("Restored original active profile: " + originalActiveProfileId);
                     } else {
-                        System.out.println("Original profile no longer exists, keeping TESTING-HARNESS active");
+                        System.out.println("Original profile no longer exists, keeping TEST-HARNESS active");
                     }
                 } catch (Exception e) {
                     System.err.println("Failed to restore original profile: " + e.getMessage());
@@ -217,9 +217,9 @@ public class TestHarness {
     }
     
     /**
-     * Performs comprehensive cleanup of ALL test profiles except TESTING-HARNESS.
+     * Performs comprehensive cleanup of ALL test profiles except TEST-HARNESS.
      * This method scans all profiles and removes any that appear to be test-related
-     * while preserving user's production profiles and the TESTING-HARNESS.
+     * while preserving user's production profiles and the TEST-HARNESS.
      * 
      * Use this for thorough cleanup after test runs that may have created
      * many temporary profiles.
@@ -233,7 +233,7 @@ public class TestHarness {
             
             int removedCount = 0;
             for (DatabaseProfile profile : allProfiles) {
-                // Skip TESTING-HARNESS profile
+                // Skip TEST-HARNESS profile
                 if (TEST_PROFILE_NAME.equals(profile.getName())) {
                     continue;
                 }
@@ -274,7 +274,7 @@ public class TestHarness {
             }
             
             System.out.println("Comprehensive cleanup complete - removed " + removedCount + " test profiles");
-            System.out.println("Preserved TESTING-HARNESS and user production profiles");
+            System.out.println("Preserved TEST-HARNESS and user production profiles");
             
         } catch (Exception e) {
             System.err.println("Error during comprehensive cleanup: " + e.getMessage());
@@ -283,13 +283,13 @@ public class TestHarness {
     }
     
     /**
-     * Ensures the test profile is active. Useful for tests that need to verify
+     * Ensures the TEST-HARNESS profile is active. Useful for tests that need to verify
      * they're running in the correct test environment.
      */
     public static void ensureTestProfileActive() {
         DatabaseProfile activeProfile = DatabaseManager.getActiveProfile();
         if (activeProfile == null || !TEST_PROFILE_NAME.equals(activeProfile.getName())) {
-            throw new IllegalStateException("TESTING-HARNESS profile is not active. Current profile: " + 
+            throw new IllegalStateException("TEST-HARNESS profile is not active. Current profile: " + 
                 (activeProfile != null ? activeProfile.getName() : "None"));
         }
     }

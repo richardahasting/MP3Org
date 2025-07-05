@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeAll;
  * 
  * <p>All test classes should extend this class to ensure:
  * <ul>
- * <li>Tests run in isolation using the TESTING-HARNESS profile</li>
+ * <li>Tests run in isolation using the TEST-HARNESS profile</li>
  * <li>Consistent test data is available across all tests</li>
  * <li>Proper cleanup of test artifacts after test completion</li>
  * <li>No interference with user's production database profiles</li>
@@ -27,7 +27,7 @@ import org.junit.jupiter.api.BeforeAll;
  *     
  *     @Test
  *     void testSomething() {
- *         // Test code here - automatically uses TESTING-HARNESS profile
+ *         // Test code here - automatically uses TEST-HARNESS profile
  *         List<MusicFile> files = DatabaseManager.getAllMusicFiles();
  *         assertThat(files).isNotEmpty(); // Test data is pre-loaded
  *     }
@@ -41,7 +41,7 @@ public abstract class BaseTest {
     
     /**
      * Sets up the test harness before any tests in the class run.
-     * This creates the TESTING-HARNESS profile and imports test data.
+     * This creates the TEST-HARNESS profile and imports test data.
      */
     @BeforeAll
     static void setupTestHarness() {
