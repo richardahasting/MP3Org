@@ -418,6 +418,7 @@ public class DatabaseProfileManager {
     
     /**
      * Creates a new profile with the given name and database path.
+     * The newly created profile is automatically set as the active profile.
      */
     public DatabaseProfile createProfile(String name, String databasePath) {
         return createProfile(name, databasePath, "");
@@ -425,16 +426,23 @@ public class DatabaseProfileManager {
     
     /**
      * Creates a new profile with the given name, database path, and description.
+     * The newly created profile is automatically set as the active profile.
      */
     public DatabaseProfile createProfile(String name, String databasePath, String description) {
         DatabaseProfile profile = new DatabaseProfile(null, name, databasePath);
         profile.setDescription(description);
         addProfile(profile);
+        
+        // Automatically activate the newly created profile
+        setActiveProfile(profile.getId());
+        
+        getLogger().info("Created and activated new profile: {} (ID: {})", profile.getName(), profile.getId());
         return profile;
     }
     
     /**
      * Duplicates an existing profile with a new name.
+     * The newly created profile is automatically set as the active profile.
      */
     public DatabaseProfile duplicateProfile(String sourceProfileId, String newName) {
         DatabaseProfile sourceProfile = profiles.get(sourceProfileId);
@@ -444,6 +452,12 @@ public class DatabaseProfileManager {
         
         DatabaseProfile newProfile = sourceProfile.copy(newName);
         addProfile(newProfile);
+        
+        // Automatically activate the newly duplicated profile
+        setActiveProfile(newProfile.getId());
+        
+        getLogger().info("Duplicated and activated profile: {} from {} (ID: {})", 
+                        newProfile.getName(), sourceProfile.getName(), newProfile.getId());
         return newProfile;
     }
     
