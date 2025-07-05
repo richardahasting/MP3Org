@@ -14,6 +14,7 @@ import org.hasting.ui.MetadataEditorView;
 import org.hasting.ui.ImportOrganizeView;
 import org.hasting.ui.ConfigurationView;
 import org.hasting.ui.LogViewerDialog;
+import org.hasting.ui.TabSwitchCallback;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.DatabaseProfileManager;
@@ -108,7 +109,7 @@ public class MP3OrgApplication extends Application {
         
         Tab metadataTab = new Tab("Metadata Editor");
         metadataTab.setClosable(false);
-        metadataTab.setContent(new MetadataEditorView());
+        metadataTab.setContent(new MetadataEditorView(createTabSwitchCallback(tabPane)));
         HelpSystem.setTooltip(
             metadataTab.getGraphic() != null ? (Control)metadataTab.getGraphic() : new Label(), 
             "tab.metadata"
@@ -419,6 +420,30 @@ public class MP3OrgApplication extends Application {
      * 
      * @throws RuntimeException if cleanup operations fail (though application will still terminate)
      */
+    /**
+     * Creates a callback for switching tabs in the main application.
+     * 
+     * <p>This callback allows child views to request tab switches without having
+     * direct access to the main TabPane, maintaining proper separation of concerns.
+     * 
+     * @param tabPane the main application TabPane to control
+     * @return a TabSwitchCallback that can switch to named tabs
+     */
+    private TabSwitchCallback createTabSwitchCallback(TabPane tabPane) {
+        return (tabName) -> {
+            for (int i = 0; i < tabPane.getTabs().size(); i++) {
+                Tab tab = tabPane.getTabs().get(i);
+                if (tab.getText().equals(tabName)) {
+                    tabPane.getSelectionModel().select(i);
+                    logger.info("Switched to tab: {}", tabName);
+                    return true;
+                }
+            }
+            logger.warning("Tab not found: {}", tabName);
+            return false;
+        };
+    }
+
     @Override
     public void stop() {
         // Clean up database connection if needed
