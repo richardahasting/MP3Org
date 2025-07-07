@@ -1,6 +1,7 @@
 package org.hasting;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -76,14 +77,16 @@ public class MP3OrgApplication extends Application {
         logger.info("Initializing MP3Org application");
         
         try {
-            // Initialize database with automatic fallback for locked databases
-            logger.debug("Initializing database manager with automatic fallback");
+            // Initialize database with comprehensive recovery mechanisms
+            logger.debug("Initializing database manager with comprehensive recovery");
             initializeDatabaseWithAutomaticFallback();
             logger.info("Database manager initialized successfully");
             
             // Reload logging configuration from database after initialization
             MP3OrgLoggingManager.reloadConfigurationFromDatabase();
         } catch (Exception e) {
+            // This should never happen with our comprehensive recovery, but handle it gracefully
+            logger.critical("Unexpected failure after comprehensive database recovery: {}", e.getMessage(), e);
             handleStartupFailure(e, primaryStage);
             return;
         }
@@ -344,16 +347,55 @@ public class MP3OrgApplication extends Application {
      * fallback behavior, and the implementation teaches the pattern through clear
      * delegation to specialized methods.
      * 
-     * <p><strong>Startup Strategy:</strong>
+     * <p><strong>Progressive Recovery Strategy:</strong>
      * <ol>
-     *   <li>Get the preferred profile from current configuration</li>
-     *   <li>Use DatabaseManager's fallback-enabled initialization</li>
-     *   <li>Log the results for user awareness and troubleshooting</li>
+     *   <li><strong>Standard Initialization</strong>: Try existing fallback mechanisms</li>
+     *   <li><strong>Emergency Mode</strong>: Create fresh database profile in user's home</li>
+     *   <li><strong>Safe Mode</strong>: Minimal functionality with temporary database</li>
+     *   <li><strong>Temporary Mode</strong>: In-memory database as final fallback</li>
      * </ol>
      * 
-     * @throws RuntimeException if no database profiles can be activated
+     * <p>This progressive strategy ensures the application never fails to start,
+     * providing users with access to recovery tools and configuration options
+     * even when primary database initialization fails.
+     * 
+     * @throws RuntimeException only if all recovery mechanisms fail (should never happen)
      */
     private void initializeDatabaseWithAutomaticFallback() {
+        try {
+            // Primary attempt: Standard initialization with existing fallback mechanisms
+            initializeDatabaseStandard();
+            
+        } catch (Exception primaryError) {
+            logger.warning("Standard database initialization failed, attempting recovery: {}", primaryError.getMessage());
+            
+            try {
+                // Secondary attempt: Emergency database creation
+                initializeDatabaseEmergency();
+                
+            } catch (Exception emergencyError) {
+                logger.warning("Emergency database creation failed, enabling safe mode: {}", emergencyError.getMessage());
+                
+                try {
+                    // Tertiary attempt: Safe mode with minimal database
+                    initializeDatabaseSafeMode();
+                    
+                } catch (Exception safeModeError) {
+                    logger.error("Safe mode initialization failed, using in-memory fallback: {}", safeModeError.getMessage());
+                    
+                    // Final fallback: In-memory temporary database
+                    initializeDatabaseTemporary();
+                }
+            }
+        }
+    }
+    
+    /**
+     * Standard database initialization using existing fallback mechanisms.
+     * 
+     * @throws RuntimeException if standard initialization fails
+     */
+    private void initializeDatabaseStandard() {
         DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
         String preferredProfileId = profileManager.getActiveProfileId();
         
@@ -367,6 +409,172 @@ public class MP3OrgApplication extends Application {
         if (!resolvedProfile.getId().equals(preferredProfileId)) {
             logger.warning("Switched from preferred profile due to database lock - now using profile: {}", resolvedProfile.getName());
         }
+    }
+    
+    /**
+     * Emergency database initialization by creating a fresh database profile.
+     * 
+     * <p>This method creates a new emergency profile with a clean database
+     * when all existing profiles fail to initialize.
+     * 
+     * @throws RuntimeException if emergency database creation fails
+     */
+    private void initializeDatabaseEmergency() {
+        logger.info("Creating emergency database profile for recovery");
+        
+        DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+        
+        // Create emergency profile with timestamp
+        String emergencyName = "Emergency-" + System.currentTimeMillis();
+        String emergencyPath = System.getProperty("user.home") + "/MP3Org-Emergency/" + emergencyName;
+        
+        // Ensure emergency directory exists
+        java.io.File emergencyDir = new java.io.File(emergencyPath);
+        if (!emergencyDir.mkdirs() && !emergencyDir.exists()) {
+            throw new RuntimeException("Cannot create emergency database directory: " + emergencyPath);
+        }
+        
+        // Create and activate emergency profile
+        DatabaseProfile emergencyProfile = profileManager.createProfile(emergencyName, emergencyPath);
+        profileManager.setActiveProfile(emergencyProfile.getId());
+        
+        // Initialize database with emergency profile
+        DatabaseManager.initialize();
+        
+        logger.info("Emergency database profile created and initialized: {}", emergencyProfile.getName());
+        
+        // Show user notification about emergency mode
+        showEmergencyModeNotification(emergencyProfile);
+    }
+    
+    /**
+     * Safe mode database initialization with minimal functionality.
+     * 
+     * <p>Creates a temporary database with basic structure for essential
+     * application functionality when normal database creation fails.
+     * 
+     * @throws RuntimeException if safe mode initialization fails
+     */
+    private void initializeDatabaseSafeMode() {
+        logger.info("Initializing database in safe mode with minimal functionality");
+        
+        // Use system temp directory for safe mode database
+        String tempDir = System.getProperty("java.io.tmpdir");
+        String safeModeDir = tempDir + "/MP3Org-SafeMode-" + System.currentTimeMillis();
+        
+        java.io.File safeDir = new java.io.File(safeModeDir);
+        if (!safeDir.mkdirs()) {
+            throw new RuntimeException("Cannot create safe mode database directory: " + safeModeDir);
+        }
+        
+        // Create minimal profile for safe mode
+        DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+        DatabaseProfile safeModeProfile = profileManager.createProfile("Safe Mode", safeModeDir);
+        profileManager.setActiveProfile(safeModeProfile.getId());
+        
+        // Initialize minimal database
+        DatabaseManager.initialize();
+        
+        logger.info("Safe mode database initialized at: {}", safeModeDir);
+        
+        // Show user notification about safe mode
+        showSafeModeNotification(safeModeProfile);
+    }
+    
+    /**
+     * Temporary in-memory database initialization as final fallback.
+     * 
+     * <p>This method should never fail and provides absolute minimum
+     * functionality to allow the application to start.
+     */
+    private void initializeDatabaseTemporary() {
+        logger.info("Initializing temporary in-memory database as final fallback");
+        
+        try {
+            // Create in-memory database profile
+            DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+            DatabaseProfile tempProfile = profileManager.createProfile("Temporary", ":memory:");
+            profileManager.setActiveProfile(tempProfile.getId());
+            
+            // Initialize in-memory database
+            DatabaseManager.initialize();
+            
+            logger.info("Temporary in-memory database initialized successfully");
+            
+            // Show user notification about temporary mode
+            showTemporaryModeNotification();
+            
+        } catch (Exception e) {
+            // This should never happen, but provide absolute final fallback
+            logger.critical("Even temporary database initialization failed - this should never happen: {}", e.getMessage(), e);
+            throw new RuntimeException("Complete database initialization failure - application cannot start", e);
+        }
+    }
+    
+    /**
+     * Shows user notification when emergency database mode is activated.
+     */
+    private void showEmergencyModeNotification(DatabaseProfile emergencyProfile) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Emergency Database Mode");
+            alert.setHeaderText("MP3Org Started in Emergency Mode");
+            alert.setContentText(
+                "A database error occurred during startup. MP3Org has created an emergency database to allow the application to run.\n\n" +
+                "Emergency Database: " + emergencyProfile.getName() + "\n" +
+                "Location: " + emergencyProfile.getDatabasePath() + "\n\n" +
+                "You can:\n" +
+                "• Continue using this emergency database\n" +
+                "• Switch to a different profile in Configuration > Database\n" +
+                "• Import your music files again if needed\n\n" +
+                "Your original database files have not been modified."
+            );
+            alert.showAndWait();
+        });
+    }
+    
+    /**
+     * Shows user notification when safe mode is activated.
+     */
+    private void showSafeModeNotification(DatabaseProfile safeModeProfile) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Safe Mode");
+            alert.setHeaderText("MP3Org Started in Safe Mode");
+            alert.setContentText(
+                "Multiple database errors occurred during startup. MP3Org is running in safe mode with limited functionality.\n\n" +
+                "Safe Mode Database: " + safeModeProfile.getName() + "\n" +
+                "Location: " + safeModeProfile.getDatabasePath() + "\n\n" +
+                "In safe mode, you can:\n" +
+                "• Access configuration settings\n" +
+                "• Create new database profiles\n" +
+                "• Repair or recover existing databases\n\n" +
+                "Some features may be limited until a full database is available."
+            );
+            alert.showAndWait();
+        });
+    }
+    
+    /**
+     * Shows user notification when temporary in-memory mode is activated.
+     */
+    private void showTemporaryModeNotification() {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Temporary Mode");
+            alert.setHeaderText("MP3Org Started in Temporary Mode");
+            alert.setContentText(
+                "Severe database errors prevented normal startup. MP3Org is running with a temporary in-memory database.\n\n" +
+                "WARNING: All data will be lost when the application closes.\n\n" +
+                "Recommendations:\n" +
+                "• Check file system permissions\n" +
+                "• Verify available disk space\n" +
+                "• Create a new database profile\n" +
+                "• Contact support if problems persist\n\n" +
+                "Use Configuration > Database to set up a permanent database."
+            );
+            alert.showAndWait();
+        });
     }
     
     /**
