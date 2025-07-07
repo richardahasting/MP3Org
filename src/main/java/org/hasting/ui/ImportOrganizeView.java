@@ -314,7 +314,7 @@ public class ImportOrganizeView extends BorderPane {
         lastScannedCol.setPrefWidth(120);
         
         // Browse/Remove column - shows different buttons based on directory type
-        TableColumn<DirectoryItem, Void> actionCol = new TableColumn<>("Action");
+        TableColumn<DirectoryItem, Void> actionCol = new TableColumn<>("Browse");
         actionCol.setCellFactory(col -> new TableCell<DirectoryItem, Void>() {
             private final Button browseButton = new Button("...");
             private final Button removeButton = new Button("X");
@@ -608,7 +608,7 @@ public class ImportOrganizeView extends BorderPane {
         // Directory management section with enhanced styling
         VBox directorySection = createStyledSection();
         
-        Label directoryTitle = createSectionTitle("Directory Management & Selective Rescanning");
+        Label directoryTitle = createSectionTitle("Rescan Directories");
         
         Label directoryInstructions = createInstructionLabel(
             "Manage previously scanned directories and selectively rescan specific directories for updated files."
