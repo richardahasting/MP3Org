@@ -1,5 +1,132 @@
 # MP3Org Developer Log
 
+## Session: 2025-07-07 - Database Persistence Issue Investigation
+
+### **Session Overview**
+- **Duration**: ~2 hours investigation session
+- **Focus**: Investigate database persistence issue where user created new config profile, imported 6800 files, but after restarting the application, the database was empty
+- **Outcome**: Identified likely cause and root issue - cache initialization problem in application startup
+
+### **User Problem Statement**
+```
+The user created a new config profile, imported 6800 files, but after restarting the application, the database was empty. This suggests a database persistence or profile loading issue.
+```
+
+### **Investigation Summary**
+
+**Profile Configuration Analysis**:
+- Active profile: `profile_1751859520370` named "aNewConfigProfile"
+- Database path: `/Users/richard/myNewProfile/mp3org`
+- Profile correctly saved to `mp3org-profiles.properties` with last used date: 2025-07-06T22:41:11
+- Profile configuration appears complete and valid
+
+**Database Files Verification**:
+- ✅ **Database directory exists**: `/Users/richard/myNewProfile/mp3org/`
+- ✅ **Derby database files present**: `db.lck`, `dbex.lck`, `log/`, `seg0/` directories with multiple data files
+- ✅ **Database structure appears intact**: Standard Derby embedded database file structure confirmed
+
+**Code Architecture Analysis**:
+
+1. **Profile Loading Process** (MP3OrgApplication.java lines 356-370):
+   ```java
+   private void initializeDatabaseWithAutomaticFallback() {
+       DatabaseProfileManager profileManager = DatabaseProfileManager.getInstance();
+       String preferredProfileId = profileManager.getActiveProfileId();
+       DatabaseProfile resolvedProfile = DatabaseManager.initializeWithAutomaticFallback(preferredProfileId);
+   }
+   ```
+
+2. **Database Initialization** (DatabaseManager.java lines 72-104):
+   ```java
+   public static synchronized void initialize() {
+       if (connection == null) {
+           connection = DriverManager.getConnection(config.getJdbcUrl(), config.getUsername(), config.getPassword());
+           createMusicFilesTable();
+           // Initialize file path cache for performance issue#41
+           try {
+               initAllPathsMap();
+           } catch (Exception e) {
+               logger.warning("Could not initialize file path cache on startup: {}", e.getMessage());
+           }
+       }
+   }
+   ```
+
+3. **Cache Initialization Problem** (DatabaseManager.java lines 794-819):
+   ```java
+   public static void initAllPathsMap() {
+       filePathsMap.clear();
+       String sql = "SELECT id, file_path FROM music_files";
+       // Loads all file paths into ConcurrentHashMap for performance
+   }
+   ```
+
+**Root Cause Analysis**:
+
+**LIKELY ISSUE**: **File Path Cache Initialization Failure**
+- The `initAllPathsMap()` method runs during database initialization (line 94)
+- If this fails silently, the `filePathsMap` remains empty
+- Later operations depend on this cache to check for existing files
+- When `saveOrUpdateMusicFile()` is called, it uses `filePathsMap.get(musicFile.getFilePath())` (line 572)
+- If cache is empty, all files appear as "new" even though they exist in database
+
+**Secondary Issues Identified**:
+
+1. **Cache Dependency in saveOrUpdateMusicFile()** (lines 570-575):
+   ```java
+   Long id = filePathsMap.get(musicFile.getFilePath());
+   if (id != null) {
+       // File exists - update existing record
+   } else {
+       // File doesn't exist - insert new record
+   }
+   ```
+
+2. **Silent Cache Failure** (lines 93-98):
+   - Cache initialization failure is only logged as warning
+   - Application continues with empty cache
+   - No recovery mechanism or user notification
+
+3. **Database Connection Timing**:
+   - Cache initialization happens immediately after connection establishment
+   - If database is still initializing or locked, cache population may fail
+   - No retry mechanism for cache initialization
+
+**Evidence Supporting This Theory**:
+- Database files exist and appear intact
+- Profile configuration is correct and persisted
+- 6800 files were likely inserted initially when cache was working
+- After restart, cache initialization failed, making database appear empty
+- Application shows empty database because queries don't populate cache retroactively
+
+**Potential Triggering Conditions**:
+1. Database lock during startup from another process
+2. Timing issues with Derby database initialization
+3. Permissions issues reading database during startup
+4. Connection timeout during cache initialization
+
+### **Recommended Fix Strategy**:
+1. Add robust error handling and retry logic to `initAllPathsMap()`
+2. Implement cache recovery mechanism that can rebuild cache on demand
+3. Add user notification when cache initialization fails
+4. Consider making cache initialization non-blocking with background population
+5. Add diagnostic logging to track cache initialization success/failure
+
+### **Files Analyzed**:
+- `DatabaseProfileManager.java` - Profile persistence and loading
+- `DatabaseProfile.java` - Profile configuration structure  
+- `DatabaseManager.java` - Database initialization and cache management
+- `DatabaseConfig.java` - Configuration loading and profile integration
+- `MP3OrgApplication.java` - Application startup sequence
+- `mp3org-profiles.properties` - Profile storage verification
+
+### **Next Steps**:
+- Implement cache initialization improvements
+- Add diagnostic tools for troubleshooting database visibility issues
+- Create comprehensive test coverage for startup sequence edge cases
+
+---
+
 ## Session: 2025-07-05 - Tab Navigation Bug Investigation
 
 ### **Session Overview**

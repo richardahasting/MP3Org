@@ -5,14 +5,16 @@
 ## Current Status: Session 2025-07-07
 
 ### **Active Work Item**
-**Issue #41 - Database Insert Performance Optimization** (IN PROGRESS)
-- 🔄 **Current Phase**: Implementing HashMap caching for file paths
-- **Problem**: saveOrUpdateMusicFile is slow because it queries database before insert
-- **Solution**: Use ConcurrentHashMap to cache file paths in memory
-- **Status**: 
-  - User fixed syntax errors on lines 550 and 555
-  - Need to create feature branch and implement proper solution
-  - Add performance profiling to measure improvements
+**Database Persistence Issue Investigation** (IN PROGRESS)
+- 🔄 **Current Phase**: Investigating database profile persistence bug
+- **Problem**: User created new config profile, imported 6800 files, but after restarting the application, database was empty
+- **Focus Areas**: 
+  - Database profile creation and activation code
+  - Database initialization and connection management  
+  - Profile switching and loading mechanisms
+  - Temporary database paths or cleanup code
+  - Configuration persistence across application restarts
+- **Status**: Starting investigation of DatabaseProfileManager and related components
 
 ### **Recently Completed (Session 2025-07-05)**
 - ✅ **Issue #39 - Import Tab Navigation Fix**: COMPLETED

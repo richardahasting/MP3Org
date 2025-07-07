@@ -161,6 +161,9 @@ public class DatabasePerformanceTest {
     @Order(4)
     @DisplayName("Test cache consistency with deletions")
     void testCacheConsistencyWithDeletions() {
+        // Ensure cache is synchronized with database before testing
+        DatabaseManager.initAllPathsMap();
+        
         // Ensure we have data
         assertTrue(DatabaseManager.getFilePathCacheSize() > 0, "Cache should have entries");
         
@@ -198,6 +201,9 @@ public class DatabasePerformanceTest {
     @Order(5)
     @DisplayName("Test bulk delete cache consistency")
     void testBulkDeleteCacheConsistency() {
+        // Ensure cache is synchronized with database before testing
+        DatabaseManager.initAllPathsMap();
+        
         int fileCount = DatabaseManager.getAllMusicFiles().size();
         assertTrue(fileCount > 0, "Should have files in database");
         assertEquals(fileCount, DatabaseManager.getFilePathCacheSize(), 

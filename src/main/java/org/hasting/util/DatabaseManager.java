@@ -90,12 +90,7 @@ public class DatabaseManager {
                 createMusicFilesTable();
                 
                 // Initialize file path cache for performance  issue#41
-                try {
-                    initAllPathsMap();
-                } catch (Exception e) {
-                    logger.warning("Could not initialize file path cache on startup: {}", e.getMessage());
-                    // This is OK - cache will be populated as files are added
-                }
+                initFilePathCacheWithRetry();
             } catch (Exception e) {
                 logger.error("Failed to initialize database connection: {}", e.getMessage(), e);
                 throw new RuntimeException("Failed to initialize database connection", e);
@@ -425,6 +420,51 @@ public class DatabaseManager {
     public static int getFilePathCacheSize() {
         return filePathsMap.size();
     }
+    
+    /**
+     * Initializes file path cache with retry logic and fallback handling.
+     * Issue #42 - Critical fix for database appearing empty after restart
+     */
+    private static void initFilePathCacheWithRetry() {
+        int maxRetries = 3;
+        long delay = 100; // Start with 100ms delay
+        
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                initAllPathsMap();
+                
+                // Verify cache was populated successfully
+                int cacheSize = filePathsMap.size();
+                int dbCount = getMusicFileCount();
+                
+                if (dbCount > 0 && cacheSize == 0) {
+                    throw new RuntimeException("Cache initialization failed - database has " + dbCount + 
+                                             " files but cache is empty");
+                }
+                
+                logger.info("File path cache initialization successful on attempt {} - {} entries", 
+                           attempt, cacheSize);
+                return; // Success!
+                
+            } catch (Exception e) {
+                logger.warning("Cache initialization attempt {} failed: {}", attempt, e.getMessage());
+                
+                if (attempt == maxRetries) {
+                    logger.error("Cache initialization failed after {} attempts. Enabling fallback mode.", maxRetries);
+                    // Don't throw - enable fallback mode instead
+                    return;
+                } else {
+                    try {
+                        Thread.sleep(delay);
+                        delay *= 2; // Exponential backoff
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }
+    }
 
     // CRUD operations for MusicFile
 
@@ -448,8 +488,8 @@ public class DatabaseManager {
      * @throws IllegalArgumentException if musicFile is null or has no file path
      */
     public static synchronized void saveMusicFile(MusicFile musicFile) {
-        // Check if the music file already exists by file_path  issue#41
-        Long existingId = filePathsMap.get(musicFile.getFilePath());
+        // Check if the music file already exists by file_path  issue#42
+        Long existingId = getFileIdByPath(musicFile.getFilePath());
         if (existingId != null) {
             logger.debug("File already exists in database with ID {}: {}", existingId, musicFile.getFilePath());
             return; // Skip insertion of duplicate
@@ -567,9 +607,9 @@ public class DatabaseManager {
         logger.debug("saveOrUpdateMusicFile() - entry: {}", musicFile.getFilePath());
         
 
-        Long id =null;
-        // No synchronization needed with ConcurrentHashMap  issue#41
-        id = filePathsMap.get(musicFile.getFilePath());
+        Long id = null;
+        // Try cache first, fallback to database query if cache is empty  issue#42
+        id = getFileIdByPath(musicFile.getFilePath());
         long cacheCheckTime = System.currentTimeMillis() - startTime;
 
         if (id != null) {
@@ -590,11 +630,8 @@ public class DatabaseManager {
             // File doesn't exist - insert new record
             logger.debug("File path is new, inserting record: {}", musicFile.getFilePath());
             
-            // Use the existing save method
+            // Use the existing save method (it will update the cache)
             saveMusicFile(musicFile);
-            
-            // Update the cache with the new entry  issue#41
-            filePathsMap.put(musicFile.getFilePath(), musicFile.getId());
             
             long totalTime = System.currentTimeMillis() - startTime;
             logger.debug("saveOrUpdateMusicFile() - exit: inserted new record with ID {} (cache check: {}ms, total: {}ms)", 
@@ -628,6 +665,20 @@ public class DatabaseManager {
 
         if(!musicFile.isModified())// only save when data changed.
             return;
+
+        // Get old file path for cache management (issue #41)
+        String oldFilePath = null;
+        String getOldPathSql = "SELECT file_path FROM music_files WHERE id = ?";
+        try (PreparedStatement getPathStmt = getConnection().prepareStatement(getOldPathSql)) {
+            getPathStmt.setLong(1, musicFile.getId());
+            try (ResultSet rs = getPathStmt.executeQuery()) {
+                if (rs.next()) {
+                    oldFilePath = rs.getString("file_path");
+                }
+            }
+        } catch (SQLException e) {
+            logger.warning("Could not retrieve old file path for cache update: {}", e.getMessage());
+        }
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, musicFile.getFilePath());
@@ -683,6 +734,14 @@ public class DatabaseManager {
             pstmt.setLong(14, musicFile.getId());
 
             pstmt.executeUpdate();
+            
+            // Update cache if file path changed (issue #41)
+            if (oldFilePath != null && !oldFilePath.equals(musicFile.getFilePath())) {
+                filePathsMap.remove(oldFilePath);
+                filePathsMap.put(musicFile.getFilePath(), musicFile.getId());
+                logger.debug("Updated cache: removed '{}', added '{}'", oldFilePath, musicFile.getFilePath());
+            }
+            
             musicFile.setModified(false);
             logger.debug("updateMusicFile() - exit: successfully updated {}", musicFile.getFilePath());
         } catch (SQLException e) {
@@ -1193,6 +1252,69 @@ public class DatabaseManager {
     public static void clearFilePathCache() {
         filePathsMap.clear();
         logger.debug("File path cache cleared manually");
+    }
+    
+    /**
+     * Rebuilds the file path cache if it appears to be out of sync.
+     * Issue #42 - Provides user-accessible recovery mechanism
+     */
+    public static void rebuildFilePathCache() {
+        logger.info("Rebuilding file path cache...");
+        filePathsMap.clear();
+        try {
+            initAllPathsMap();
+            logger.info("File path cache rebuilt successfully with {} entries", filePathsMap.size());
+        } catch (Exception e) {
+            logger.error("Failed to rebuild file path cache: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to rebuild file path cache", e);
+        }
+    }
+    
+    /**
+     * Gets file ID by path with fallback to database query if cache is empty.
+     * Issue #42 - Critical fix for database appearing empty after restart
+     */
+    private static Long getFileIdByPath(String filePath) {
+        // Try cache first
+        Long id = filePathsMap.get(filePath);
+        if (id != null) {
+            return id;
+        }
+        
+        // If cache is empty but database has data, query database directly
+        if (filePathsMap.isEmpty()) {
+            MusicFile existing = findByPathDirect(filePath);
+            if (existing != null) {
+                // Cache the result for future use
+                filePathsMap.put(filePath, existing.getId());
+                logger.debug("Found file via database fallback and cached: {}", filePath);
+                return existing.getId();
+            }
+        }
+        
+        return null; // File doesn't exist
+    }
+    
+    /**
+     * Direct database query for file by path (bypasses cache).
+     * Used as fallback when cache is empty.
+     */
+    private static MusicFile findByPathDirect(String path) {
+        String sql = "SELECT * FROM music_files WHERE file_path = ?";
+
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, path);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return extractMusicFileFromResultSet(rs);
+                }
+            }
+        } catch (SQLException e) {
+            logger.warning("Database fallback query failed for path {}: {}", path, e.getMessage());
+        }
+
+        return null;
     }
 
     public static synchronized List<MusicFile> searchMusicFiles(String title, String artist, String album) {
