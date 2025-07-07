@@ -13,6 +13,7 @@ import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import org.hasting.model.MusicFile;
+import org.hasting.ui.TabSwitchCallback;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.ProfileChangeListener;
@@ -84,6 +85,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
     
     private MusicFile currentFile;
     private Label statusLabel;
+    private TabSwitchCallback tabSwitchCallback;
     
     // Bulk editing components
     private CheckBox bulkEditModeCheckBox;
@@ -94,6 +96,11 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
     private Label bulkSelectionLabel;
     
     public MetadataEditorView() {
+        this(null);
+    }
+    
+    public MetadataEditorView(TabSwitchCallback tabSwitchCallback) {
+        this.tabSwitchCallback = tabSwitchCallback;
         initializeComponents();
         layoutComponents();
         
@@ -1061,13 +1068,26 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
     
     /**
      * Requests that the main application switch to the import tab.
-     * This is a placeholder - the actual implementation would depend on how tabs are managed.
+     * Uses the provided TabSwitchCallback to perform the actual tab switch.
      */
     private void notifyRequestTabSwitch() {
-        // This could be implemented with another event system or callback
-        // For now, just update the status
-        statusLabel.setText("Please switch to 'Import & Organize' tab to add music files");
-        statusLabel.setStyle("-fx-text-fill: green;");
+        if (tabSwitchCallback != null) {
+            boolean success = tabSwitchCallback.switchToTab("Import & Organize");
+            if (success) {
+                statusLabel.setText("Switched to Import & Organize tab");
+                statusLabel.setStyle("-fx-text-fill: green;");
+                logger.info("Successfully switched to Import & Organize tab via callback");
+            } else {
+                statusLabel.setText("Failed to switch to Import & Organize tab");
+                statusLabel.setStyle("-fx-text-fill: red;");
+                logger.warning("Failed to switch to Import & Organize tab - tab not found");
+            }
+        } else {
+            // Fallback behavior when no callback is available
+            statusLabel.setText("Please switch to 'Import & Organize' tab to add music files");
+            statusLabel.setStyle("-fx-text-fill: orange;");
+            logger.warning("No tab switch callback available - user must manually switch tabs");
+        }
     }
     
     /**
