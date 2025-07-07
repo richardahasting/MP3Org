@@ -125,19 +125,21 @@ public class ImportOrganizeView extends BorderPane {
      * Helper class to represent directory items for selective rescanning (Issue #28)
      */
     public static class DirectoryItem {
-        private final String path;
+        private javafx.beans.property.StringProperty path;
         private javafx.beans.property.BooleanProperty selected;
         private javafx.beans.property.StringProperty status;
         private javafx.beans.property.StringProperty lastScanned;
         
         public DirectoryItem(String path) {
-            this.path = path;
+            this.path = new SimpleStringProperty(path);
             this.selected = new javafx.beans.property.SimpleBooleanProperty(false);
             this.status = new SimpleStringProperty("Ready");
             this.lastScanned = new SimpleStringProperty("Never");
         }
         
-        public String getPath() { return path; }
+        public String getPath() { return path.get(); }
+        public javafx.beans.property.StringProperty pathProperty() { return path; }
+        public void setPath(String path) { this.path.set(path); }
         public javafx.beans.property.BooleanProperty selectedProperty() { return selected; }
         public boolean isSelected() { return selected.get(); }
         public void setSelected(boolean selected) { this.selected.set(selected); }
@@ -261,7 +263,7 @@ public class ImportOrganizeView extends BorderPane {
         
         // Directory path column
         TableColumn<DirectoryItem, String> pathCol = new TableColumn<>("Directory Path");
-        pathCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getPath()));
+        pathCol.setCellValueFactory(cellData -> cellData.getValue().pathProperty());
         pathCol.setPrefWidth(400);
         
         // Status column
@@ -274,9 +276,101 @@ public class ImportOrganizeView extends BorderPane {
         lastScannedCol.setCellValueFactory(cellData -> cellData.getValue().lastScannedProperty());
         lastScannedCol.setPrefWidth(120);
         
-        table.getColumns().addAll(selectCol, pathCol, statusCol, lastScannedCol);
+        // Browse subdirectory column
+        TableColumn<DirectoryItem, Void> browseCol = new TableColumn<>("Browse");
+        browseCol.setCellFactory(col -> new TableCell<DirectoryItem, Void>() {
+            private final Button browseButton = new Button("...");
+            
+            {
+                browseButton.setStyle("-fx-font-size: 10px; -fx-padding: 2 6 2 6;");
+                browseButton.setTooltip(new Tooltip("Select subdirectory within this path"));
+                browseButton.setOnAction(event -> {
+                    DirectoryItem item = getTableView().getItems().get(getIndex());
+                    selectSubdirectory(item);
+                });
+            }
+            
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(browseButton);
+                }
+            }
+        });
+        browseCol.setPrefWidth(60);
+        browseCol.setResizable(false);
+        
+        table.getColumns().addAll(selectCol, pathCol, statusCol, lastScannedCol, browseCol);
         
         return table;
+    }
+    
+    /**
+     * Opens a directory chooser to allow user to select a subdirectory within the given DirectoryItem's path.
+     * Updates the DirectoryItem's path to the selected subdirectory for more targeted rescanning.
+     * 
+     * @param directoryItem the DirectoryItem to update with a selected subdirectory
+     * @since 1.0
+     */
+    private void selectSubdirectory(DirectoryItem directoryItem) {
+        String currentPath = directoryItem.getPath();
+        File currentDirectory = new File(currentPath);
+        
+        // Check if current directory exists
+        if (!currentDirectory.exists() || !currentDirectory.isDirectory()) {
+            statusLabel.setText("Cannot browse: Directory does not exist - " + currentPath);
+            return;
+        }
+        
+        // Create and configure directory chooser
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Subdirectory to Rescan");
+        directoryChooser.setInitialDirectory(currentDirectory);
+        
+        // Show directory chooser
+        File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
+        
+        if (selectedDirectory != null) {
+            String selectedPath = selectedDirectory.getAbsolutePath();
+            String originalPath = currentPath;
+            
+            // Validate that selected directory is within the original path
+            if (selectedPath.startsWith(originalPath)) {
+                // Update the directory item's path
+                updateDirectoryItemPath(directoryItem, selectedPath, originalPath);
+                statusLabel.setText("Updated directory path to: " + selectedPath);
+            } else {
+                // Selected directory is outside the original path
+                statusLabel.setText("Selected directory must be within: " + originalPath);
+            }
+        }
+    }
+    
+    /**
+     * Updates a DirectoryItem's path to a new subdirectory path.
+     * Stores the original path for reference and updates the display.
+     * 
+     * @param directoryItem the DirectoryItem to update
+     * @param newPath the new subdirectory path
+     * @param originalPath the original root path for reference
+     * @since 1.0
+     */
+    private void updateDirectoryItemPath(DirectoryItem directoryItem, String newPath, String originalPath) {
+        // Store original path in a custom property for future reference if needed
+        directoryItem.setPath(newPath);
+        
+        // Update status to reflect the change
+        if (!newPath.equals(originalPath)) {
+            directoryItem.setStatus("Subdirectory selected");
+        } else {
+            directoryItem.setStatus("Ready");
+        }
+        
+        // Log the path change
+        logger.info("Directory path updated from '{}' to '{}'", originalPath, newPath);
     }
     
     private TableView<MusicFileSelection> createFileSelectionTable() {
