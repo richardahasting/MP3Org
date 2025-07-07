@@ -239,6 +239,19 @@ public class ImportOrganizeView extends BorderPane {
         table.setPrefHeight(200);
         table.setEditable(true);
         
+        // Disable row selection to avoid confusion with checkbox selection
+        table.setRowFactory(tv -> {
+            TableRow<DirectoryItem> row = new TableRow<>();
+            // Disable row selection highlighting
+            row.setOnMouseClicked(event -> {
+                // Prevent row selection, only allow checkbox interaction
+                event.consume();
+            });
+            return row;
+        });
+        table.getSelectionModel().setSelectionMode(javafx.scene.control.SelectionMode.SINGLE);
+        table.getSelectionModel().clearSelection();
+        
         // Selection column
         TableColumn<DirectoryItem, Boolean> selectCol = new TableColumn<>("Select");
         selectCol.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
@@ -262,11 +275,6 @@ public class ImportOrganizeView extends BorderPane {
         lastScannedCol.setPrefWidth(120);
         
         table.getColumns().addAll(selectCol, pathCol, statusCol, lastScannedCol);
-        
-        // Update button state when selection changes
-        table.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
-            updateRescanButtonState();
-        });
         
         return table;
     }
@@ -960,6 +968,11 @@ public class ImportOrganizeView extends BorderPane {
                     item.setStatus("Directory not found");
                     item.setLastScanned("Directory missing");
                 }
+                
+                // Add listener to update button state when checkbox selection changes
+                item.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
+                    updateRescanButtonState();
+                });
                 
                 directoryData.add(item);
             }
