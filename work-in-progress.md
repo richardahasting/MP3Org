@@ -5,15 +5,16 @@
 ## Current Status: Session 2025-07-07
 
 ### **Active Work Item**
-**Issue #47 - Directory Rescanning Table Problems** (IN PROGRESS)
-- 🔄 **Current Phase**: Fixing directory rescanning functionality in Import/Organize tab
-- **Problem**: Directory Management & Selective Rescanning table shows "No content in table" instead of previously scanned directories
-- **Secondary Issue**: "Add New Directory" button appears in rescanning panel where it shouldn't
+**Issue #49 - Directory Rescanning Shows Wrong Directories** (IN PROGRESS)
+- 🔄 **Current Phase**: Fix directory rescanning table to show original scan directories only
+- **Problem**: Directory rescanning table shows every individual file's parent directory instead of the original root directories that were scanned
+- **Root Cause**: `getDistinctDirectories()` extracts parent from every file path, creating overwhelming list of subdirectories
 - **Focus Areas**: 
-  - Populate rescanning table with previously scanned directories from database
-  - Remove unwanted "Add New Directory" button from rescanning section
-  - Ensure directory selection and rescanning functionality works properly
-- **Status**: Created Issue #47, starting implementation
+  - Track original scan root directories (not every subdirectory)
+  - Implement database schema to store scan directory history
+  - Modify rescanning table to show only meaningful root directories
+  - Preserve user intent about which directories were originally selected
+- **Status**: Created Issue #49, analyzing solution approach
 
 ### **Recently Completed (Session 2025-07-05)**
 - ✅ **Issue #39 - Import Tab Navigation Fix**: COMPLETED
