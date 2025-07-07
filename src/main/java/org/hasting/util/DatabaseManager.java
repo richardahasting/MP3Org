@@ -1094,6 +1094,57 @@ public class DatabaseManager {
     }
 
     /**
+     * Gets all distinct parent directories from music files in the database.
+     * 
+     * <p>This method extracts the parent directory from each music file's path
+     * and returns a sorted list of unique directories. This is useful for:
+     * <ul>
+     *   <li>Populating directory rescanning tables</li>
+     *   <li>Understanding the directory structure of the music collection</li>
+     *   <li>Selective directory operations</li>
+     * </ul>
+     * 
+     * <p>The directories are:
+     * <ul>
+     *   <li><strong>Filtered:</strong> Only includes file types enabled in configuration</li>
+     *   <li><strong>Unique:</strong> Each directory appears only once in the result</li>
+     *   <li><strong>Sorted:</strong> Alphabetically sorted for consistent ordering</li>
+     * </ul>
+     * 
+     * @return a sorted list of distinct directory paths containing music files
+     * @throws RuntimeException if database query fails or connection is unavailable
+     * @since 1.0
+     */
+    public static synchronized List<String> getDistinctDirectories() {
+        List<String> directories = new ArrayList<>();
+        Set<String> uniqueDirectories = new HashSet<>();
+        
+        String sql = "SELECT DISTINCT file_path FROM music_files WHERE 1=1" + getFileTypeFilterClause();
+        
+        try (Statement stmt = getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                String filePath = rs.getString("file_path");
+                if (filePath != null) {
+                    // Extract parent directory from file path
+                    java.io.File file = new java.io.File(filePath);
+                    String parentDir = file.getParent();
+                    if (parentDir != null && uniqueDirectories.add(parentDir)) {
+                        directories.add(parentDir);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to get distinct directories from database", e);
+            throw new RuntimeException("Failed to get distinct directories", e);
+        }
+        
+        Collections.sort(directories);
+        return directories;
+    }
+
+    /**
      * Performs a comprehensive search across multiple metadata fields.
      * 
      * <p>This method searches for the given term across the following fields:

@@ -5,16 +5,15 @@
 ## Current Status: Session 2025-07-07
 
 ### **Active Work Item**
-**Database Persistence Issue Investigation** (IN PROGRESS)
-- 🔄 **Current Phase**: Investigating database profile persistence bug
-- **Problem**: User created new config profile, imported 6800 files, but after restarting the application, database was empty
+**Issue #47 - Directory Rescanning Table Problems** (IN PROGRESS)
+- 🔄 **Current Phase**: Fixing directory rescanning functionality in Import/Organize tab
+- **Problem**: Directory Management & Selective Rescanning table shows "No content in table" instead of previously scanned directories
+- **Secondary Issue**: "Add New Directory" button appears in rescanning panel where it shouldn't
 - **Focus Areas**: 
-  - Database profile creation and activation code
-  - Database initialization and connection management  
-  - Profile switching and loading mechanisms
-  - Temporary database paths or cleanup code
-  - Configuration persistence across application restarts
-- **Status**: Starting investigation of DatabaseProfileManager and related components
+  - Populate rescanning table with previously scanned directories from database
+  - Remove unwanted "Add New Directory" button from rescanning section
+  - Ensure directory selection and rescanning functionality works properly
+- **Status**: Created Issue #47, starting implementation
 
 ### **Recently Completed (Session 2025-07-05)**
 - ✅ **Issue #39 - Import Tab Navigation Fix**: COMPLETED

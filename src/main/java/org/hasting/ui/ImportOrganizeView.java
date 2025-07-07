@@ -83,7 +83,6 @@ public class ImportOrganizeView extends BorderPane {
     private ObservableList<DirectoryItem> directoryData;
     private CheckBox selectAllDirectoriesCheckBox;
     private Button rescanSelectedButton;
-    private Button addNewDirectoryButton;
     
     // File selection components for Issue #6
     private TableView<MusicFileSelection> fileSelectionTable;
@@ -222,8 +221,6 @@ public class ImportOrganizeView extends BorderPane {
         rescanSelectedButton.setOnAction(e -> rescanSelectedDirectories());
         rescanSelectedButton.setDisable(true);
         
-        addNewDirectoryButton = new Button("Add New Directory");
-        addNewDirectoryButton.setOnAction(e -> addNewDirectory());
         
         // Update button state when selection changes
         directoryData.addListener((javafx.collections.ListChangeListener<DirectoryItem>) change -> {
@@ -410,7 +407,7 @@ public class ImportOrganizeView extends BorderPane {
         
         HBox directoryControlsBox = createButtonContainer();
         directoryControlsBox.getChildren().addAll(
-            selectAllDirectoriesCheckBox, addNewDirectoryButton, rescanSelectedButton
+            selectAllDirectoriesCheckBox, rescanSelectedButton
         );
         
         // Enhanced table styling
@@ -726,6 +723,7 @@ public class ImportOrganizeView extends BorderPane {
                         statusLabel.setText("Import completed: " + result.size() + " files processed");
                         progressDialog.setCompleted(true, "Successfully imported " + result.size() + " music files");
                         refreshFileSelection(); // Refresh file selection after import
+                        refreshDirectoryTable(); // Refresh directory rescanning table after import
                     }
                 });
             }
@@ -928,54 +926,53 @@ public class ImportOrganizeView extends BorderPane {
     }
     
     /**
-     * Loads previously scanned directories from the selectedDirectoriesArea.
+     * Loads previously scanned directories from the database.
+     * 
+     * <p>This method populates the directory rescanning table with directories
+     * that actually contain music files in the database, providing users with
+     * a meaningful list of directories they can selectively rescan.
      */
     private void loadPreviouslyScannedDirectories() {
-        String directoriesText = selectedDirectoriesArea.getText().trim();
-        if (!directoriesText.isEmpty()) {
-            String[] directories = directoriesText.split("\n");
+        try {
+            // Get distinct directories from the database
+            List<String> directories = DatabaseManager.getDistinctDirectories();
+            
+            // Clear existing data
+            directoryData.clear();
+            
+            // Add directories to the table
             for (String directory : directories) {
-                if (!directory.trim().isEmpty()) {
-                    DirectoryItem item = new DirectoryItem(directory.trim());
+                DirectoryItem item = new DirectoryItem(directory);
+                
+                // Set status based on file existence
+                java.io.File dir = new java.io.File(directory);
+                if (dir.exists() && dir.isDirectory()) {
+                    item.setStatus("Ready");
                     item.setLastScanned("Previously scanned");
-                    directoryData.add(item);
+                } else {
+                    item.setStatus("Directory not found");
+                    item.setLastScanned("Directory missing");
                 }
+                
+                directoryData.add(item);
             }
+            
+            logger.info("Loaded {} directories for rescanning from database", directories.size());
+            
+        } catch (Exception e) {
+            logger.error("Failed to load directories from database", e);
+            statusLabel.setText("Error loading directories from database: " + e.getMessage());
         }
     }
     
     /**
-     * Adds a new directory to the scanning list.
+     * Refreshes the directory rescanning table with current data from the database.
+     * 
+     * <p>This method should be called after scanning operations to ensure the
+     * directory table reflects the current state of the database.
      */
-    private void addNewDirectory() {
-        DirectoryChooser directoryChooser = new DirectoryChooser();
-        directoryChooser.setTitle("Select Directory to Add");
-        
-        File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
-        if (selectedDirectory != null) {
-            String directoryPath = selectedDirectory.getAbsolutePath();
-            
-            // Check if directory is already in the list
-            boolean alreadyExists = directoryData.stream()
-                    .anyMatch(item -> item.getPath().equals(directoryPath));
-            
-            if (!alreadyExists) {
-                DirectoryItem item = new DirectoryItem(directoryPath);
-                directoryData.add(item);
-                
-                // Also add to the legacy text area for backward compatibility
-                String currentText = selectedDirectoriesArea.getText();
-                if (!currentText.isEmpty()) {
-                    currentText += "\n";
-                }
-                currentText += directoryPath;
-                selectedDirectoriesArea.setText(currentText);
-                
-                statusLabel.setText("Added directory: " + directoryPath);
-            } else {
-                statusLabel.setText("Directory already in list: " + directoryPath);
-            }
-        }
+    public void refreshDirectoryTable() {
+        loadPreviouslyScannedDirectories();
     }
     
     /**
@@ -993,7 +990,6 @@ public class ImportOrganizeView extends BorderPane {
         
         // Disable buttons during rescan
         rescanSelectedButton.setDisable(true);
-        addNewDirectoryButton.setDisable(true);
         scanButton.setDisable(true);
         clearDatabaseButton.setDisable(true);
         organizeButton.setDisable(true);
@@ -1125,7 +1121,6 @@ public class ImportOrganizeView extends BorderPane {
                 Platform.runLater(() -> {
                     // Re-enable buttons
                     rescanSelectedButton.setDisable(false);
-                    addNewDirectoryButton.setDisable(false);
                     scanButton.setDisable(false);
                     clearDatabaseButton.setDisable(false);
                     organizeButton.setDisable(false);
@@ -1139,6 +1134,9 @@ public class ImportOrganizeView extends BorderPane {
                     // Refresh file selection to show updated data
                     refreshFileSelection();
                     
+                    // Refresh directory rescanning table after rescan
+                    refreshDirectoryTable();
+                    
                     // Update organizeButton state
                     organizeButton.setDisable(DatabaseManager.getMusicFileCount() <= 0);
                 });
@@ -1149,7 +1147,6 @@ public class ImportOrganizeView extends BorderPane {
                 Platform.runLater(() -> {
                     // Re-enable buttons
                     rescanSelectedButton.setDisable(false);
-                    addNewDirectoryButton.setDisable(false);
                     scanButton.setDisable(false);
                     clearDatabaseButton.setDisable(false);
                     organizeButton.setDisable(false);
