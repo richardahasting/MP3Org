@@ -317,6 +317,50 @@ public class DatabaseManager {
     }
 
     /**
+     * Ensures a valid database connection is available, with recovery mechanisms.
+     * 
+     * <p>This method provides robust connection validation and recovery:
+     * <ol>
+     *   <li>Attempts to get current connection</li>
+     *   <li>Validates connection is not null and is valid</li>
+     *   <li>If connection fails, attempts standard initialization</li>
+     *   <li>If that fails, throws RuntimeException with clear error message</li>
+     * </ol>
+     * 
+     * @return valid database connection, never null
+     * @throws RuntimeException if no database connection can be established
+     */
+    public static synchronized Connection ensureConnection() {
+        try {
+            Connection conn = getConnection();
+            
+            // Check if connection is null or closed
+            if (conn == null || conn.isClosed()) {
+                logger.warning("Database connection is null or closed, attempting recovery");
+                
+                // Try standard initialization
+                initialize();
+                conn = getConnection();
+                
+                if (conn == null || conn.isClosed()) {
+                    throw new RuntimeException("Failed to establish database connection after recovery attempt");
+                }
+                
+                logger.info("Database connection recovered successfully");
+            }
+            
+            return conn;
+            
+        } catch (SQLException e) {
+            logger.error("Database connection validation failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Database connection validation failed", e);
+        } catch (Exception e) {
+            logger.error("Unexpected error during connection validation: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to ensure database connection", e);
+        }
+    }
+
+    /**
      * Properly closes the database connection and cleans up resources.
      * 
      * <p>This method should be called when the application is shutting down
@@ -1051,7 +1095,7 @@ public class DatabaseManager {
         logger.debug("getMusicFileCount() - entry");
         String sql = "SELECT COUNT(*) as file_count FROM music_files WHERE 1=1" + getFileTypeFilterClause();
         
-        try (Statement stmt = getConnection().createStatement();
+        try (Statement stmt = ensureConnection().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             
             if (rs.next()) {
@@ -1210,7 +1254,7 @@ public class DatabaseManager {
         
         // First try to update existing record
         String updateSql = "UPDATE scan_directories SET scan_date = CURRENT_TIMESTAMP WHERE root_path = ?";
-        try (PreparedStatement updateStmt = getConnection().prepareStatement(updateSql)) {
+        try (PreparedStatement updateStmt = ensureConnection().prepareStatement(updateSql)) {
             updateStmt.setString(1, rootPath.trim());
             int updated = updateStmt.executeUpdate();
             
@@ -1224,7 +1268,7 @@ public class DatabaseManager {
         
         // If no update occurred, insert new record
         String insertSql = "INSERT INTO scan_directories (root_path) VALUES (?)";
-        try (PreparedStatement insertStmt = getConnection().prepareStatement(insertSql)) {
+        try (PreparedStatement insertStmt = ensureConnection().prepareStatement(insertSql)) {
             insertStmt.setString(1, rootPath.trim());
             insertStmt.executeUpdate();
             logger.debug("Recorded new scan directory: {}", rootPath);
@@ -1255,7 +1299,7 @@ public class DatabaseManager {
         
         String sql = "SELECT root_path FROM scan_directories ORDER BY root_path";
         
-        try (Statement stmt = getConnection().createStatement();
+        try (Statement stmt = ensureConnection().createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             
             while (rs.next()) {
@@ -1285,7 +1329,7 @@ public class DatabaseManager {
         
         String sql = "UPDATE scan_directories SET last_rescan = CURRENT_TIMESTAMP WHERE root_path = ?";
         
-        try (PreparedStatement stmt = getConnection().prepareStatement(sql)) {
+        try (PreparedStatement stmt = ensureConnection().prepareStatement(sql)) {
             stmt.setString(1, rootPath.trim());
             int updated = stmt.executeUpdate();
             if (updated > 0) {
