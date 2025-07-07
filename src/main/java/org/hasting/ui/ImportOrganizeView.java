@@ -9,6 +9,7 @@ import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.layout.*;
+import javafx.scene.control.ScrollPane;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import org.hasting.model.MusicFile;
@@ -362,130 +363,214 @@ public class ImportOrganizeView extends BorderPane {
     }
     
     private void layoutComponents() {
-        setPadding(new Insets(20));
+        setPadding(new Insets(25, 30, 25, 30)); // Increased padding for better spacing
         
-        // Import section
-        VBox importSection = new VBox(10);
+        // Import section with enhanced styling
+        VBox importSection = createStyledSection();
         
-        Label importTitle = new Label("Import Music Files");
-        importTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        Label importTitle = createSectionTitle("Import Music Files");
         
-        Label importInstructions = new Label(
+        Label importInstructions = createInstructionLabel(
             "Select directories containing music files to scan and add to the database."
         );
-        importInstructions.setWrapText(true);
         
-        HBox importButtons = new HBox(10);
+        HBox importButtons = createButtonContainer();
         importButtons.getChildren().addAll(scanButton, clearDatabaseButton);
         
-        Label selectedLabel = new Label("Selected Directories:");
-        selectedLabel.setStyle("-fx-font-weight: bold;");
+        Label selectedLabel = createFieldLabel("Selected Directories:");
+        
+        // Enhanced directory area styling
+        selectedDirectoriesArea.setStyle(
+            "-fx-border-color: #ddd; " +
+            "-fx-border-radius: 5; " +
+            "-fx-padding: 10; " +
+            "-fx-background-color: #fafafa;"
+        );
         
         importSection.getChildren().addAll(
             importTitle,
+            createVerticalSpacer(8),
             importInstructions,
+            createVerticalSpacer(12),
             importButtons,
+            createVerticalSpacer(15),
             selectedLabel,
+            createVerticalSpacer(5),
             selectedDirectoriesArea
         );
         
-        // Directory management section for Issue #28
-        VBox directorySection = new VBox(10);
+        // Directory management section with enhanced styling
+        VBox directorySection = createStyledSection();
         
-        Label directoryTitle = new Label("Directory Management & Selective Rescanning");
-        directoryTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        Label directoryTitle = createSectionTitle("Directory Management & Selective Rescanning");
         
-        Label directoryInstructions = new Label(
+        Label directoryInstructions = createInstructionLabel(
             "Manage previously scanned directories and selectively rescan specific directories for updated files."
         );
-        directoryInstructions.setWrapText(true);
         
-        HBox directoryControlsBox = new HBox(10);
+        HBox directoryControlsBox = createButtonContainer();
         directoryControlsBox.getChildren().addAll(
             selectAllDirectoriesCheckBox, addNewDirectoryButton, rescanSelectedButton
         );
         
+        // Enhanced table styling
+        directoryTable.setStyle(
+            "-fx-border-color: #ddd; " +
+            "-fx-border-radius: 5; " +
+            "-fx-background-color: white;"
+        );
+        
         directorySection.getChildren().addAll(
             directoryTitle,
+            createVerticalSpacer(8),
             directoryInstructions,
+            createVerticalSpacer(12),
             directoryControlsBox,
+            createVerticalSpacer(15),
             directoryTable
         );
         
-        // File selection section for Issue #6
-        VBox fileSelectionSection = new VBox(10);
+        // File selection section with enhanced styling
+        VBox fileSelectionSection = createStyledSection();
         
-        Label selectionTitle = new Label("Select Files to Organize");
-        selectionTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        Label selectionTitle = createSectionTitle("Select Files to Organize");
         
-        Label selectionInstructions = new Label(
+        Label selectionInstructions = createInstructionLabel(
             "Choose which music files to organize. You can select individual files or use 'Select All'."
         );
-        selectionInstructions.setWrapText(true);
         
-        HBox selectionControlsBox = new HBox(10);
+        HBox selectionControlsBox = createButtonContainer();
+        // Add selection count with better styling
+        selectionCountLabel.setStyle("-fx-font-weight: bold; -fx-text-fill: #666;");
         selectionControlsBox.getChildren().addAll(
-            selectAllCheckBox, refreshSelectionButton, selectionCountLabel
+            selectAllCheckBox, refreshSelectionButton, 
+            createHorizontalSpacer(), selectionCountLabel
+        );
+        
+        // Enhanced table styling
+        fileSelectionTable.setStyle(
+            "-fx-border-color: #ddd; " +
+            "-fx-border-radius: 5; " +
+            "-fx-background-color: white;"
         );
         
         fileSelectionSection.getChildren().addAll(
             selectionTitle,
+            createVerticalSpacer(8),
             selectionInstructions,
+            createVerticalSpacer(12),
             selectionControlsBox,
+            createVerticalSpacer(15),
             fileSelectionTable
         );
         
-        // Organize section
-        VBox organizeSection = new VBox(10);
+        // Organize section with enhanced styling
+        VBox organizeSection = createStyledSection();
         
-        Label organizeTitle = new Label("Organize Selected Files");
-        organizeTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        Label organizeTitle = createSectionTitle("Organize Selected Files");
         
-        Label organizeInstructions = new Label(
+        Label organizeInstructions = createInstructionLabel(
             "Copy selected music files to a new organized folder structure.\n" +
             "Files will be organized using the template configured in Settings."
         );
-        organizeInstructions.setWrapText(true);
         
-        HBox organizeFolderBox = new HBox(10);
+        HBox organizeFolderBox = createButtonContainer();
+        Label destinationLabel = createFieldLabel("Destination:");
+        destinationLabel.setMinWidth(80);
+        
+        // Enhanced folder field styling
+        organizeFolderField.setStyle(
+            "-fx-border-color: #ddd; " +
+            "-fx-border-radius: 3; " +
+            "-fx-padding: 8; " +
+            "-fx-background-color: white;"
+        );
+        HBox.setHgrow(organizeFolderField, Priority.ALWAYS);
+        
         organizeFolderBox.getChildren().addAll(
-            new Label("Destination:"), organizeFolderField, browseFolderButton
+            destinationLabel, organizeFolderField, browseFolderButton
+        );
+        
+        // Enhanced organize button styling
+        organizeButton.setStyle(
+            "-fx-background-color: #4CAF50; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-weight: bold; " +
+            "-fx-padding: 12 24; " +
+            "-fx-border-radius: 5; " +
+            "-fx-background-radius: 5;"
         );
         
         organizeSection.getChildren().addAll(
             organizeTitle,
+            createVerticalSpacer(8),
             organizeInstructions,
+            createVerticalSpacer(12),
             organizeFolderBox,
+            createVerticalSpacer(15),
             organizeButton
         );
         
-        // Progress section
-        VBox progressSection = new VBox(5);
+        // Progress section with enhanced styling
+        VBox progressSection = createStyledSection();
+        progressSection.setSpacing(8);
+        
+        // Enhanced progress bar styling
+        progressBar.setStyle(
+            "-fx-accent: #2196F3; " +
+            "-fx-background-color: #f0f0f0; " +
+            "-fx-border-radius: 3; " +
+            "-fx-background-radius: 3;"
+        );
+        
+        // Enhanced progress label styling
+        progressLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #666;");
+        
         progressSection.getChildren().addAll(progressBar, progressLabel);
         
-        // Status section
+        // Status section with enhanced styling
         HBox statusSection = new HBox();
+        statusSection.setPadding(new Insets(10, 0, 0, 0));
+        statusLabel.setStyle(
+            "-fx-font-size: 12px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #333;"
+        );
         statusSection.getChildren().add(statusLabel);
         
-        // Main layout
-        VBox mainContent = new VBox(20);
+        // Main layout with improved spacing and separators
+        VBox mainContent = new VBox();
+        mainContent.setSpacing(25); // Increased spacing between sections
+        
         mainContent.getChildren().addAll(
             importSection, 
-            new Separator(), 
+            createStyledSeparator(), 
             directorySection,
-            new Separator(), 
+            createStyledSeparator(), 
             fileSelectionSection, 
-            new Separator(), 
+            createStyledSeparator(), 
             organizeSection
         );
         
-        setCenter(mainContent);
-        setBottom(new VBox(10, progressSection, statusSection));
+        // Enhanced scroll pane for main content
+        ScrollPane scrollPane = new ScrollPane(mainContent);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setStyle("-fx-background-color: transparent;");
         
-        // Make text area and tables grow
+        setCenter(scrollPane);
+        setBottom(new VBox(15, progressSection, statusSection));
+        
+        // Enhanced growth behavior for responsive design
         VBox.setVgrow(selectedDirectoriesArea, Priority.ALWAYS);
         VBox.setVgrow(directoryTable, Priority.ALWAYS);
         VBox.setVgrow(fileSelectionTable, Priority.ALWAYS);
+        
+        // Set minimum heights for better UX
+        selectedDirectoriesArea.setMinHeight(100);
+        directoryTable.setMinHeight(150);
+        fileSelectionTable.setMinHeight(200);
     }
     
     private void selectDirectoriesToScan() {
@@ -1089,5 +1174,131 @@ public class ImportOrganizeView extends BorderPane {
         Thread rescanThread = new Thread(rescanTask);
         rescanThread.setDaemon(true);
         rescanThread.start();
+    }
+    
+    // ================================================================================================
+    // UI STYLING AND LAYOUT HELPER METHODS (Issue #45)
+    // ================================================================================================
+    
+    /**
+     * Creates a styled section container with consistent padding and styling.
+     * 
+     * @return a VBox configured with standard section styling
+     */
+    private VBox createStyledSection() {
+        VBox section = new VBox();
+        section.setSpacing(10);
+        section.setPadding(new Insets(20, 25, 20, 25));
+        section.setStyle(
+            "-fx-background-color: white; " +
+            "-fx-border-color: #e0e0e0; " +
+            "-fx-border-radius: 8; " +
+            "-fx-background-radius: 8; " +
+            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 3, 0, 0, 1);"
+        );
+        return section;
+    }
+    
+    /**
+     * Creates a styled section title with consistent formatting.
+     * 
+     * @param text the title text
+     * @return a Label with title styling
+     */
+    private Label createSectionTitle(String text) {
+        Label title = new Label(text);
+        title.setStyle(
+            "-fx-font-size: 18px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #1976D2; " +
+            "-fx-padding: 0 0 5 0;"
+        );
+        return title;
+    }
+    
+    /**
+     * Creates a styled instruction label with consistent formatting.
+     * 
+     * @param text the instruction text
+     * @return a Label with instruction styling
+     */
+    private Label createInstructionLabel(String text) {
+        Label instruction = new Label(text);
+        instruction.setWrapText(true);
+        instruction.setStyle(
+            "-fx-font-size: 13px; " +
+            "-fx-text-fill: #666; " +
+            "-fx-line-spacing: 2px;"
+        );
+        return instruction;
+    }
+    
+    /**
+     * Creates a styled field label with consistent formatting.
+     * 
+     * @param text the label text
+     * @return a Label with field label styling
+     */
+    private Label createFieldLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle(
+            "-fx-font-size: 13px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #333;"
+        );
+        return label;
+    }
+    
+    /**
+     * Creates a styled button container with consistent spacing.
+     * 
+     * @return an HBox configured for button layout
+     */
+    private HBox createButtonContainer() {
+        HBox container = new HBox();
+        container.setSpacing(12);
+        container.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        return container;
+    }
+    
+    /**
+     * Creates a vertical spacer for consistent spacing between components.
+     * 
+     * @param height the height of the spacer in pixels
+     * @return a Region configured as a vertical spacer
+     */
+    private Region createVerticalSpacer(double height) {
+        Region spacer = new Region();
+        spacer.setPrefHeight(height);
+        spacer.setMaxHeight(height);
+        spacer.setMinHeight(height);
+        return spacer;
+    }
+    
+    /**
+     * Creates a horizontal spacer that grows to fill available space.
+     * 
+     * @return a Region configured as a horizontal spacer
+     */
+    private Region createHorizontalSpacer() {
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        return spacer;
+    }
+    
+    /**
+     * Creates a styled separator line for visual section separation.
+     * 
+     * @return a Separator with enhanced styling
+     */
+    private Separator createStyledSeparator() {
+        Separator separator = new Separator();
+        separator.setStyle(
+            "-fx-background-color: #e0e0e0; " +
+            "-fx-border-color: #e0e0e0; " +
+            "-fx-opacity: 0.8;"
+        );
+        separator.setPadding(new Insets(10, 0, 10, 0));
+        return separator;
     }
 }
