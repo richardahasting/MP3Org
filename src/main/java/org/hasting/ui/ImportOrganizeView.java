@@ -597,6 +597,13 @@ public class ImportOrganizeView extends BorderPane {
         
         String[] directories = directoriesText.split("\n");
         
+        // Record the original scan directories for rescanning functionality
+        for (String directory : directories) {
+            if (!directory.trim().isEmpty()) {
+                DatabaseManager.recordScanDirectory(directory.trim());
+            }
+        }
+        
         // Create enhanced progress dialog
         ImportProgressDialog progressDialog = new ImportProgressDialog(getScene().getWindow());
         progressDialog.setOnCancel(() -> {
@@ -934,8 +941,8 @@ public class ImportOrganizeView extends BorderPane {
      */
     private void loadPreviouslyScannedDirectories() {
         try {
-            // Get distinct directories from the database
-            List<String> directories = DatabaseManager.getDistinctDirectories();
+            // Get original scan directories from the database
+            List<String> directories = DatabaseManager.getScanDirectories();
             
             // Clear existing data
             directoryData.clear();
@@ -1039,8 +1046,9 @@ public class ImportOrganizeView extends BorderPane {
                         allFoundFiles.addAll(foundFiles);
                         processedItems.add(item);
                         
-                        // Update status
+                        // Update status and rescan timestamp
                         Platform.runLater(() -> item.setStatus("Scanned"));
+                        DatabaseManager.updateScanDirectoryRescanTime(item.getPath());
                         
                     } catch (Exception e) {
                         Platform.runLater(() -> item.setStatus("Scan Error"));

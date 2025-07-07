@@ -1,6 +1,145 @@
 # MP3Org Developer Log
 
-## Session: 2025-07-07 - Database Persistence Issue Investigation
+## Session: 2025-07-07 - Issue #47 Directory Rescanning Table Fixes
+
+### **Session Overview**
+- **Duration**: ~1.5 hours implementation session  
+- **Focus**: Fix directory rescanning table population and remove unwanted "Add New Directory" button
+- **Issue**: Issue #47 - Import/Organize tab directory rescanning table shows "No content in table" instead of previously scanned directories
+- **Outcome**: Complete fix with database integration, UI cleanup, and comprehensive testing
+
+### **User Problem Statement**
+```
+The Import/Organize tab has issues in the Directory Management & Selective Rescanning section:
+1. The table shows "No content in table" but should display previously scanned directories
+2. The "Add New Directory" button should be removed from the rescanning panel
+```
+
+### **Root Cause Analysis**
+- **Primary Issue**: `loadPreviouslyScannedDirectories()` method was trying to populate the table from the `selectedDirectoriesArea` text field, which is only populated during manual directory selection, not when the application loads existing data from the database
+- **Secondary Issue**: The "Add New Directory" button was incorrectly placed in the rescanning panel where it didn't belong
+
+### **Technical Implementation**
+
+#### **Database Enhancement - DatabaseManager.java**
+**New Method Added**: `getDistinctDirectories()`
+```java
+public static synchronized List<String> getDistinctDirectories() {
+    List<String> directories = new ArrayList<>();
+    Set<String> uniqueDirectories = new HashSet<>();
+    
+    String sql = "SELECT DISTINCT file_path FROM music_files WHERE 1=1" + getFileTypeFilterClause();
+    
+    try (Statement stmt = getConnection().createStatement();
+         ResultSet rs = stmt.executeQuery(sql)) {
+        
+        while (rs.next()) {
+            String filePath = rs.getString("file_path");
+            if (filePath != null) {
+                java.io.File file = new java.io.File(filePath);
+                String parentDir = file.getParent();
+                if (parentDir != null && uniqueDirectories.add(parentDir)) {
+                    directories.add(parentDir);
+                }
+            }
+        }
+    } catch (SQLException e) {
+        logger.error("Failed to get distinct directories from database", e);
+        throw new RuntimeException("Failed to get distinct directories", e);
+    }
+    
+    Collections.sort(directories);
+    return directories;
+}
+```
+
+**Features**:
+- Extracts unique parent directories from all music file paths in database
+- Respects file type filtering based on user configuration  
+- Returns sorted list for consistent user experience
+- Comprehensive error handling with meaningful error messages
+- Thread-safe synchronized access following existing patterns
+
+#### **UI Enhancement - ImportOrganizeView.java**
+
+**Method Replacement**: `loadPreviouslyScannedDirectories()`
+- **Before**: Read from `selectedDirectoriesArea` text field (empty on startup)
+- **After**: Use `DatabaseManager.getDistinctDirectories()` to get actual directories from database
+- **Added**: Directory status checking - "Ready" for existing directories, "Directory not found" for missing ones
+- **Added**: Proper error handling with user feedback
+
+**Button Removal**: 
+- Removed `addNewDirectoryButton` field and all references
+- Removed `addNewDirectory()` method
+- Cleaned up UI layout without the unwanted button
+
+**Refresh Logic**:
+- Added `refreshDirectoryTable()` method for updating directory list
+- Added automatic refresh calls after scan and rescan operations complete
+- Ensures UI stays synchronized with database state
+
+#### **Testing Implementation**
+**New Test Suite**: `DatabaseManagerDistinctDirectoriesTest.java`
+
+**Test Coverage**:
+- Empty database scenario (returns empty list)
+- Multiple directories with uniqueness verification  
+- Sorting verification (alphabetical order)
+- Error handling robustness
+- Edge cases and null handling
+
+**Test Results**: ✅ All tests pass successfully
+
+### **Validation Results**
+
+#### **Compilation & Testing**
+- ✅ `./gradlew compileJava` - Build successful
+- ✅ `./gradlew test --tests "*DatabaseManagerDistinctDirectoriesTest*"` - New tests pass
+- ✅ No compilation errors or warnings related to changes
+
+#### **Functional Verification**
+- ✅ Directory rescanning table now populates with actual directories from database
+- ✅ "Add New Directory" button successfully removed from rescanning panel
+- ✅ Directory status shows appropriate messages ("Ready" vs "Directory not found")
+- ✅ Automatic refresh after scan/rescan operations
+- ✅ UI layout remains clean and functional
+
+### **Performance Impact**
+- **Database Query**: Single `SELECT DISTINCT` query is efficient for typical music collections
+- **Memory Usage**: Minimal - processes directories incrementally with streaming ResultSet
+- **UI Responsiveness**: Directory loading happens during initialization, no user-facing delays
+
+### **User Experience Improvements**
+1. **Meaningful Data**: Users now see actual directories that contain their music files
+2. **Cleaner Interface**: Removed confusing "Add New Directory" button from rescanning section  
+3. **Real-time Updates**: Directory list automatically refreshes after operations
+4. **Status Awareness**: Clear indication of directory availability
+
+### **Git Workflow**
+- **Branch**: `feature/issue-47-directory-rescanning-fixes`
+- **Commit**: `77b0cbc` - "Fix Issue #47: Directory rescanning table not populated and unwanted Add Directory button"
+- **Pull Request**: #48 with comprehensive documentation and code review
+- **Files Changed**: 4 files (2 modified, 1 new test, 1 documentation update)
+
+### **Code Review Results**
+- **Score**: 9.5/10 - Excellent technical implementation
+- **Highlights**: Proper database integration, comprehensive testing, clean UI improvements
+- **Status**: APPROVED - Ready for merge
+
+### **Lessons Learned**
+1. **Database Integration**: When UI components need persistent data, always source from the database rather than temporary UI state
+2. **UI Design**: Buttons should be contextually appropriate - rescanning functionality shouldn't include "add new" operations
+3. **Automatic Refresh**: UI components showing database-derived data should automatically refresh after operations that modify that data
+4. **Comprehensive Testing**: New database methods require thorough test coverage including edge cases
+
+### **Next Steps**
+- Pull request #48 ready for merge
+- Issue #47 can be closed after merge
+- Directory rescanning functionality now fully operational
+
+---
+
+## Session: 2025-07-07 - Database Persistence Issue Investigation (Previous Session)
 
 ### **Session Overview**
 - **Duration**: ~2 hours investigation session

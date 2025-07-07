@@ -89,6 +89,7 @@ public class DatabaseManager {
                 // Create table if not exists
                 // deleteMusicFilesTable();
                 createMusicFilesTable();
+                createScanDirectoriesTable();
                 
                 // Initialize file path cache for performance  issue#41
                 initFilePathCacheWithRetry();
@@ -246,6 +247,53 @@ public class DatabaseManager {
         } catch (SQLException e) {
             logger.error("Failed to create music_files table: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to create music_files table", e);
+        }
+    }
+
+    /**
+     * Creates the scan_directories table if it doesn't exist.
+     * 
+     * <p>This table tracks the original root directories that users selected for scanning,
+     * allowing the directory rescanning feature to show meaningful top-level directories
+     * rather than every subdirectory that contains music files.
+     * 
+     * <p>Table schema:
+     * <ul>
+     *   <li>id: Primary key, auto-generated</li>
+     *   <li>root_path: The original directory path selected by the user</li>
+     *   <li>scan_date: When this directory was first scanned</li>
+     *   <li>last_rescan: When this directory was last rescanned (nullable)</li>
+     *   <li>file_count: Number of music files found in this directory tree</li>
+     * </ul>
+     * 
+     * @since 1.0
+     */
+    private static synchronized void createScanDirectoriesTable() {
+        // First check if table exists
+        try (Statement stmt = connection.createStatement()) {
+            ResultSet rs = stmt.executeQuery("SELECT 1 FROM scan_directories WHERE 1=0");
+            rs.close();
+            logger.debug("Scan directories table already exists, skipping creation");
+            return; // Table exists, no need to create
+        } catch (SQLException e) {
+            // Table doesn't exist, proceed with creation
+            logger.debug("Scan directories table does not exist, creating it");
+        }
+        
+        String sql = "CREATE TABLE scan_directories (" +
+                "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, " +
+                "root_path VARCHAR(1024) NOT NULL UNIQUE, " +
+                "scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "last_rescan TIMESTAMP, " +
+                "file_count INT DEFAULT 0" +
+                ")";
+
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate(sql);
+            logger.info("Created scan_directories table successfully");
+        } catch (SQLException e) {
+            logger.error("Failed to create scan_directories table: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to create scan_directories table", e);
         }
     }
 
@@ -1142,6 +1190,110 @@ public class DatabaseManager {
         
         Collections.sort(directories);
         return directories;
+    }
+
+    /**
+     * Records an original scan directory in the database.
+     * 
+     * <p>This method stores the root directory path that was selected by the user
+     * for scanning, allowing the rescanning feature to show only meaningful
+     * top-level directories rather than every subdirectory.
+     * 
+     * @param rootPath the original directory path selected for scanning
+     * @throws RuntimeException if database operation fails
+     * @since 1.0
+     */
+    public static synchronized void recordScanDirectory(String rootPath) {
+        if (rootPath == null || rootPath.trim().isEmpty()) {
+            return;
+        }
+        
+        // First try to update existing record
+        String updateSql = "UPDATE scan_directories SET scan_date = CURRENT_TIMESTAMP WHERE root_path = ?";
+        try (PreparedStatement updateStmt = getConnection().prepareStatement(updateSql)) {
+            updateStmt.setString(1, rootPath.trim());
+            int updated = updateStmt.executeUpdate();
+            
+            if (updated > 0) {
+                logger.debug("Updated existing scan directory: {}", rootPath);
+                return;
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to update scan directory: {}", e.getMessage(), e);
+        }
+        
+        // If no update occurred, insert new record
+        String insertSql = "INSERT INTO scan_directories (root_path) VALUES (?)";
+        try (PreparedStatement insertStmt = getConnection().prepareStatement(insertSql)) {
+            insertStmt.setString(1, rootPath.trim());
+            insertStmt.executeUpdate();
+            logger.debug("Recorded new scan directory: {}", rootPath);
+        } catch (SQLException e) {
+            // If it's a duplicate key error (directory already exists), that's fine
+            if (!e.getMessage().contains("duplicate") && !e.getMessage().contains("UNIQUE") && !e.getMessage().contains("constraint")) {
+                logger.error("Failed to record scan directory: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to record scan directory", e);
+            } else {
+                logger.debug("Scan directory already exists: {}", rootPath);
+            }
+        }
+    }
+
+    /**
+     * Gets all original scan directories from the database.
+     * 
+     * <p>This method returns the root directories that were originally selected
+     * by users for scanning, providing a clean list for the directory rescanning
+     * feature instead of showing every subdirectory that contains music files.
+     * 
+     * @return a sorted list of original scan directory paths
+     * @throws RuntimeException if database query fails
+     * @since 1.0
+     */
+    public static synchronized List<String> getScanDirectories() {
+        List<String> scanDirectories = new ArrayList<>();
+        
+        String sql = "SELECT root_path FROM scan_directories ORDER BY root_path";
+        
+        try (Statement stmt = getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                String rootPath = rs.getString("root_path");
+                if (rootPath != null) {
+                    scanDirectories.add(rootPath);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to get scan directories from database", e);
+            throw new RuntimeException("Failed to get scan directories", e);
+        }
+        
+        return scanDirectories;
+    }
+
+    /**
+     * Updates the last rescan timestamp for a scan directory.
+     * 
+     * @param rootPath the scan directory path to update
+     * @since 1.0
+     */
+    public static synchronized void updateScanDirectoryRescanTime(String rootPath) {
+        if (rootPath == null || rootPath.trim().isEmpty()) {
+            return;
+        }
+        
+        String sql = "UPDATE scan_directories SET last_rescan = CURRENT_TIMESTAMP WHERE root_path = ?";
+        
+        try (PreparedStatement stmt = getConnection().prepareStatement(sql)) {
+            stmt.setString(1, rootPath.trim());
+            int updated = stmt.executeUpdate();
+            if (updated > 0) {
+                logger.debug("Updated rescan time for directory: {}", rootPath);
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to update rescan time for directory {}: {}", rootPath, e.getMessage(), e);
+        }
     }
 
     /**
