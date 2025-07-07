@@ -129,12 +129,27 @@ public class ImportOrganizeView extends BorderPane {
         private javafx.beans.property.BooleanProperty selected;
         private javafx.beans.property.StringProperty status;
         private javafx.beans.property.StringProperty lastScanned;
+        private final boolean isOriginalDirectory;
+        private final String originalRootPath; // For subdirectories, stores the original root
         
+        // Constructor for original directories
         public DirectoryItem(String path) {
             this.path = new SimpleStringProperty(path);
             this.selected = new javafx.beans.property.SimpleBooleanProperty(false);
             this.status = new SimpleStringProperty("Ready");
             this.lastScanned = new SimpleStringProperty("Never");
+            this.isOriginalDirectory = true;
+            this.originalRootPath = path;
+        }
+        
+        // Constructor for subdirectories
+        public DirectoryItem(String path, String originalRootPath) {
+            this.path = new SimpleStringProperty(path);
+            this.selected = new javafx.beans.property.SimpleBooleanProperty(true); // Auto-select subdirectories
+            this.status = new SimpleStringProperty("Subdirectory");
+            this.lastScanned = new SimpleStringProperty("Never");
+            this.isOriginalDirectory = false;
+            this.originalRootPath = originalRootPath;
         }
         
         public String getPath() { return path.get(); }
@@ -151,6 +166,9 @@ public class ImportOrganizeView extends BorderPane {
         public javafx.beans.property.StringProperty lastScannedProperty() { return lastScanned; }
         public String getLastScanned() { return lastScanned.get(); }
         public void setLastScanned(String lastScanned) { this.lastScanned.set(lastScanned); }
+        
+        public boolean isOriginalDirectory() { return isOriginalDirectory; }
+        public String getOriginalRootPath() { return originalRootPath; }
     }
     
     private void initializeComponents() {
@@ -261,9 +279,28 @@ public class ImportOrganizeView extends BorderPane {
         selectCol.setPrefWidth(60);
         selectCol.setEditable(true);
         
-        // Directory path column
+        // Directory path column with visual hierarchy
         TableColumn<DirectoryItem, String> pathCol = new TableColumn<>("Directory Path");
         pathCol.setCellValueFactory(cellData -> cellData.getValue().pathProperty());
+        pathCol.setCellFactory(col -> new TableCell<DirectoryItem, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
+                } else {
+                    DirectoryItem directoryItem = getTableView().getItems().get(getIndex());
+                    if (directoryItem.isOriginalDirectory()) {
+                        setText(item);
+                        setStyle("-fx-font-weight: bold;");
+                    } else {
+                        setText("  → " + item); // Indentation with arrow for subdirectories
+                        setStyle("-fx-text-fill: #666666; -fx-padding: 0 0 0 20;");
+                    }
+                }
+            }
+        });
         pathCol.setPrefWidth(400);
         
         // Status column
@@ -276,17 +313,27 @@ public class ImportOrganizeView extends BorderPane {
         lastScannedCol.setCellValueFactory(cellData -> cellData.getValue().lastScannedProperty());
         lastScannedCol.setPrefWidth(120);
         
-        // Browse subdirectory column
-        TableColumn<DirectoryItem, Void> browseCol = new TableColumn<>("Browse");
-        browseCol.setCellFactory(col -> new TableCell<DirectoryItem, Void>() {
+        // Browse/Remove column - shows different buttons based on directory type
+        TableColumn<DirectoryItem, Void> actionCol = new TableColumn<>("Action");
+        actionCol.setCellFactory(col -> new TableCell<DirectoryItem, Void>() {
             private final Button browseButton = new Button("...");
+            private final Button removeButton = new Button("X");
             
             {
                 browseButton.setStyle("-fx-font-size: 10px; -fx-padding: 2 6 2 6;");
                 browseButton.setTooltip(new Tooltip("Select subdirectory within this path"));
+                
+                removeButton.setStyle("-fx-font-size: 10px; -fx-padding: 2 6 2 6; -fx-background-color: #ff6b6b; -fx-text-fill: white;");
+                removeButton.setTooltip(new Tooltip("Remove this subdirectory"));
+                
                 browseButton.setOnAction(event -> {
                     DirectoryItem item = getTableView().getItems().get(getIndex());
                     selectSubdirectory(item);
+                });
+                
+                removeButton.setOnAction(event -> {
+                    DirectoryItem item = getTableView().getItems().get(getIndex());
+                    removeSubdirectory(item);
                 });
             }
             
@@ -296,26 +343,37 @@ public class ImportOrganizeView extends BorderPane {
                 if (empty) {
                     setGraphic(null);
                 } else {
-                    setGraphic(browseButton);
+                    DirectoryItem directoryItem = getTableView().getItems().get(getIndex());
+                    if (directoryItem.isOriginalDirectory()) {
+                        setGraphic(browseButton);
+                    } else {
+                        setGraphic(removeButton);
+                    }
                 }
             }
         });
-        browseCol.setPrefWidth(60);
-        browseCol.setResizable(false);
+        actionCol.setPrefWidth(60);
+        actionCol.setResizable(false);
         
-        table.getColumns().addAll(selectCol, pathCol, statusCol, lastScannedCol, browseCol);
+        table.getColumns().addAll(selectCol, pathCol, statusCol, lastScannedCol, actionCol);
         
         return table;
     }
     
     /**
      * Opens a directory chooser to allow user to select a subdirectory within the given DirectoryItem's path.
-     * Updates the DirectoryItem's path to the selected subdirectory for more targeted rescanning.
+     * Creates a new subdirectory entry below the original directory instead of replacing it.
      * 
-     * @param directoryItem the DirectoryItem to update with a selected subdirectory
+     * @param directoryItem the original DirectoryItem to browse from (must be original directory)
      * @since 1.0
      */
     private void selectSubdirectory(DirectoryItem directoryItem) {
+        // Only allow browsing from original directories
+        if (!directoryItem.isOriginalDirectory()) {
+            statusLabel.setText("Cannot browse: Can only browse from original directories");
+            return;
+        }
+        
         String currentPath = directoryItem.getPath();
         File currentDirectory = new File(currentPath);
         
@@ -339,9 +397,17 @@ public class ImportOrganizeView extends BorderPane {
             
             // Validate that selected directory is within the original path
             if (selectedPath.startsWith(originalPath)) {
-                // Update the directory item's path
-                updateDirectoryItemPath(directoryItem, selectedPath, originalPath);
-                statusLabel.setText("Updated directory path to: " + selectedPath);
+                // Check if this subdirectory already exists in the list
+                boolean alreadyExists = directoryData.stream()
+                    .anyMatch(item -> item.getPath().equals(selectedPath));
+                
+                if (!alreadyExists) {
+                    // Add new subdirectory entry below the original directory
+                    addSubdirectoryEntry(directoryItem, selectedPath);
+                    statusLabel.setText("Added subdirectory: " + selectedPath);
+                } else {
+                    statusLabel.setText("Subdirectory already exists: " + selectedPath);
+                }
             } else {
                 // Selected directory is outside the original path
                 statusLabel.setText("Selected directory must be within: " + originalPath);
@@ -350,27 +416,68 @@ public class ImportOrganizeView extends BorderPane {
     }
     
     /**
-     * Updates a DirectoryItem's path to a new subdirectory path.
-     * Stores the original path for reference and updates the display.
+     * Adds a new subdirectory entry below the given original directory.
+     * The subdirectory is automatically selected for immediate rescanning.
      * 
-     * @param directoryItem the DirectoryItem to update
-     * @param newPath the new subdirectory path
-     * @param originalPath the original root path for reference
+     * @param originalDirectoryItem the original directory item (parent)
+     * @param subdirectoryPath the path of the subdirectory to add
      * @since 1.0
      */
-    private void updateDirectoryItemPath(DirectoryItem directoryItem, String newPath, String originalPath) {
-        // Store original path in a custom property for future reference if needed
-        directoryItem.setPath(newPath);
+    private void addSubdirectoryEntry(DirectoryItem originalDirectoryItem, String subdirectoryPath) {
+        // Create new subdirectory item (auto-selected)
+        DirectoryItem subdirectoryItem = new DirectoryItem(subdirectoryPath, originalDirectoryItem.getPath());
         
-        // Update status to reflect the change
-        if (!newPath.equals(originalPath)) {
-            directoryItem.setStatus("Subdirectory selected");
+        // Add listener for selection changes
+        subdirectoryItem.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
+            updateRescanButtonState();
+        });
+        
+        // Find the position to insert the subdirectory (right after the original directory)
+        int originalIndex = directoryData.indexOf(originalDirectoryItem);
+        if (originalIndex != -1) {
+            // Insert after the original directory and any existing subdirectories
+            int insertIndex = originalIndex + 1;
+            
+            // Find the correct position (after all existing subdirectories of this original directory)
+            while (insertIndex < directoryData.size()) {
+                DirectoryItem nextItem = directoryData.get(insertIndex);
+                if (nextItem.isOriginalDirectory() || 
+                    !nextItem.getOriginalRootPath().equals(originalDirectoryItem.getPath())) {
+                    break; // Found next original directory or subdirectory of different parent
+                }
+                insertIndex++;
+            }
+            
+            directoryData.add(insertIndex, subdirectoryItem);
         } else {
-            directoryItem.setStatus("Ready");
+            // Fallback: add at the end
+            directoryData.add(subdirectoryItem);
         }
         
-        // Log the path change
-        logger.info("Directory path updated from '{}' to '{}'", originalPath, newPath);
+        // Update button state since we have a new selected item
+        updateRescanButtonState();
+        
+        logger.info("Added subdirectory '{}' under original directory '{}'", 
+                   subdirectoryPath, originalDirectoryItem.getPath());
+    }
+    
+    /**
+     * Removes a subdirectory entry from the list.
+     * 
+     * @param subdirectoryItem the subdirectory item to remove (must not be original directory)
+     * @since 1.0
+     */
+    private void removeSubdirectory(DirectoryItem subdirectoryItem) {
+        if (subdirectoryItem.isOriginalDirectory()) {
+            statusLabel.setText("Cannot remove: This is an original directory");
+            return;
+        }
+        
+        directoryData.remove(subdirectoryItem);
+        updateRescanButtonState();
+        statusLabel.setText("Removed subdirectory: " + subdirectoryItem.getPath());
+        
+        logger.info("Removed subdirectory '{}'", subdirectoryItem.getPath());
     }
     
     private TableView<MusicFileSelection> createFileSelectionTable() {
