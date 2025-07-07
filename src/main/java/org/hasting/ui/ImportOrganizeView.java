@@ -717,9 +717,9 @@ public class ImportOrganizeView extends BorderPane {
             organizeButton
         );
         
-        // Progress section with enhanced styling
-        VBox progressSection = createStyledSection();
-        progressSection.setSpacing(8);
+        // Progress section - use plain VBox to avoid visible styling when hidden
+        VBox progressSection = new VBox(8);
+        progressSection.setPadding(new Insets(10, 25, 10, 25));
         
         // Enhanced progress bar styling
         progressBar.setStyle(
@@ -733,6 +733,10 @@ public class ImportOrganizeView extends BorderPane {
         progressLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #666;");
         
         progressSection.getChildren().addAll(progressBar, progressLabel);
+        
+        // Bind progress section visibility to progress bar visibility
+        progressSection.visibleProperty().bind(progressBar.visibleProperty());
+        progressSection.managedProperty().bind(progressBar.visibleProperty());
         
         // Status section with enhanced styling
         HBox statusSection = new HBox();
