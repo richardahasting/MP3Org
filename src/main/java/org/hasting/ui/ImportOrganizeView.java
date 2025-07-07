@@ -580,13 +580,14 @@ public class ImportOrganizeView extends BorderPane {
                         savedFiles++;
                         
                         // Update saving progress
+                        if (savedFiles % (totalFiles / 50) == 0) {  // update every 2%
                         progressDialog.updateSavingProgress(
                             musicFile.getArtist(),
                             musicFile.getAlbum(), 
                             musicFile.getTitle(),
                             savedFiles,
-                            totalFiles
-                        );
+                            totalFiles );
+                        }
                         
                     } catch (Exception e) {
                         // Skip duplicates but log them
@@ -914,7 +915,8 @@ public class ImportOrganizeView extends BorderPane {
                         progressLabel.setText(progress.currentFile != null ? progress.currentFile : progress.currentDirectory);
                     });
                 });
-                
+
+                DatabaseManager.initAllPathsMap(); // Load all paths for quick lookups  issue#41
                 for (DirectoryItem item : selectedItems) {
                     if (isCancelled()) break;
                     

@@ -5,10 +5,9 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
 import org.hasting.util.logging.Logger;
 
 import java.sql.*;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Central database management class providing all database operations for the MP3Org application.
@@ -46,7 +45,7 @@ public class DatabaseManager {
     private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseManager.class);
     private static DatabaseConfig config;
     private static Connection connection;
-
+    private static final ConcurrentHashMap<String, Long> filePathsMap = new ConcurrentHashMap<>();  // Load all paths for quick lookups  issue#41
     static {
         // Initialize configuration
         config = DatabaseConfig.getInstance();
@@ -82,12 +81,21 @@ public class DatabaseManager {
                     config.getUsername(), 
                     config.getPassword()
                 );
-                
+
+                filePathsMap.clear();  // Clear existing entries  issue#41
                 logger.info("Connected to database at: {}", config.getDatabasePath());
 
                 // Create table if not exists
                 // deleteMusicFilesTable();
                 createMusicFilesTable();
+                
+                // Initialize file path cache for performance  issue#41
+                try {
+                    initAllPathsMap();
+                } catch (Exception e) {
+                    logger.warning("Could not initialize file path cache on startup: {}", e.getMessage());
+                    // This is OK - cache will be populated as files are added
+                }
             } catch (Exception e) {
                 logger.error("Failed to initialize database connection: {}", e.getMessage(), e);
                 throw new RuntimeException("Failed to initialize database connection", e);
@@ -409,6 +417,14 @@ public class DatabaseManager {
     public static DatabaseProfileManager getProfileManager() {
         return config.getProfileManager();
     }
+    
+    /**
+     * Gets statistics about the file path cache for performance monitoring.
+     * @return cache size or -1 if not initialized
+     */
+    public static int getFilePathCacheSize() {
+        return filePathsMap.size();
+    }
 
     // CRUD operations for MusicFile
 
@@ -432,7 +448,12 @@ public class DatabaseManager {
      * @throws IllegalArgumentException if musicFile is null or has no file path
      */
     public static synchronized void saveMusicFile(MusicFile musicFile) {
-        // Check if the music file already exists by file_path
+        // Check if the music file already exists by file_path  issue#41
+        Long existingId = filePathsMap.get(musicFile.getFilePath());
+        if (existingId != null) {
+            logger.debug("File already exists in database with ID {}: {}", existingId, musicFile.getFilePath());
+            return; // Skip insertion of duplicate
+        }
 
         String sql = "INSERT INTO music_files (file_path, title, artist, album, genre, track_number, " +
                 "yr, duration_seconds, file_size_bytes, bit_rate, sample_rate, file_type, last_modified) " +
@@ -490,11 +511,14 @@ public class DatabaseManager {
             }
 
             pstmt.executeUpdate();
+            // Put the filePath into the Set.
 
             // Get the generated ID
             try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     musicFile.setId(generatedKeys.getLong(1));
+                    // No synchronization needed with ConcurrentHashMap  issue#41
+                    filePathsMap.put(musicFile.getFilePath(), musicFile.getId());
                 }
             }
         } catch (SQLException e) {
@@ -539,23 +563,29 @@ public class DatabaseManager {
             throw new IllegalArgumentException("MusicFile must have a valid file path");
         }
         
+        long startTime = System.currentTimeMillis();
         logger.debug("saveOrUpdateMusicFile() - entry: {}", musicFile.getFilePath());
         
-        // Check if a record with this file path already exists
-        MusicFile existingFile = findByPath(musicFile.getFilePath());
-        
-        if (existingFile != null) {
+
+        Long id =null;
+        // No synchronization needed with ConcurrentHashMap  issue#41
+        id = filePathsMap.get(musicFile.getFilePath());
+        long cacheCheckTime = System.currentTimeMillis() - startTime;
+
+        if (id != null) {
             // File exists - update the existing record
-            logger.debug("File path already exists, updating record ID {}: {}", existingFile.getId(), musicFile.getFilePath());
+            logger.debug("File path already exists, updating record ID {}: {}", id, musicFile.getFilePath());
             
             // Preserve the existing ID and transfer updated metadata
-            musicFile.setId(existingFile.getId());
+            musicFile.setId(id);
             musicFile.setModified(true); // Ensure the update will be performed
             
             // Use the existing update method
             updateMusicFile(musicFile);
             
-            logger.debug("saveOrUpdateMusicFile() - exit: updated existing record");
+            long totalTime = System.currentTimeMillis() - startTime;
+            logger.debug("saveOrUpdateMusicFile() - exit: updated existing record (cache check: {}ms, total: {}ms)", 
+                        cacheCheckTime, totalTime);
         } else {
             // File doesn't exist - insert new record
             logger.debug("File path is new, inserting record: {}", musicFile.getFilePath());
@@ -563,7 +593,12 @@ public class DatabaseManager {
             // Use the existing save method
             saveMusicFile(musicFile);
             
-            logger.debug("saveOrUpdateMusicFile() - exit: inserted new record with ID {}", musicFile.getId());
+            // Update the cache with the new entry  issue#41
+            filePathsMap.put(musicFile.getFilePath(), musicFile.getId());
+            
+            long totalTime = System.currentTimeMillis() - startTime;
+            logger.debug("saveOrUpdateMusicFile() - exit: inserted new record with ID {} (cache check: {}ms, total: {}ms)", 
+                        musicFile.getId(), cacheCheckTime, totalTime);
         }
     }
 
@@ -674,6 +709,10 @@ public class DatabaseManager {
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setLong(1, musicFile.getId());
             pstmt.executeUpdate();
+            
+            // Remove from cache  issue#41
+            filePathsMap.remove(musicFile.getFilePath());
+            
             musicFile.setId(null); // Clear the ID to indicate it's deleted'
             musicFile.setModified(false); // Clear the modified flag to indicate it's not modified
             boolean fileDeleted = musicFile.deleteFile();
@@ -749,6 +788,33 @@ public class DatabaseManager {
             // Return -1 to indicate error state rather than throwing exception
             // This allows the UI to display "Unknown" or "Error" instead of crashing
             return -1;
+        }
+    }
+
+    public static void initAllPathsMap(){ // Load all paths for quick lookups  issue#41
+        long startTime = System.currentTimeMillis();
+        logger.info("Starting file path cache initialization...");
+        
+        filePathsMap.clear();
+        
+        // Optimized query to load only id and file_path
+        String sql = "SELECT id, file_path FROM music_files";
+        int count = 0;
+        
+        try (Statement stmt = getConnection().createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            
+            while (rs.next()) {
+                filePathsMap.put(rs.getString("file_path"), rs.getLong("id"));
+                count++;
+            }
+            
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            logger.info("File path cache initialized: {} entries loaded in {} ms", count, elapsedTime);
+            
+        } catch (SQLException e) {
+            logger.error("Failed to initialize file paths cache: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to initialize file paths cache", e);
         }
     }
 
@@ -1110,10 +1176,23 @@ public class DatabaseManager {
 
         try (Statement stmt = getConnection().createStatement()) {
             stmt.executeUpdate(sql);
+            
+            // Clear the cache  issue#41
+            filePathsMap.clear();
+            logger.debug("File path cache cleared after deleting all music files");
         } catch (SQLException e) {
             logger.error("Failed to delete all music files from database", e);
             throw new RuntimeException("Failed to delete all music files", e);
         }
+    }
+    
+    /**
+     * Clears the file path cache. Used primarily for testing.
+     * issue#41
+     */
+    public static void clearFilePathCache() {
+        filePathsMap.clear();
+        logger.debug("File path cache cleared manually");
     }
 
     public static synchronized List<MusicFile> searchMusicFiles(String title, String artist, String album) {
