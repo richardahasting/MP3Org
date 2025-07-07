@@ -45,6 +45,7 @@ public class DatabaseManager {
     private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseManager.class);
     private static DatabaseConfig config;
     private static Connection connection;
+    private static DatabaseConnectionPool connectionPool;
     private static final ConcurrentHashMap<String, Long> filePathsMap = new ConcurrentHashMap<>();  // Load all paths for quick lookups  issue#41
     static {
         // Initialize configuration
@@ -70,12 +71,12 @@ public class DatabaseManager {
      *                         invalid configuration, or table creation problems
      */
     public static synchronized void initialize() {
-        if (connection == null) {
+        if (connection == null && connectionPool == null) {
             try {
-                // Register JDBC driver (not needed with modern JDBC)
-                // Class.forName(config.getJdbcDriver());
-
-                // Open a connection using configured database location
+                // Initialize connection pool
+                connectionPool = new DatabaseConnectionPool(config);
+                
+                // Open a single connection for legacy compatibility
                 connection = DriverManager.getConnection(
                     config.getJdbcUrl(), 
                     config.getUsername(), 
@@ -286,6 +287,13 @@ public class DatabaseManager {
      * @throws RuntimeException if connection closure fails (though this is typically logged and ignored)
      */
     public static synchronized void shutdown() {
+        // Shutdown connection pool if available
+        if (connectionPool != null) {
+            connectionPool.shutdown();
+            connectionPool = null;
+        }
+        
+        // Close legacy single connection
         if (connection != null) {
             try {
                 connection.close();
@@ -516,6 +524,7 @@ public class DatabaseManager {
             logger.error("Failed to save music file to database: {}", musicFile.getFilePath(), e);
             throw new RuntimeException("Failed to save music file", e);
         }
+
     }
 
     /**
@@ -583,53 +592,95 @@ public class DatabaseManager {
                 "yr, duration_seconds, file_size_bytes, bit_rate, sample_rate, file_type, last_modified) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            // Disable auto-commit for batch transaction
-            Connection conn = getConnection();
-            boolean originalAutoCommit = conn.getAutoCommit();
-            conn.setAutoCommit(false);
-            
+        // Use connection pool if available, otherwise fall back to single connection
+        if (connectionPool != null) {
             try {
-                // Add all files to the batch
-                for (MusicFile musicFile : newFiles) {
-                    setMusicFileParameters(pstmt, musicFile);
-                    pstmt.addBatch();
-                }
-                
-                // Execute the batch
-                int[] results = pstmt.executeBatch();
-                conn.commit(); // Commit the transaction
-                
-                // Get generated IDs and update cache
-                try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
-                    int index = 0;
-                    while (generatedKeys.next() && index < newFiles.size()) {
-                        MusicFile musicFile = newFiles.get(index);
-                        long generatedId = generatedKeys.getLong(1);
-                        musicFile.setId(generatedId);
+                return connectionPool.executeWithConnection(conn -> {
+                    try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                        // Add all files to the batch
+                        for (MusicFile musicFile : newFiles) {
+                            setMusicFileParameters(pstmt, musicFile);
+                            pstmt.addBatch();
+                        }
                         
-                        // Update cache with new entry
-                        filePathsMap.put(musicFile.getFilePath(), generatedId);
-                        index++;
+                        // Execute the batch
+                        int[] results = pstmt.executeBatch();
+                        
+                        // Get generated IDs and update cache
+                        try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                            int index = 0;
+                            while (generatedKeys.next() && index < newFiles.size()) {
+                                MusicFile musicFile = newFiles.get(index);
+                                long generatedId = generatedKeys.getLong(1);
+                                musicFile.setId(generatedId);
+                                
+                                // Update cache with new entry
+                                filePathsMap.put(musicFile.getFilePath(), generatedId);
+                                index++;
+                            }
+                        }
+                        
+                        long totalTime = System.currentTimeMillis() - startTime;
+                        logger.info("Batch insert completed: {} files inserted in {}ms (avg: {}ms/file)", 
+                                   newFiles.size(), totalTime, totalTime / (double) newFiles.size());
+                        
+                        return newFiles.size();
                     }
+                });
+            } catch (SQLException e) {
+                logger.error("Failed to batch insert music files to database", e);
+                throw new RuntimeException("Failed to batch insert music files", e);
+            }
+        } else {
+            // Legacy single connection approach
+            try (PreparedStatement pstmt = getConnection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                // Disable auto-commit for batch transaction
+                Connection conn = getConnection();
+                boolean originalAutoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+                
+                try {
+                    // Add all files to the batch
+                    for (MusicFile musicFile : newFiles) {
+                        setMusicFileParameters(pstmt, musicFile);
+                        pstmt.addBatch();
+                    }
+                    
+                    // Execute the batch
+                    int[] results = pstmt.executeBatch();
+                    conn.commit(); // Commit the transaction
+                    
+                    // Get generated IDs and update cache
+                    try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                        int index = 0;
+                        while (generatedKeys.next() && index < newFiles.size()) {
+                            MusicFile musicFile = newFiles.get(index);
+                            long generatedId = generatedKeys.getLong(1);
+                            musicFile.setId(generatedId);
+                            
+                            // Update cache with new entry
+                            filePathsMap.put(musicFile.getFilePath(), generatedId);
+                            index++;
+                        }
+                    }
+                    
+                    long totalTime = System.currentTimeMillis() - startTime;
+                    logger.info("Batch insert completed: {} files inserted in {}ms (avg: {}ms/file)", 
+                               newFiles.size(), totalTime, totalTime / (double) newFiles.size());
+                    
+                    return newFiles.size();
+                    
+                } catch (SQLException e) {
+                    conn.rollback(); // Rollback on error
+                    throw e;
+                } finally {
+                    conn.setAutoCommit(originalAutoCommit); // Restore original auto-commit setting
                 }
-                
-                long totalTime = System.currentTimeMillis() - startTime;
-                logger.info("Batch insert completed: {} files inserted in {}ms (avg: {}ms/file)", 
-                           newFiles.size(), totalTime, totalTime / (double) newFiles.size());
-                
-                return newFiles.size();
                 
             } catch (SQLException e) {
-                conn.rollback(); // Rollback on error
-                throw e;
-            } finally {
-                conn.setAutoCommit(originalAutoCommit); // Restore original auto-commit setting
+                logger.error("Failed to batch insert music files to database", e);
+                throw new RuntimeException("Failed to batch insert music files", e);
             }
-            
-        } catch (SQLException e) {
-            logger.error("Failed to batch insert music files to database", e);
-            throw new RuntimeException("Failed to batch insert music files", e);
         }
     }
     
@@ -1396,7 +1447,7 @@ public class DatabaseManager {
      * Gets file ID by path with fallback to database query if cache is empty.
      * Issue #42 - Critical fix for database appearing empty after restart
      */
-    private static Long getFileIdByPath(String filePath) {
+    public static Long getFileIdByPath(String filePath) {
         // Try cache first
         Long id = filePathsMap.get(filePath);
         if (id != null) {

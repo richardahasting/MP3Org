@@ -566,32 +566,57 @@ public class ImportOrganizeView extends BorderPane {
                     return new ArrayList<>(); // Return empty list if cancelled
                 }
                 
-                // Stage 3: Save files to database with progress
+                // Stage 3: Save files to database using batch operation for better performance
                 int totalFiles = allMusicFiles.size();
-                int savedFiles = 0;
                 
-                for (MusicFile musicFile : allMusicFiles) {
-                    if (progressDialog.isCancelled()) {
-                        break;
-                    }
-                    
+                if (!progressDialog.isCancelled() && !allMusicFiles.isEmpty()) {
                     try {
-                        DatabaseManager.saveMusicFile(musicFile);
-                        savedFiles++;
+                        // Update progress dialog
+                        progressDialog.addLogEntry("Saving " + totalFiles + " files to database using batch operation...");
                         
-                        // Update saving progress
-                        if (savedFiles % (totalFiles / 50) == 0) {  // update every 2%
+                        // Use batch insert for much better performance
+                        int savedFiles = DatabaseManager.saveMusicFilesBatch(allMusicFiles);
+                        
+                        // Update final progress
                         progressDialog.updateSavingProgress(
-                            musicFile.getArtist(),
-                            musicFile.getAlbum(), 
-                            musicFile.getTitle(),
+                            "Batch Operation",
+                            "Database Save", 
+                            "Completed",
                             savedFiles,
-                            totalFiles );
-                        }
+                            totalFiles);
+                            
+                        progressDialog.addLogEntry("Successfully saved " + savedFiles + " files to database");
                         
                     } catch (Exception e) {
-                        // Skip duplicates but log them
-                        progressDialog.addLogEntry("Skipped (duplicate or error): " + musicFile.getTitle() + " - " + e.getMessage());
+                        progressDialog.addLogEntry("Batch save error: " + e.getMessage());
+                        logger.error("Batch save failed, falling back to individual saves", e);
+                        
+                        // Fallback to individual saves if batch fails
+                        int savedFiles = 0;
+                        for (MusicFile musicFile : allMusicFiles) {
+                            if (progressDialog.isCancelled()) {
+                                break;
+                            }
+                            
+                            try {
+                                DatabaseManager.saveMusicFile(musicFile);
+                                savedFiles++;
+                                
+                                // Update saving progress less frequently for fallback
+                                if (savedFiles % (totalFiles / 20) == 0) {  // update every 5%
+                                    progressDialog.updateSavingProgress(
+                                        musicFile.getArtist(),
+                                        musicFile.getAlbum(), 
+                                        musicFile.getTitle(),
+                                        savedFiles,
+                                        totalFiles);
+                                }
+                                
+                            } catch (Exception ex) {
+                                // Skip duplicates but log them
+                                progressDialog.addLogEntry("Skipped (duplicate or error): " + musicFile.getTitle() + " - " + ex.getMessage());
+                            }
+                        }
                     }
                 }
                 
@@ -917,6 +942,11 @@ public class ImportOrganizeView extends BorderPane {
                 });
 
                 DatabaseManager.initAllPathsMap(); // Load all paths for quick lookups  issue#41
+                
+                // First, collect all files from all selected directories
+                List<MusicFile> allFoundFiles = new ArrayList<>();
+                List<DirectoryItem> processedItems = new ArrayList<>();
+                
                 for (DirectoryItem item : selectedItems) {
                     if (isCancelled()) break;
                     
@@ -925,29 +955,80 @@ public class ImportOrganizeView extends BorderPane {
                     try {
                         // Scan the directory using the correct method
                         List<MusicFile> foundFiles = scanner.findAllMusicFiles(item.getPath());
+                        allFoundFiles.addAll(foundFiles);
+                        processedItems.add(item);
                         
-                        // Use the new saveOrUpdateMusicFile method for upsert functionality
-                        for (MusicFile musicFile : foundFiles) {
+                        // Update status
+                        Platform.runLater(() -> item.setStatus("Scanned"));
+                        
+                    } catch (Exception e) {
+                        Platform.runLater(() -> item.setStatus("Scan Error"));
+                        logger.error("Failed to scan directory: {}", item.getPath(), e);
+                    }
+                }
+                
+                // Now process all found files using batch operations where possible
+                if (!allFoundFiles.isEmpty() && !isCancelled()) {
+                    Platform.runLater(() -> {
+                        for (DirectoryItem item : processedItems) {
+                            if (item.getStatus().equals("Scanned")) {
+                                item.setStatus("Saving...");
+                            }
+                        }
+                    });
+                    
+                    try {
+                        // Separate new files from existing files for optimal batch processing
+                        List<MusicFile> newFiles = new ArrayList<>();
+                        List<MusicFile> existingFiles = new ArrayList<>();
+                        
+                        for (MusicFile musicFile : allFoundFiles) {
+                            if (DatabaseManager.getFileIdByPath(musicFile.getFilePath()) == null) {
+                                newFiles.add(musicFile);
+                            } else {
+                                existingFiles.add(musicFile);
+                            }
+                        }
+                        
+                        // Batch insert new files for maximum performance
+                        if (!newFiles.isEmpty()) {
+                            int savedNew = DatabaseManager.saveMusicFilesBatch(newFiles);
+                            totalProcessed += savedNew;
+                            logger.info("Batch inserted {} new files during rescan", savedNew);
+                        }
+                        
+                        // Handle existing files individually (upsert operations)
+                        for (MusicFile musicFile : existingFiles) {
                             if (isCancelled()) break;
                             
                             try {
                                 DatabaseManager.saveOrUpdateMusicFile(musicFile);
                                 totalProcessed++;
                             } catch (Exception e) {
-                                logger.error("Failed to save/update music file: {}", musicFile.getFilePath(), e);
+                                logger.error("Failed to update music file: {}", musicFile.getFilePath(), e);
                             }
                         }
                         
-                        // Update status and timestamp
+                        // Update final status and timestamp for all processed items
                         Platform.runLater(() -> {
-                            item.setStatus("Completed");
-                            item.setLastScanned(java.time.LocalDateTime.now().format(
-                                java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm")));
+                            for (DirectoryItem item : processedItems) {
+                                if (!item.getStatus().equals("Scan Error")) {
+                                    item.setStatus("Completed");
+                                    item.setLastScanned(java.time.LocalDateTime.now().format(
+                                        java.time.format.DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm")));
+                                }
+                            }
                         });
                         
                     } catch (Exception e) {
-                        Platform.runLater(() -> item.setStatus("Error"));
-                        logger.error("Failed to rescan directory: {}", item.getPath(), e);
+                        Platform.runLater(() -> {
+                            for (DirectoryItem item : processedItems) {
+                                if (item.getStatus().equals("Saving...")) {
+                                    item.setStatus("Save Error");
+                                }
+                            }
+                        });
+                        logger.error("Failed to save rescanned files", e);
                     }
                 }
                 
