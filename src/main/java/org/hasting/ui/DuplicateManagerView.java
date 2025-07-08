@@ -339,8 +339,15 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
             
             @Override
             protected List<MusicFile> call() throws Exception {
-                // Get total file count for progress tracking
-                int totalFiles = DatabaseManager.getAllMusicFiles().size();
+                // Get all music files for duplicate detection
+                List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+                int totalFiles = allFiles.size();
+                
+                // Clear any existing similar files cache before starting new detection
+                updateMessage("Preparing files for duplicate analysis...");
+                for (MusicFile file : allFiles) {
+                    file.clearSimilarFiles();
+                }
                 updateMessage("Loading " + totalFiles + " music files...");
                 
                 if (isCancelled()) return null;
@@ -355,6 +362,10 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                         if (!isCancelled()) {
                             foundDuplicates.add(file1);
                             foundDuplicates.add(file2);
+                            
+                            // Cache similar files in the MusicFile objects for efficient access
+                            file1.addSimilarFile(file2);
+                            file2.addSimilarFile(file1);
                             
                             // Update UI immediately with new duplicates
                             Platform.runLater(() -> {
@@ -594,22 +605,33 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                 
                 if (isCancelled()) return null;
                 
-                // Get all files from database
-                updateMessage("Retrieving music collection...");
-                updateProgress(25, 100);
-                List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+                // First, try to use cached similar files from duplicate detection
+                List<MusicFile> similarFiles = selectedFile.getSimilarFilesList();
                 
-                if (isCancelled()) return null;
-                
-                // Find most similar files
-                updateMessage("Analyzing similarities...");
-                updateProgress(50, 100);
-                List<MusicFile> similarFiles = selectedFile.findMostSimilarFiles(allFiles, 10);
-                
-                updateProgress(100, 100);
-                updateMessage("Found " + similarFiles.size() + " similar files");
-                
-                return similarFiles;
+                if (!similarFiles.isEmpty()) {
+                    // Use cached results from previous duplicate detection
+                    updateProgress(100, 100);
+                    updateMessage("Using cached results - found " + similarFiles.size() + " similar files");
+                    return new ArrayList<>(similarFiles);
+                } else {
+                    // Fall back to calculating similar files if cache is empty
+                    updateMessage("Cache empty, calculating similarities...");
+                    updateProgress(25, 100);
+                    
+                    List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+                    
+                    if (isCancelled()) return null;
+                    
+                    // Find most similar files using traditional method
+                    updateMessage("Analyzing similarities...");
+                    updateProgress(50, 100);
+                    similarFiles = selectedFile.findMostSimilarFiles(allFiles, 10);
+                    
+                    updateProgress(100, 100);
+                    updateMessage("Found " + similarFiles.size() + " similar files");
+                    
+                    return similarFiles;
+                }
             }
             
             @Override
