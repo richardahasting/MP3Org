@@ -3,6 +3,89 @@
 ## Overview
 This developer log tracks the evolution of MP3Org from a basic music organization tool to a sophisticated application with advanced directory management, test infrastructure, and user experience enhancements. The log spans multiple major development sessions between July 2025 and covers critical architectural improvements, database enhancements, and UI/UX refinements.
 
+## Latest Session: Issue #62 - Duplicate Detection Optimization (July 7, 2025)
+**Duration**: ~2 hours | **Status**: ✅ COMPLETED | **Priority**: High
+
+### Problem Statement
+The duplicate detection system was performing redundant similarity calculations. When users clicked "Find Duplicates" and then selected a file to view similar files, the system would recalculate similarities instead of using the already computed results from the duplicate detection process.
+
+### Technical Solution Implemented
+1. **Added similarFilesList Field to MusicFile**:
+   - Transient `List<MusicFile> similarFilesList` field for in-memory caching
+   - Not persisted to database (marked as transient)
+   - Provides access methods: `getSimilarFilesList()`, `addSimilarFile()`, `clearSimilarFiles()`, `hasSimilarFiles()`
+
+2. **Enhanced DuplicateManagerView Workflow**:
+   - Modified `onDuplicateFound()` callback to populate `similarFilesList` during detection
+   - Updated `loadSimilarFiles()` to check cache first before recalculating
+   - Added cache clearing before starting new duplicate detection runs
+
+3. **Optimized Performance**:
+   - Eliminated redundant similarity calculations
+   - Improved user experience with faster similar file loading
+   - Minimal memory overhead (only stores references to existing objects)
+
+### Code Changes Summary
+**MusicFile.java** (Lines 74-524):
+```java
+// Transient field for caching similar files
+private transient List<MusicFile> similarFilesList = new ArrayList<>();
+
+// Access methods with proper validation
+public List<MusicFile> getSimilarFilesList() {
+    return Collections.unmodifiableList(new ArrayList<>(similarFilesList));
+}
+
+public void addSimilarFile(MusicFile similarFile) {
+    if (similarFile == null) {
+        throw new IllegalArgumentException("Similar file cannot be null");
+    }
+    if (!this.similarFilesList.contains(similarFile)) {
+        this.similarFilesList.add(similarFile);
+    }
+}
+```
+
+**DuplicateManagerView.java** (Lines 346-368, 608-634):
+```java
+// Clear cache before new detection
+for (MusicFile file : allFiles) {
+    file.clearSimilarFiles();
+}
+
+// Populate cache during duplicate detection
+public void onDuplicateFound(MusicFile file1, MusicFile file2) {
+    file1.addSimilarFile(file2);
+    file2.addSimilarFile(file1);
+    // ... rest of duplicate handling
+}
+
+// Use cache when loading similar files
+List<MusicFile> similarFiles = selectedFile.getSimilarFilesList();
+if (!similarFiles.isEmpty()) {
+    updateMessage("Using cached results - found " + similarFiles.size() + " similar files");
+    return new ArrayList<>(similarFiles);
+}
+```
+
+### Testing Results
+- ✅ **Compilation**: All Java sources compile successfully
+- ✅ **Application Startup**: Application launches without errors
+- ✅ **Database Integration**: No conflicts with existing database operations
+- ⚠️ **Test Suite**: Some pre-existing database connection test failures (unrelated to this feature)
+
+### Benefits Achieved
+1. **Performance**: Eliminated redundant similarity calculations
+2. **User Experience**: Faster loading of similar files after duplicate detection
+3. **Memory Efficiency**: Minimal memory overhead using object references
+4. **Maintainability**: Clean separation between duplicate detection and similarity caching
+
+### Architecture Impact
+- **Zero Breaking Changes**: All existing functionality preserved
+- **Backward Compatible**: Transient field doesn't affect database persistence
+- **Future Extensible**: Cache can be enhanced with TTL or other advanced features
+- **Memory Safe**: Cache cleared on each new duplicate detection run
+
 ## Major Development Sessions Summary
 
 ### Session 1: Issue #55 - Enhanced Subdirectory Selection (July 2025)

@@ -70,6 +70,10 @@ public class MusicFile {
     
     // Field for testing file organization paths without actual file copying
     private String organizationalPath;
+    
+    // Transient field to cache similar files found during duplicate detection
+    // This is not persisted to the database and exists only in memory
+    private transient List<MusicFile> similarFilesList = new ArrayList<>();
 
     /**
      * Enumeration of available metadata fields that can be accessed through the getField method.
@@ -455,6 +459,68 @@ public class MusicFile {
      */
     public void setModified(boolean modified) {
         isModified = modified;
+    }
+    
+    /**
+     * Gets the list of similar files found during duplicate detection.
+     * 
+     * <p>This transient field caches similar files found during analysis and is not
+     * persisted to the database. It exists only in memory for the current session.
+     * 
+     * @return an unmodifiable list of similar MusicFile objects, or empty list if none found
+     */
+    public List<MusicFile> getSimilarFilesList() {
+        return Collections.unmodifiableList(new ArrayList<>(similarFilesList));
+    }
+
+    /**
+     * Sets the list of similar files found during duplicate detection.
+     * 
+     * <p>This method replaces the current list with a new list of similar files.
+     * The provided list is copied to prevent external modification.
+     * 
+     * @param similarFiles the list of similar MusicFile objects to set (must not be null)
+     * @throws IllegalArgumentException if the provided list is null
+     */
+    public void setSimilarFilesList(List<MusicFile> similarFiles) {
+        if (similarFiles == null) {
+            throw new IllegalArgumentException("Similar files list cannot be null");
+        }
+        this.similarFilesList = new ArrayList<>(similarFiles);
+    }
+
+    /**
+     * Adds a music file to the list of similar files.
+     * 
+     * @param similarFile the MusicFile to add to the similar files list (must not be null)
+     * @throws IllegalArgumentException if the provided file is null
+     */
+    public void addSimilarFile(MusicFile similarFile) {
+        if (similarFile == null) {
+            throw new IllegalArgumentException("Similar file cannot be null");
+        }
+        if (!this.similarFilesList.contains(similarFile)) {
+            this.similarFilesList.add(similarFile);
+        }
+    }
+
+    /**
+     * Clears all similar files from the list.
+     * 
+     * <p>This method is useful when re-running duplicate detection to ensure
+     * the list is fresh and contains only current results.
+     */
+    public void clearSimilarFiles() {
+        this.similarFilesList.clear();
+    }
+    
+    /**
+     * Checks if this music file has any similar files in its cache.
+     * 
+     * @return true if the similar files list is not empty, false otherwise
+     */
+    public boolean hasSimilarFiles() {
+        return !this.similarFilesList.isEmpty();
     }
 
     /**
