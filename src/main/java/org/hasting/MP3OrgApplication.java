@@ -12,7 +12,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 import org.hasting.ui.DuplicateManagerView;
 import org.hasting.ui.MetadataEditorView;
-import org.hasting.ui.ImportOrganizeView;
+import org.hasting.ui.ImportView;
+import org.hasting.ui.OrganizeView;
 import org.hasting.ui.ConfigurationView;
 import org.hasting.ui.LogViewerDialog;
 import org.hasting.ui.TabSwitchCallback;
@@ -118,12 +119,20 @@ public class MP3OrgApplication extends Application {
             "tab.metadata"
         );
         
-        Tab importTab = new Tab("Import & Organize");
+        Tab importTab = new Tab("Import");
         importTab.setClosable(false);
-        importTab.setContent(new ImportOrganizeView());
+        importTab.setContent(new ImportView());
         HelpSystem.setTooltip(
             importTab.getGraphic() != null ? (Control)importTab.getGraphic() : new Label(), 
             "tab.import"
+        );
+        
+        Tab organizeTab = new Tab("Organize");
+        organizeTab.setClosable(false);
+        organizeTab.setContent(new OrganizeView());
+        HelpSystem.setTooltip(
+            organizeTab.getGraphic() != null ? (Control)organizeTab.getGraphic() : new Label(), 
+            "tab.organize"
         );
         
         Tab configTab = new Tab("Config");
@@ -135,7 +144,7 @@ public class MP3OrgApplication extends Application {
         );
         
         // Add tabs to tab pane
-        tabPane.getTabs().addAll(duplicateTab, metadataTab, importTab, configTab);
+        tabPane.getTabs().addAll(duplicateTab, metadataTab, importTab, organizeTab, configTab);
         
         // Set duplicate manager as default selected tab
         tabPane.getSelectionModel().select(duplicateTab);
@@ -224,8 +233,14 @@ public class MP3OrgApplication extends Application {
                 case "Metadata Editor":
                     // Metadata editor typically doesn't need refreshing - it loads on demand
                     break;
-                case "Import & Organize":
+                case "Import":
                     // Import view typically doesn't need refreshing - it's file-based
+                    break;
+                case "Organize":
+                    // Organize view may need to refresh file list when switching to it
+                    if (tab.getContent() instanceof OrganizeView) {
+                        // OrganizeView will automatically refresh on tab switch
+                    }
                     break;
                 case "Config":
                     // Configuration view refreshes automatically when switching internal tabs
