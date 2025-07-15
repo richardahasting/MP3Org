@@ -681,8 +681,8 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
             alert.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.OK) {
                     try {
-                        if (selected.deleteFile()) {
-                            DatabaseManager.deleteMusicFile(selected);
+                        // Use DatabaseManager to handle both database and file deletion
+                        if (DatabaseManager.deleteMusicFile(selected)) {
                             duplicatesData.remove(selected);
                             statusLabel.setText("File deleted successfully");
                         } else {
@@ -718,8 +718,8 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
             alert.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.OK) {
                     try {
-                        if (toDelete.deleteFile()) {
-                            DatabaseManager.deleteMusicFile(toDelete);
+                        // Use DatabaseManager to handle both database and file deletion
+                        if (DatabaseManager.deleteMusicFile(toDelete)) {
                             duplicatesData.remove(toDelete);
                             comparisonData.remove(toDelete);
                             statusLabel.setText("Lower quality file deleted");
@@ -843,8 +843,8 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    if (file.deleteFile()) {
-                        DatabaseManager.deleteMusicFile(file);
+                    // Use DatabaseManager to handle both database and file deletion
+                    if (DatabaseManager.deleteMusicFile(file)) {
                         duplicatesData.remove(file);
                         comparisonData.remove(file);
                         statusLabel.setText("File deleted successfully");
