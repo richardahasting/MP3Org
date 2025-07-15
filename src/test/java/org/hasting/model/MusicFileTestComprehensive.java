@@ -248,8 +248,8 @@ public class MusicFileTestComprehensive {
         
         boolean deleted = musicFile.deleteFile();
         
-        assertFalse(deleted); // Should not delete when ID is set
-        assertTrue(Files.exists(testFile)); // File should still exist
+        assertTrue(deleted); // Should delete successfully regardless of ID status
+        assertFalse(Files.exists(testFile)); // File should be deleted
     }
 
     @Test

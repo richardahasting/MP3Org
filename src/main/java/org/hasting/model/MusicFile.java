@@ -579,37 +579,35 @@ public class MusicFile {
     }
 
     /**
-     * Deletes the file at the filePath if it exists and the id is null.
+     * Deletes the file at the filePath if it exists.
      * Sets all string attributes to "****deleted****" if the file is successfully deleted.
      */
     public boolean deleteFile() {
-        if (this.id == null) {
-            String pathname = this.title + "." + this.fileType;
-            if (this.filePath != null) {
-                String path = filePath;
-                File file = new File(this.filePath);
-                if (file.exists()) {
-                    boolean deleted = file.delete();
-                    if (deleted) {
-                        // Set all string attributes to "****deleted****"
-                        this.filePath = "****deleted****";
-                        this.id = null;
-                        this.title = "****deleted****";
-                        this.artist = "****deleted****";
-                        this.album = "****deleted****";
-                        this.genre = "****deleted****";
-                        this.fileType = "****deleted****";
-                        logger.info("Deleted file: {}", path);
-                        return true;
-                    } else {
-                        logger.error("Failed to delete file: {}", pathname);
-                    }
+        // File can be deleted regardless of ID status - the ID check is handled by DatabaseManager
+        if (this.filePath != null) {
+            String path = filePath;
+            File file = new File(this.filePath);
+            if (file.exists()) {
+                boolean deleted = file.delete();
+                if (deleted) {
+                    // Set all string attributes to "****deleted****"
+                    this.filePath = "****deleted****";
+                    this.id = null;
+                    this.title = "****deleted****";
+                    this.artist = "****deleted****";
+                    this.album = "****deleted****";
+                    this.genre = "****deleted****";
+                    this.fileType = "****deleted****";
+                    logger.info("Deleted file: {}", path);
+                    return true;
                 } else {
-                    logger.warning("File does not exist: {}", pathname);
+                    logger.error("Failed to delete file: {}", path);
                 }
+            } else {
+                logger.warning("File does not exist: {}", path);
             }
         } else {
-            logger.error("File cannot be deleted because the ID is not null: {}", this.filePath);
+            logger.error("File cannot be deleted because filePath is null");
         }
         return false;
     }

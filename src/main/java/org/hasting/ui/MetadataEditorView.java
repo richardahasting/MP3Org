@@ -602,8 +602,8 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    if (currentFile.deleteFile()) {
-                        DatabaseManager.deleteMusicFile(currentFile);
+                    // Use DatabaseManager to handle both database and file deletion
+                    if (DatabaseManager.deleteMusicFile(currentFile)) {
                         resultsData.remove(currentFile);
                         
                         // Clear form
@@ -880,8 +880,8 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 try {
-                    if (file.deleteFile()) {
-                        DatabaseManager.deleteMusicFile(file);
+                    // Use DatabaseManager to handle both database and file deletion
+                    if (DatabaseManager.deleteMusicFile(file)) {
                         resultsData.remove(file);
                         
                         // Clear form if this was the selected file
