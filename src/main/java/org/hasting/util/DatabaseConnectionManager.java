@@ -1,7 +1,7 @@
 package org.hasting.util;
 
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 import java.sql.*;
 
@@ -18,7 +18,7 @@ import java.sql.*;
  * </ul>
  */
 public class DatabaseConnectionManager {
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseConnectionManager.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseConnectionManager.class);
     private static final int CONNECTION_TIMEOUT_SECONDS = 5;
     
     /**
@@ -84,7 +84,7 @@ public class DatabaseConnectionManager {
                     conn.rollback();
                     logger.debug("Transaction rolled back due to error");
                 } catch (SQLException rollbackEx) {
-                    logger.error("Failed to rollback transaction", rollbackEx);
+                    logger.error(String.format("Failed to rollback transaction", rollbackEx));
                 }
             }
             throw e;
@@ -95,7 +95,7 @@ public class DatabaseConnectionManager {
                     conn.close();
                     logger.debug("Connection closed");
                 } catch (SQLException e) {
-                    logger.error("Error closing connection", e);
+                    logger.error("Error closing connection");
                 }
             }
         }
@@ -130,7 +130,7 @@ public class DatabaseConnectionManager {
                     conn.close();
                     logger.debug("Read-only connection closed");
                 } catch (SQLException e) {
-                    logger.error("Error closing read-only connection", e);
+                    logger.error("Error closing read-only connection");
                 }
             }
         }
@@ -150,7 +150,7 @@ public class DatabaseConnectionManager {
             conn = DriverManager.getConnection(jdbcUrl, username, password);
             return conn.isValid(CONNECTION_TIMEOUT_SECONDS);
         } catch (SQLException e) {
-            logger.debug("Connection test failed: {}", e.getMessage());
+            logger.debug(String.format("Connection test failed: {}", e.getMessage()));
             return false;
         } finally {
             if (conn != null) {
@@ -179,11 +179,11 @@ public class DatabaseConnectionManager {
             // Check for Derby lock exception
             String sqlState = e.getSQLState();
             if ("XJ040".equals(sqlState) || "XSDB6".equals(sqlState)) {
-                logger.debug("Database is locked by another process: {}", databasePath);
+                logger.debug(String.format("Database is locked by another process: {}", databasePath));
                 return true;
             }
             // Other errors mean database doesn't exist or other issues
-            logger.debug("Database connection test failed for other reasons: {}", e.getMessage());
+            logger.debug(String.format("Database connection test failed for other reasons: {}", e.getMessage()));
             return false;
         } finally {
             if (testConnection != null) {

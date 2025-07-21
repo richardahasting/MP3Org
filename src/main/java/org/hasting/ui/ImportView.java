@@ -13,8 +13,8 @@ import javafx.stage.DirectoryChooser;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.MusicFileScanner;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -47,7 +47,7 @@ import java.util.List;
  */
 public class ImportView extends BorderPane {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(ImportView.class);
+    private static final Logger logger = Log4Rich.getLogger(ImportView.class);
     
     private TextArea selectedDirectoriesArea;
     private ProgressBar progressBar;
@@ -331,7 +331,7 @@ public class ImportView extends BorderPane {
                 clearDatabaseButton.setDisable(false);
                 progressBar.setVisible(false);
                 statusLabel.setText("Scan failed: " + scanTask.getException().getMessage());
-                logger.error("Scan task failed", scanTask.getException());
+                logger.error("Scan task failed");
             });
         });
         
@@ -354,7 +354,7 @@ public class ImportView extends BorderPane {
                 selectedDirectoriesArea.clear();
             } catch (Exception e) {
                 statusLabel.setText("Error clearing database: " + e.getMessage());
-                logger.error("Error clearing database", e);
+                logger.error("Error clearing database");
             }
         }
     }
@@ -371,7 +371,7 @@ public class ImportView extends BorderPane {
             }
             
         } catch (Exception e) {
-            logger.error("Error loading previously scanned directories", e);
+            logger.error("Error loading previously scanned directories");
             statusLabel.setText("Error loading directory list: " + e.getMessage());
         }
     }

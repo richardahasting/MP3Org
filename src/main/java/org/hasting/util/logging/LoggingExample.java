@@ -34,14 +34,14 @@ public class LoggingExample {
         logger.info("Application started successfully");
         logger.warning("This is a warning - something might be wrong");
         logger.error("This is an error - something definitely went wrong");
-        logger.critical("This is critical - system might shut down");
+        logger.error("This is critical - system might shut down"); // No fatal method in this context
         
         // Example 3: Parameterized logging (SLF4J-style)
         System.out.println("\n=== Parameterized Logging ===");
         String fileName = "music.mp3";
         int fileSize = 1024;
-        logger.info("Processing file: {} (size: {} bytes)", fileName, fileSize);
-        logger.debug("File details - name: {}, size: {}, type: {}", fileName, fileSize, "MP3");
+        logger.info(String.format("Processing file: {} (size: {} bytes)", fileName, fileSize));
+        logger.debug(String.format("File details - name: {}, size: {}, type: {}", fileName, fileSize, "MP3"));
         
         // Example 4: Exception logging
         System.out.println("\n=== Exception Logging ===");
@@ -49,7 +49,7 @@ public class LoggingExample {
             // Simulate an error
             throw new RuntimeException("Simulated file processing error");
         } catch (Exception e) {
-            logger.error("Failed to process file {}: {}", fileName, e.getMessage(), e);
+            logger.error(String.format("Failed to process file {}: {}", fileName, e.getMessage()), e);
         }
         
         // Example 5: Level-specific configuration
@@ -76,7 +76,7 @@ public class LoggingExample {
         if (logger.isLoggable(LogLevel.DEBUG)) {
             // Only do expensive operations if debug logging is enabled
             String expensiveDebugInfo = generateExpensiveDebugInfo();
-            logger.debug("Expensive debug info: {}", expensiveDebugInfo);
+            logger.debug(String.format("Expensive debug info: {}", expensiveDebugInfo));
         }
         
         // Cleanup

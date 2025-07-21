@@ -21,8 +21,8 @@ import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.DatabaseProfileManager;
 import org.hasting.util.HelpSystem;
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 /**
  * Main application class for MP3Org - Music Collection Manager.
@@ -52,7 +52,7 @@ import org.hasting.util.logging.Logger;
  */
 public class MP3OrgApplication extends Application {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(MP3OrgApplication.class);
+    private static final Logger logger = Log4Rich.getLogger(MP3OrgApplication.class);
 
     /**
      * Starts the MP3Org application by initializing the user interface and database.
@@ -71,23 +71,17 @@ public class MP3OrgApplication extends Application {
      */
     @Override
     public void start(Stage primaryStage) {
-        // Initialize logging system
-        MP3OrgLoggingManager.initialize();
-        MP3OrgLoggingManager.logApplicationStartup("MP3Org", "1.0");
-        
-        logger.info("Initializing MP3Org application");
+        // Initialize log4Rich - configuration is loaded automatically from log4Rich.config
+        logger.info("Initializing MP3Org application with log4Rich");
         
         try {
             // Initialize database with comprehensive recovery mechanisms
             logger.debug("Initializing database manager with comprehensive recovery");
             initializeDatabaseWithAutomaticFallback();
             logger.info("Database manager initialized successfully");
-            
-            // Reload logging configuration from database after initialization
-            MP3OrgLoggingManager.reloadConfigurationFromDatabase();
         } catch (Exception e) {
             // This should never happen with our comprehensive recovery, but handle it gracefully
-            logger.critical("Unexpected failure after comprehensive database recovery: {}", e.getMessage(), e);
+            logger.fatal(String.format("Unexpected failure after comprehensive database recovery: {}", e.getMessage()), e);
             handleStartupFailure(e, primaryStage);
             return;
         }
@@ -251,7 +245,7 @@ public class MP3OrgApplication extends Application {
                     break;
             }
         } catch (Exception e) {
-            logger.error("Error refreshing tab content for tab '{}': {}", tab.getText(), e.getMessage(), e);
+            logger.error(String.format("Error refreshing tab content for tab '%s': %s", tab.getText(), e.getMessage()), e);
         }
     }
     
@@ -336,7 +330,7 @@ public class MP3OrgApplication extends Application {
             logViewer.show();
             logger.info("Log viewer dialog opened");
         } catch (Exception e) {
-            logger.error("Failed to open log viewer dialog: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to open log viewer dialog: {}", e.getMessage()), e);
             
             Alert errorDialog = new Alert(Alert.AlertType.ERROR);
             errorDialog.initOwner(owner);
@@ -382,21 +376,21 @@ public class MP3OrgApplication extends Application {
             initializeDatabaseStandard();
             
         } catch (Exception primaryError) {
-            logger.warning("Standard database initialization failed, attempting recovery: {}", primaryError.getMessage());
+            logger.warn(String.format("Standard database initialization failed, attempting recovery: %s", primaryError.getMessage()));
             
             try {
                 // Secondary attempt: Emergency database creation
                 initializeDatabaseEmergency();
                 
             } catch (Exception emergencyError) {
-                logger.warning("Emergency database creation failed, enabling safe mode: {}", emergencyError.getMessage());
+                logger.warn(String.format("Emergency database creation failed, enabling safe mode: %s", emergencyError.getMessage()));
                 
                 try {
                     // Tertiary attempt: Safe mode with minimal database
                     initializeDatabaseSafeMode();
                     
                 } catch (Exception safeModeError) {
-                    logger.error("Safe mode initialization failed, using in-memory fallback: {}", safeModeError.getMessage());
+                    logger.error(String.format("Safe mode initialization failed, using in-memory fallback: %s", safeModeError.getMessage()));
                     
                     // Final fallback: In-memory temporary database
                     initializeDatabaseTemporary();
@@ -420,9 +414,9 @@ public class MP3OrgApplication extends Application {
         
         DatabaseProfile resolvedProfile = DatabaseManager.initializeWithAutomaticFallback(preferredProfileId);
         
-        logger.info("Database initialized with profile: {}", resolvedProfile.getName());
+        logger.info(String.format("Database initialized with profile: {}", resolvedProfile.getName()));
         if (!resolvedProfile.getId().equals(preferredProfileId)) {
-            logger.warning("Switched from preferred profile due to database lock - now using profile: {}", resolvedProfile.getName());
+            logger.warn(String.format("Switched from preferred profile due to database lock - now using profile: {}", resolvedProfile.getName()));
         }
     }
     
@@ -456,7 +450,7 @@ public class MP3OrgApplication extends Application {
         // Initialize database with emergency profile
         DatabaseManager.initialize();
         
-        logger.info("Emergency database profile created and initialized: {}", emergencyProfile.getName());
+        logger.info(String.format("Emergency database profile created and initialized: {}", emergencyProfile.getName()));
         
         // Show user notification about emergency mode
         showEmergencyModeNotification(emergencyProfile);
@@ -490,7 +484,7 @@ public class MP3OrgApplication extends Application {
         // Initialize minimal database
         DatabaseManager.initialize();
         
-        logger.info("Safe mode database initialized at: {}", safeModeDir);
+        logger.info(String.format("Safe mode database initialized at: {}", safeModeDir));
         
         // Show user notification about safe mode
         showSafeModeNotification(safeModeProfile);
@@ -521,7 +515,7 @@ public class MP3OrgApplication extends Application {
             
         } catch (Exception e) {
             // This should never happen, but provide absolute final fallback
-            logger.critical("Even temporary database initialization failed - this should never happen: {}", e.getMessage(), e);
+            logger.fatal(String.format("Even temporary database initialization failed - this should never happen: {}", e.getMessage()), e);
             throw new RuntimeException("Complete database initialization failure - application cannot start", e);
         }
     }
@@ -604,7 +598,7 @@ public class MP3OrgApplication extends Application {
      * @param primaryStage the primary stage (may be used for error dialog positioning)
      */
     private void handleStartupFailure(Exception e, Stage primaryStage) {
-        logger.critical("Failed to start MP3Org application: {}", e.getMessage(), e);
+        logger.fatal(String.format("Failed to start MP3Org application: {}", e.getMessage()), e);
         
         // Show user-friendly error dialog
         Alert errorAlert = new Alert(Alert.AlertType.ERROR);
@@ -623,7 +617,7 @@ public class MP3OrgApplication extends Application {
             errorAlert.showAndWait();
         } catch (Exception dialogException) {
             // If we can't even show the error dialog, just log and exit
-            logger.critical("Could not display error dialog: {}", dialogException.getMessage(), dialogException);
+            logger.fatal(String.format("Could not display error dialog: %s", dialogException.getMessage()), dialogException);
         }
         
         // Graceful shutdown
@@ -658,11 +652,11 @@ public class MP3OrgApplication extends Application {
                 Tab tab = tabPane.getTabs().get(i);
                 if (tab.getText().equals(tabName)) {
                     tabPane.getSelectionModel().select(i);
-                    logger.info("Switched to tab: {}", tabName);
+                    logger.info(String.format("Switched to tab: {}", tabName));
                     return true;
                 }
             }
-            logger.warning("Tab not found: {}", tabName);
+            logger.warn(String.format("Tab not found: {}", tabName));
             return false;
         };
     }
@@ -672,7 +666,7 @@ public class MP3OrgApplication extends Application {
         // Clean up database connection if needed
         logger.info("Shutting down application");
         DatabaseManager.shutdown();
-        MP3OrgLoggingManager.shutdown();
+        // MP3OrgLoggingManager.shutdown(); // Replaced by log4Rich
     }
 
     /**

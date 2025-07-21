@@ -13,8 +13,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -28,7 +28,7 @@ import java.util.function.Consumer;
  */
 public class SearchPanel extends VBox {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(SearchPanel.class);
+    private static final Logger logger = Log4Rich.getLogger(SearchPanel.class);
     
     private TextField searchField;
     private ComboBox<String> searchTypeCombo;
@@ -286,7 +286,7 @@ public class SearchPanel extends VBox {
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     updateStatus("Search error: " + e.getMessage());
-                    logger.error("Error performing search operation: {}", e.getMessage(), e);
+                    logger.error(String.format("Error performing search operation: {}", e.getMessage()), e);
                 });
             }
         });

@@ -6,8 +6,8 @@ import javafx.scene.layout.*;
 import org.hasting.model.PathTemplate;
 import org.hasting.util.HelpSystem;
 import org.hasting.util.PathTemplateManager;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * UI panel for configuring path templates for file organization.
@@ -15,7 +15,7 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
  */
 public class PathTemplateConfigPanel extends VBox {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(PathTemplateConfigPanel.class);
+    private static final Logger logger = Log4Rich.getLogger(PathTemplateConfigPanel.class);
     
     // Template selection
     private ComboBox<String> templateComboBox;
@@ -384,7 +384,7 @@ public class PathTemplateConfigPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to apply path template: " + e.getMessage());
-            logger.error("Error applying template configuration changes: {}", e.getMessage(), e);
+            logger.error(String.format("Error applying template configuration changes: {}", e.getMessage()), e);
         }
     }
     

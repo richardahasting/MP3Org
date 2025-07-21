@@ -3,8 +3,8 @@ package org.hasting.test.generator;
 import org.hasting.test.spec.AudioFormat;
 import org.hasting.test.spec.TestFileSpec;
 import org.hasting.test.template.TestTemplateManager;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.FieldKey;
@@ -25,7 +25,7 @@ import java.util.UUID;
  */
 public class TestFileGenerator {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(TestFileGenerator.class);
+    private static final Logger logger = Log4Rich.getLogger(TestFileGenerator.class);
     
     private final TestTemplateManager templateManager;
     private final Path tempDirectory;
@@ -38,7 +38,7 @@ public class TestFileGenerator {
         
         try {
             this.tempDirectory = Files.createTempDirectory("mp3org-test-");
-            logger.info("Created temporary directory for test files: {}", tempDirectory);
+            logger.info(String.format("Created temporary directory for test files: {}", tempDirectory));
         } catch (IOException e) {
             throw new RuntimeException("Failed to create temp directory for test files", e);
         }
@@ -52,7 +52,7 @@ public class TestFileGenerator {
      * @throws IOException if generation fails
      */
     public File generateFromSpec(TestFileSpec spec) throws IOException {
-        logger.debug("Generating file from spec: {}", spec);
+        logger.debug(String.format("Generating file from spec: {}", spec));
         
         // Get template for the format
         File template = templateManager.getTemplate(spec.getFormat());
@@ -71,7 +71,7 @@ public class TestFileGenerator {
         // Embed metadata
         embedMetadata(generatedFile, spec);
         
-        logger.info("Generated test file: {}", generatedFile.getAbsolutePath());
+        logger.info(String.format("Generated test file: {}", generatedFile.getAbsolutePath()));
         return generatedFile;
     }
     
@@ -84,7 +84,7 @@ public class TestFileGenerator {
      */
     public void embedMetadata(File audioFile, TestFileSpec spec) throws IOException {
         if (!spec.getFormat().supportsMetadata()) {
-            logger.debug("Format {} has limited metadata support, skipping embedding", spec.getFormat());
+            logger.debug(String.format("Format {} has limited metadata support, skipping embedding", spec.getFormat()));
             return;
         }
         
@@ -95,7 +95,7 @@ public class TestFileGenerator {
             if (tag == null) {
                 tag = f.createDefaultTag();
                 if (tag == null) {
-                    logger.warning("Unable to create tag for file: {}", audioFile);
+                    logger.warn(String.format("Unable to create tag for file: {}", audioFile));
                     return;
                 }
             }
@@ -123,10 +123,10 @@ public class TestFileGenerator {
             // Save the file with new metadata
             f.commit();
             
-            logger.debug("Successfully embedded metadata for: {}", audioFile.getName());
+            logger.debug(String.format("Successfully embedded metadata for: {}", audioFile.getName()));
             
         } catch (Exception e) {
-            logger.error("Failed to embed metadata in file: {}", audioFile, e);
+            logger.error(String.format("Failed to embed metadata in file: {}", audioFile), e);
             throw new IOException("Failed to embed metadata: " + e.getMessage(), e);
         }
     }
@@ -204,13 +204,13 @@ public class TestFileGenerator {
                             try {
                                 Files.deleteIfExists(path);
                             } catch (IOException e) {
-                                logger.error("Failed to delete: {}", path, e);
+                                logger.error(String.format("Failed to delete: {}", path), e);
                             }
                         });
-                logger.info("Cleaned up temporary directory: {}", tempDirectory);
+                logger.info(String.format("Cleaned up temporary directory: {}", tempDirectory));
             }
         } catch (IOException e) {
-            logger.error("Failed to cleanup temporary directory", e);
+            logger.error("Failed to cleanup temporary directory");
         }
     }
 }

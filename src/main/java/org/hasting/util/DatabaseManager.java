@@ -1,8 +1,8 @@
 package org.hasting.util;
 
 import org.hasting.model.MusicFile;
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 import java.sql.*;
 import java.util.*;
@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see MusicFile
  */
 public class DatabaseManager {
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseManager.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseManager.class);
     private static DatabaseConfig config;
     private static Connection connection;
     private static DatabaseConnectionPool connectionPool;
@@ -84,7 +84,7 @@ public class DatabaseManager {
                 );
 
                 filePathsMap.clear();  // Clear existing entries  issue#41
-                logger.info("Connected to database at: {}", config.getDatabasePath());
+                logger.info(String.format("Connected to database at: {}", config.getDatabasePath()));
 
                 // Create table if not exists
                 // deleteMusicFilesTable();
@@ -94,7 +94,7 @@ public class DatabaseManager {
                 // Initialize file path cache for performance  issue#41
                 initFilePathCacheWithRetry();
             } catch (Exception e) {
-                logger.error("Failed to initialize database connection: {}", e.getMessage(), e);
+                logger.error(String.format("Failed to initialize database connection: {}", e.getMessage()), e);
                 throw new RuntimeException("Failed to initialize database connection", e);
             }
         }
@@ -145,7 +145,7 @@ public class DatabaseManager {
             return resolvedProfile;
             
         } catch (Exception e) {
-            logger.error("Failed to initialize database connection with fallback: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to initialize database connection with fallback: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to initialize database connection with fallback: " + e.getMessage(), e);
         }
     }
@@ -188,7 +188,7 @@ public class DatabaseManager {
                 connection.close();
                 connection = null;
         } catch (SQLException e) {
-            logger.error("Failed to drop music_files table: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to drop music_files table: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to drop music_files table", e);
         }
     }
@@ -245,7 +245,7 @@ public class DatabaseManager {
             stmt.executeUpdate(sql);
             logger.info("Created music_files table successfully");
         } catch (SQLException e) {
-            logger.error("Failed to create music_files table: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to create music_files table: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to create music_files table", e);
         }
     }
@@ -292,7 +292,7 @@ public class DatabaseManager {
             stmt.executeUpdate(sql);
             logger.info("Created scan_directories table successfully");
         } catch (SQLException e) {
-            logger.error("Failed to create scan_directories table: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to create scan_directories table: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to create scan_directories table", e);
         }
     }
@@ -336,7 +336,7 @@ public class DatabaseManager {
             
             // Check if connection is null or closed
             if (conn == null || conn.isClosed()) {
-                logger.warning("Database connection is null or closed, attempting recovery");
+                logger.warn("Database connection is null or closed, attempting recovery");
                 
                 // Try standard initialization
                 initialize();
@@ -352,10 +352,10 @@ public class DatabaseManager {
             return conn;
             
         } catch (SQLException e) {
-            logger.error("Database connection validation failed: {}", e.getMessage(), e);
+            logger.error(String.format("Database connection validation failed: {}", e.getMessage()), e);
             throw new RuntimeException("Database connection validation failed", e);
         } catch (Exception e) {
-            logger.error("Unexpected error during connection validation: {}", e.getMessage(), e);
+            logger.error(String.format("Unexpected error during connection validation: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to ensure database connection", e);
         }
     }
@@ -392,7 +392,7 @@ public class DatabaseManager {
                 connection = null;
                 logger.info("Database connection closed");
             } catch (SQLException e) {
-                logger.error("Error closing database connection: {}", e.getMessage(), e);
+                logger.error(String.format("Error closing database connection: {}", e.getMessage()), e);
             }
         }
     }
@@ -413,7 +413,7 @@ public class DatabaseManager {
         // Reinitialize with new location
         initialize();
         
-        logger.info("Database location changed to: {}", config.getDatabasePath());
+        logger.info(String.format("Database location changed to: {}", config.getDatabasePath()));
         
         // Check if the new database is empty
         boolean isNewDatabase = false;
@@ -460,22 +460,22 @@ public class DatabaseManager {
             if (success) {
                 // Reinitialize with new profile
                 initialize();
-                logger.info("Successfully switched to profile: {}", profileId);
+                logger.info(String.format("Successfully switched to profile: {}", profileId));
                 return true;
             } else {
                 // Reinitialize with current profile if switch failed
                 initialize();
-                logger.error("Failed to switch to profile: {}", profileId);
+                logger.error(String.format("Failed to switch to profile: {}", profileId));
                 return false;
             }
         } catch (Exception e) {
-            logger.error("Error switching to profile {}: {}", profileId, e.getMessage(), e);
+            logger.error(String.format("Error switching to profile {}: {}", profileId, e.getMessage()), e);
             
             // Try to recover by reinitializing
             try {
                 initialize();
             } catch (Exception recoveryError) {
-                logger.error("Failed to recover database connection: {}", recoveryError.getMessage(), recoveryError);
+                logger.error(String.format("Failed to recover database connection: %s", recoveryError.getMessage()), recoveryError);
             }
             return false;
         }
@@ -490,11 +490,11 @@ public class DatabaseManager {
             if (profile != null) {
                 return switchToProfile(profile.getId());
             } else {
-                logger.error("Profile not found: {}", profileName);
+                logger.error(String.format("Profile not found: {}", profileName));
                 return false;
             }
         } catch (Exception e) {
-            logger.error("Error switching to profile {}: {}", profileName, e.getMessage(), e);
+            logger.error(String.format("Error switching to profile {}: {}", profileName, e.getMessage()), e);
             return false;
         }
     }
@@ -542,15 +542,14 @@ public class DatabaseManager {
                                              " files but cache is empty");
                 }
                 
-                logger.info("File path cache initialization successful on attempt {} - {} entries", 
-                           attempt, cacheSize);
+                logger.info(String.format("File path cache initialization successful on attempt {} - {} entries", attempt, cacheSize));
                 return; // Success!
                 
             } catch (Exception e) {
-                logger.warning("Cache initialization attempt {} failed: {}", attempt, e.getMessage());
+                logger.warn(String.format("Cache initialization attempt {} failed: {}", attempt, e.getMessage()));
                 
                 if (attempt == maxRetries) {
-                    logger.error("Cache initialization failed after {} attempts. Enabling fallback mode.", maxRetries);
+                    logger.error(String.format("Cache initialization failed after {} attempts. Enabling fallback mode.", maxRetries));
                     // Don't throw - enable fallback mode instead
                     return;
                 } else {
@@ -591,7 +590,7 @@ public class DatabaseManager {
         // Check if the music file already exists by file_path  issue#42
         Long existingId = getFileIdByPath(musicFile.getFilePath());
         if (existingId != null) {
-            logger.debug("File already exists in database with ID {}: {}", existingId, musicFile.getFilePath());
+            logger.debug(String.format("File already exists in database with ID {}: {}", existingId, musicFile.getFilePath()));
             return; // Skip insertion of duplicate
         }
 
@@ -613,7 +612,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to save music file to database: {}", musicFile.getFilePath(), e);
+            logger.error(String.format("Failed to save music file to database: {}", musicFile.getFilePath()), e);
             throw new RuntimeException("Failed to save music file", e);
         }
 
@@ -652,7 +651,7 @@ public class DatabaseManager {
         }
         
         long startTime = System.currentTimeMillis();
-        logger.info("Starting batch insert of {} music files", musicFiles.size());
+        logger.info(String.format("Starting batch insert of {} music files", musicFiles.size()));
         
         // Filter out files that already exist
         List<MusicFile> newFiles = new ArrayList<>();
@@ -660,13 +659,13 @@ public class DatabaseManager {
         
         for (MusicFile musicFile : musicFiles) {
             if (musicFile == null || musicFile.getFilePath() == null || musicFile.getFilePath().trim().isEmpty()) {
-                logger.warning("Skipping null or invalid music file");
+                logger.warn("Skipping null or invalid music file");
                 continue;
             }
             
             Long existingId = getFileIdByPath(musicFile.getFilePath());
             if (existingId != null) {
-                logger.debug("File already exists in database with ID {}: {}", existingId, musicFile.getFilePath());
+                logger.debug(String.format("File already exists in database with ID {}: {}", existingId, musicFile.getFilePath()));
                 duplicateCount++;
             } else {
                 newFiles.add(musicFile);
@@ -674,11 +673,11 @@ public class DatabaseManager {
         }
         
         if (newFiles.isEmpty()) {
-            logger.info("All {} files already exist in database - no new files to insert", musicFiles.size());
+            logger.info(String.format("All {} files already exist in database - no new files to insert", musicFiles.size()));
             return 0;
         }
         
-        logger.info("Inserting {} new files ({} duplicates skipped)", newFiles.size(), duplicateCount);
+        logger.info(String.format("Inserting %d new files (%d duplicates skipped)", newFiles.size(), duplicateCount));
         
         String sql = "INSERT INTO music_files (file_path, title, artist, album, genre, track_number, " +
                 "yr, duration_seconds, file_size_bytes, bit_rate, sample_rate, file_type, last_modified) " +
@@ -713,14 +712,13 @@ public class DatabaseManager {
                         }
                         
                         long totalTime = System.currentTimeMillis() - startTime;
-                        logger.info("Batch insert completed: {} files inserted in {}ms (avg: {}ms/file)", 
-                                   newFiles.size(), totalTime, totalTime / (double) newFiles.size());
+                        logger.info(String.format("Batch insert completed: %d files inserted in %dms (avg: %.2fms/file)", newFiles.size(), totalTime, totalTime / (double) newFiles.size()));
                         
                         return newFiles.size();
                     }
                 });
             } catch (SQLException e) {
-                logger.error("Failed to batch insert music files to database", e);
+                logger.error("Failed to batch insert music files to database");
                 throw new RuntimeException("Failed to batch insert music files", e);
             }
         } else {
@@ -757,8 +755,7 @@ public class DatabaseManager {
                     }
                     
                     long totalTime = System.currentTimeMillis() - startTime;
-                    logger.info("Batch insert completed: {} files inserted in {}ms (avg: {}ms/file)", 
-                               newFiles.size(), totalTime, totalTime / (double) newFiles.size());
+                    logger.info(String.format("Batch insert completed: %d files inserted in %dms (avg: %.2fms/file)", newFiles.size(), totalTime, totalTime / (double) newFiles.size()));
                     
                     return newFiles.size();
                     
@@ -770,7 +767,7 @@ public class DatabaseManager {
                 }
                 
             } catch (SQLException e) {
-                logger.error("Failed to batch insert music files to database", e);
+                logger.error("Failed to batch insert music files to database");
                 throw new RuntimeException("Failed to batch insert music files", e);
             }
         }
@@ -869,7 +866,7 @@ public class DatabaseManager {
         }
         
         long startTime = System.currentTimeMillis();
-        logger.debug("saveOrUpdateMusicFile() - entry: {}", musicFile.getFilePath());
+        logger.debug(String.format("saveOrUpdateMusicFile() - entry: {}", musicFile.getFilePath()));
         
 
         Long id = null;
@@ -879,7 +876,7 @@ public class DatabaseManager {
 
         if (id != null) {
             // File exists - update the existing record
-            logger.debug("File path already exists, updating record ID {}: {}", id, musicFile.getFilePath());
+            logger.debug(String.format("File path already exists, updating record ID {}: {}", id, musicFile.getFilePath()));
             
             // Preserve the existing ID and transfer updated metadata
             musicFile.setId(id);
@@ -889,18 +886,16 @@ public class DatabaseManager {
             updateMusicFile(musicFile);
             
             long totalTime = System.currentTimeMillis() - startTime;
-            logger.debug("saveOrUpdateMusicFile() - exit: updated existing record (cache check: {}ms, total: {}ms)", 
-                        cacheCheckTime, totalTime);
+            logger.debug(String.format("saveOrUpdateMusicFile() - exit: updated existing record (cache check: {}ms, total: {}ms)", cacheCheckTime, totalTime));
         } else {
             // File doesn't exist - insert new record
-            logger.debug("File path is new, inserting record: {}", musicFile.getFilePath());
+            logger.debug(String.format("File path is new, inserting record: {}", musicFile.getFilePath()));
             
             // Use the existing save method (it will update the cache)
             saveMusicFile(musicFile);
             
             long totalTime = System.currentTimeMillis() - startTime;
-            logger.debug("saveOrUpdateMusicFile() - exit: inserted new record with ID {} (cache check: {}ms, total: {}ms)", 
-                        musicFile.getId(), cacheCheckTime, totalTime);
+            logger.debug(String.format("saveOrUpdateMusicFile() - exit: inserted new record with ID %d (cache check: %dms, total: %dms)", musicFile.getId(), cacheCheckTime, totalTime));
         }
     }
 
@@ -942,7 +937,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.warning("Could not retrieve old file path for cache update: {}", e.getMessage());
+            logger.warn(String.format("Could not retrieve old file path for cache update: {}", e.getMessage()));
         }
 
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
@@ -1004,19 +999,19 @@ public class DatabaseManager {
             if (oldFilePath != null && !oldFilePath.equals(musicFile.getFilePath())) {
                 filePathsMap.remove(oldFilePath);
                 filePathsMap.put(musicFile.getFilePath(), musicFile.getId());
-                logger.debug("Updated cache: removed '{}', added '{}'", oldFilePath, musicFile.getFilePath());
+                logger.debug(String.format("Updated cache: removed '{}', added '{}'", oldFilePath, musicFile.getFilePath()));
             }
             
             musicFile.setModified(false);
-            logger.debug("updateMusicFile() - exit: successfully updated {}", musicFile.getFilePath());
+            logger.debug(String.format("updateMusicFile() - exit: successfully updated {}", musicFile.getFilePath()));
         } catch (SQLException e) {
-            logger.error("Failed to update music file: {} - SQL error: {}", musicFile.getFilePath(), e.getMessage(), e);
+            logger.error(String.format("Failed to update music file: %s - SQL error: %s", musicFile.getFilePath(), e.getMessage()), e);
             throw new RuntimeException("Failed to update music file: " + musicFile.getFilePath(), e);
         }
     }
 
     public static synchronized boolean deleteMusicFile(MusicFile musicFile) {
-        logger.debug("deleteMusicFile() - entry: {}", musicFile != null ? musicFile.getFilePath() : "null");
+        logger.debug(String.format("deleteMusicFile() - entry: %s", musicFile != null ? musicFile.getFilePath() : "null"));
         
         if (musicFile == null) {
             logger.error("deleteMusicFile() - musicFile parameter is null");
@@ -1024,7 +1019,7 @@ public class DatabaseManager {
         }
         
         if (musicFile.getId() == null) {
-            logger.error("deleteMusicFile() - musicFile has no ID: {}", musicFile.getFilePath());
+            logger.error(String.format("deleteMusicFile() - musicFile has no ID: {}", musicFile.getFilePath()));
             throw new IllegalStateException("Cannot delete MusicFile without ID");
         }
         
@@ -1040,16 +1035,16 @@ public class DatabaseManager {
             musicFile.setId(null); // Clear the ID to indicate it's deleted'
             musicFile.setModified(false); // Clear the modified flag to indicate it's not modified
             boolean fileDeleted = musicFile.deleteFile();
-            logger.debug("deleteMusicFile() - exit: database record deleted, file deletion: {}", fileDeleted);
+            logger.debug(String.format("deleteMusicFile() - exit: database record deleted, file deletion: {}", fileDeleted));
             return fileDeleted;
         } catch (SQLException e) {
-            logger.error("Failed to delete music file from database: {} - SQL error: {}", musicFile.getTitle(), e.getMessage(), e);
+            logger.error(String.format("Failed to delete music file from database: %s - SQL error: %s", musicFile.getTitle(), e.getMessage()), e);
         }
         return false;
     }
 
     public static MusicFile getMusicFileById(Long id) {
-        logger.debug("getMusicFileById() - entry: {}", id);
+        logger.debug(String.format("getMusicFileById() - entry: {}", id));
         
         if (id == null) {
             logger.debug("getMusicFileById() - null ID provided");
@@ -1064,16 +1059,16 @@ public class DatabaseManager {
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     MusicFile result = extractMusicFileFromResultSet(rs);
-                    logger.debug("getMusicFileById() - exit: found music file {}", result.getFilePath());
+                    logger.debug(String.format("getMusicFileById() - exit: found music file {}", result.getFilePath()));
                     return result;
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to retrieve music file by ID: {} - SQL error: {}", id, e.getMessage(), e);
+            logger.error(String.format("Failed to retrieve music file by ID: {} - SQL error: {}", id, e.getMessage()), e);
             throw new RuntimeException("Failed to get music file by ID: " + id, e);
         }
 
-        logger.debug("getMusicFileById() - exit: no music file found with ID {}", id);
+        logger.debug(String.format("getMusicFileById() - exit: no music file found with ID {}", id));
         return null;
     }
 
@@ -1100,15 +1095,15 @@ public class DatabaseManager {
             
             if (rs.next()) {
                 int count = rs.getInt("file_count");
-                logger.debug("getMusicFileCount() - exit: found {} files", count);
+                logger.debug(String.format("getMusicFileCount() - exit: found {} files", count));
                 return count;
             }
             logger.debug("getMusicFileCount() - exit: no results, returning 0");
             return 0;
             
         } catch (SQLException e) {
-            logger.error("getMusicFileCount() - SQL error: {}", e.getMessage(), e);
-            logger.error("Error getting music file count: {}", e.getMessage(), e);
+            logger.error(String.format("getMusicFileCount() - SQL error: {}", e.getMessage()), e);
+            logger.error(String.format("Error getting music file count: {}", e.getMessage()), e);
             // Return -1 to indicate error state rather than throwing exception
             // This allows the UI to display "Unknown" or "Error" instead of crashing
             return -1;
@@ -1134,10 +1129,10 @@ public class DatabaseManager {
             }
             
             long elapsedTime = System.currentTimeMillis() - startTime;
-            logger.info("File path cache initialized: {} entries loaded in {} ms", count, elapsedTime);
+            logger.info(String.format("File path cache initialized: {} entries loaded in {} ms", count, elapsedTime));
             
         } catch (SQLException e) {
-            logger.error("Failed to initialize file paths cache: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to initialize file paths cache: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to initialize file paths cache", e);
         }
     }
@@ -1178,7 +1173,7 @@ public class DatabaseManager {
                 musicFiles.add(extractMusicFileFromResultSet(rs));
             }
         } catch (SQLException e) {
-            logger.error("Failed to retrieve all music files from database", e);
+            logger.error("Failed to retrieve all music files from database");
             throw new RuntimeException("Failed to get all music files", e);
         }
 
@@ -1228,7 +1223,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to get distinct directories from database", e);
+            logger.error("Failed to get distinct directories from database");
             throw new RuntimeException("Failed to get distinct directories", e);
         }
         
@@ -1259,11 +1254,11 @@ public class DatabaseManager {
             int updated = updateStmt.executeUpdate();
             
             if (updated > 0) {
-                logger.debug("Updated existing scan directory: {}", rootPath);
+                logger.debug(String.format("Updated existing scan directory: {}", rootPath));
                 return;
             }
         } catch (SQLException e) {
-            logger.error("Failed to update scan directory: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to update scan directory: {}", e.getMessage()), e);
         }
         
         // If no update occurred, insert new record
@@ -1271,14 +1266,14 @@ public class DatabaseManager {
         try (PreparedStatement insertStmt = ensureConnection().prepareStatement(insertSql)) {
             insertStmt.setString(1, rootPath.trim());
             insertStmt.executeUpdate();
-            logger.debug("Recorded new scan directory: {}", rootPath);
+            logger.debug(String.format("Recorded new scan directory: {}", rootPath));
         } catch (SQLException e) {
             // If it's a duplicate key error (directory already exists), that's fine
             if (!e.getMessage().contains("duplicate") && !e.getMessage().contains("UNIQUE") && !e.getMessage().contains("constraint")) {
-                logger.error("Failed to record scan directory: {}", e.getMessage(), e);
+                logger.error(String.format("Failed to record scan directory: {}", e.getMessage()), e);
                 throw new RuntimeException("Failed to record scan directory", e);
             } else {
-                logger.debug("Scan directory already exists: {}", rootPath);
+                logger.debug(String.format("Scan directory already exists: {}", rootPath));
             }
         }
     }
@@ -1309,7 +1304,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to get scan directories from database", e);
+            logger.error("Failed to get scan directories from database");
             throw new RuntimeException("Failed to get scan directories", e);
         }
         
@@ -1333,10 +1328,10 @@ public class DatabaseManager {
             stmt.setString(1, rootPath.trim());
             int updated = stmt.executeUpdate();
             if (updated > 0) {
-                logger.debug("Updated rescan time for directory: {}", rootPath);
+                logger.debug(String.format("Updated rescan time for directory: {}", rootPath));
             }
         } catch (SQLException e) {
-            logger.error("Failed to update rescan time for directory {}: {}", rootPath, e.getMessage(), e);
+            logger.error(String.format("Failed to update rescan time for directory {}: {}", rootPath, e.getMessage()), e);
         }
     }
 
@@ -1386,7 +1381,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to search music files with term: {}", searchTerm, e);
+            logger.error(String.format("Failed to search music files with term: {}", searchTerm), e);
             throw new RuntimeException("Failed to search music files", e);
         }
 
@@ -1484,7 +1479,7 @@ public class DatabaseManager {
                 candidates.add(extractMusicFileFromResultSet(rs));
             }
         } catch (SQLException e) {
-            logger.warning("Optimized candidate search failed, falling back to full scan: {}", e.getMessage(), e);
+            logger.warn(String.format("Optimized candidate search failed, falling back to full scan: {}", e.getMessage()), e);
             // Fall back to getting all files if the optimized query fails
             return getAllMusicFiles();
         }
@@ -1528,7 +1523,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to find music file by path: {}", path, e);
+            logger.error(String.format("Failed to find music file by path: {}", path), e);
             throw new RuntimeException("Failed to find music file by path", e);
         }
 
@@ -1599,7 +1594,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to search music files by title: {}", title, e);
+            logger.error(String.format("Failed to search music files by title: {}", title), e);
             throw new RuntimeException("Failed to search music files by title", e);
         }
 
@@ -1621,7 +1616,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to search music files by artist: {}", artist, e);
+            logger.error(String.format("Failed to search music files by artist: {}", artist), e);
             throw new RuntimeException("Failed to search music files by artist", e);
         }
 
@@ -1643,7 +1638,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to search music files by album: {}", album, e);
+            logger.error(String.format("Failed to search music files by album: {}", album), e);
             throw new RuntimeException("Failed to search music files by album", e);
         }
 
@@ -1660,7 +1655,7 @@ public class DatabaseManager {
             filePathsMap.clear();
             logger.debug("File path cache cleared after deleting all music files");
         } catch (SQLException e) {
-            logger.error("Failed to delete all music files from database", e);
+            logger.error("Failed to delete all music files from database");
             throw new RuntimeException("Failed to delete all music files", e);
         }
     }
@@ -1683,9 +1678,9 @@ public class DatabaseManager {
         filePathsMap.clear();
         try {
             initAllPathsMap();
-            logger.info("File path cache rebuilt successfully with {} entries", filePathsMap.size());
+            logger.info(String.format("File path cache rebuilt successfully with {} entries", filePathsMap.size()));
         } catch (Exception e) {
-            logger.error("Failed to rebuild file path cache: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to rebuild file path cache: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to rebuild file path cache", e);
         }
     }
@@ -1707,7 +1702,7 @@ public class DatabaseManager {
             if (existing != null) {
                 // Cache the result for future use
                 filePathsMap.put(filePath, existing.getId());
-                logger.debug("Found file via database fallback and cached: {}", filePath);
+                logger.debug(String.format("Found file via database fallback and cached: {}", filePath));
                 return existing.getId();
             }
         }
@@ -1731,7 +1726,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.warning("Database fallback query failed for path {}: {}", path, e.getMessage());
+            logger.warn(String.format("Database fallback query failed for path {}: {}", path, e.getMessage()));
         }
 
         return null;
@@ -1775,7 +1770,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            logger.error("Failed to search music files with multiple criteria - title: {}, artist: {}, album: {}", title, artist, album, e);
+            logger.error(String.format("Failed to search music files with multiple criteria - title: {}, artist: {}, album: {}", title, artist, album), e);
             throw new RuntimeException("Failed to search music files", e);
         }
 

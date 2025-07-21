@@ -6,8 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.LoggerFactory;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Centralized configuration management for database connectivity and application settings.
@@ -87,7 +87,7 @@ import org.hasting.util.logging.LoggerFactory;
  * @since 1.0
  */
 public class DatabaseConfig {
-    private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseConfig.class);
     
     // Configuration keys
     private static final String SYSTEM_PROPERTY_DB_PATH = "mp3org.database.path";
@@ -162,7 +162,7 @@ public class DatabaseConfig {
                 configProperties.load(input);
                 logger.info("Loaded configuration from: " + configPath.toAbsolutePath());
             } catch (IOException e) {
-                logger.warning("Could not load configuration file: " + e.getMessage());
+                logger.warn("Could not load configuration file: " + e.getMessage());
             }
         }
         
@@ -174,7 +174,7 @@ public class DatabaseConfig {
                     configProperties.load(input);
                     logger.info("Loaded configuration from: " + homeConfigPath.toAbsolutePath());
                 } catch (IOException e) {
-                    logger.warning("Could not load configuration file from home: " + e.getMessage());
+                    logger.warn("Could not load configuration file from home: " + e.getMessage());
                 }
             }
         }
@@ -269,7 +269,7 @@ public class DatabaseConfig {
                 logger.info("Created database directory: " + parentDir);
             }
         } catch (IOException e) {
-            logger.warning("Could not create database directory: " + e.getMessage());
+            logger.warn("Could not create database directory: " + e.getMessage());
         }
         
         return dbPath.toString();
@@ -399,7 +399,7 @@ public class DatabaseConfig {
                 logger.info("Saved configuration to: " + configPath.toAbsolutePath());
             }
         } catch (IOException e) {
-            logger.warning("Could not save configuration file: " + e.getMessage());
+            logger.warn("Could not save configuration file: " + e.getMessage());
         }
     }
     
@@ -437,7 +437,7 @@ public class DatabaseConfig {
                 }
             }
         } catch (IOException e) {
-            logger.warning("Could not create sample configuration file: " + e.getMessage());
+            logger.warn("Could not create sample configuration file: " + e.getMessage());
         }
     }
     
@@ -596,7 +596,7 @@ public class DatabaseConfig {
         } catch (Exception e) {
             // Log the error but don't throw - return -1 to indicate error state
             // This is especially important during config reloads when connection might be temporarily unavailable
-            logger.warning("Could not retrieve music file count (possibly during config reload): " + e.getMessage());
+            logger.warn("Could not retrieve music file count (possibly during config reload): " + e.getMessage());
             return -1;
         }
     }

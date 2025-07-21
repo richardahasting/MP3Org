@@ -1,8 +1,8 @@
 package org.hasting.test.template;
 
 import org.hasting.test.spec.AudioFormat;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,7 +18,7 @@ import java.util.Map;
  */
 public class TestTemplateManager {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(TestTemplateManager.class);
+    private static final Logger logger = Log4Rich.getLogger(TestTemplateManager.class);
     
     // Cache for template files
     private final Map<AudioFormat, File> templateCache = new HashMap<>();
@@ -56,9 +56,9 @@ public class TestTemplateManager {
     public void registerTemplate(AudioFormat format, File template) {
         if (template.exists() && template.isFile()) {
             templateCache.put(format, template);
-            logger.info("Registered template for {}: {}", format, template.getAbsolutePath());
+            logger.info(String.format("Registered template for {}: {}", format, template.getAbsolutePath()));
         } else {
-            logger.warning("Cannot register non-existent template: {}", template);
+            logger.warn(String.format("Cannot register non-existent template: {}", template));
         }
     }
     
@@ -77,10 +77,10 @@ public class TestTemplateManager {
             
             if (mp3Template10.exists()) {
                 registerTemplate(AudioFormat.MP3, mp3Template10);
-                logger.info("Found user-provided MP3 template: {}", mp3Template10.getName());
+                logger.info(String.format("Found user-provided MP3 template: {}", mp3Template10.getName()));
             } else if (mp3Template20.exists()) {
                 registerTemplate(AudioFormat.MP3, mp3Template20);
-                logger.info("Found user-provided MP3 template: {}", mp3Template20.getName());
+                logger.info(String.format("Found user-provided MP3 template: {}", mp3Template20.getName()));
             }
             
             // Also check for other formats in testdata/originalMusicFiles
@@ -107,7 +107,7 @@ public class TestTemplateManager {
             }
         }
         
-        logger.info("Template discovery complete. Found {} templates", templateCache.size());
+        logger.info(String.format("Template discovery complete. Found {} templates", templateCache.size()));
     }
     
     /**
@@ -133,7 +133,7 @@ public class TestTemplateManager {
                         }
                     });
         } catch (IOException e) {
-            logger.error("Error discovering templates in directory: {}", directory, e);
+            logger.error(String.format("Error discovering templates in directory: {}", directory), e);
         }
     }
     

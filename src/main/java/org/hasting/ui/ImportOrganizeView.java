@@ -17,8 +17,8 @@ import org.hasting.model.PathTemplate;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.MusicFileScanner;
 import org.hasting.util.PathTemplateManager;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -66,7 +66,7 @@ import java.util.stream.Collectors;
  */
 public class ImportOrganizeView extends BorderPane {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(ImportOrganizeView.class);
+    private static final Logger logger = Log4Rich.getLogger(ImportOrganizeView.class);
     
     private TextArea selectedDirectoriesArea;
     private ProgressBar progressBar;
@@ -457,8 +457,7 @@ public class ImportOrganizeView extends BorderPane {
         // Update button state since we have a new selected item
         updateRescanButtonState();
         
-        logger.info("Added subdirectory '{}' under original directory '{}'", 
-                   subdirectoryPath, originalDirectoryItem.getPath());
+        logger.info(String.format("Added subdirectory '{}' under original directory '{}'", subdirectoryPath, originalDirectoryItem.getPath()));
     }
     
     /**
@@ -477,7 +476,7 @@ public class ImportOrganizeView extends BorderPane {
         updateRescanButtonState();
         statusLabel.setText("Removed subdirectory: " + subdirectoryItem.getPath());
         
-        logger.info("Removed subdirectory '{}'", subdirectoryItem.getPath());
+        logger.info(String.format("Removed subdirectory '{}'", subdirectoryItem.getPath()));
     }
     
     private TableView<MusicFileSelection> createFileSelectionTable() {
@@ -554,7 +553,7 @@ public class ImportOrganizeView extends BorderPane {
             statusLabel.setText("Loaded " + allFiles.size() + " files for selection");
         } catch (Exception e) {
             statusLabel.setText("Error loading files: " + e.getMessage());
-            logger.error("Error loading files for selection: {}", e.getMessage(), e);
+            logger.error(String.format("Error loading files for selection: {}", e.getMessage()), e);
         }
     }
     
@@ -891,7 +890,7 @@ public class ImportOrganizeView extends BorderPane {
                         
                     } catch (Exception e) {
                         progressDialog.addLogEntry("Batch save error: " + e.getMessage());
-                        logger.error("Batch save failed, falling back to individual saves", e);
+                        logger.error("Batch save failed, falling back to individual saves");
                         
                         // Fallback to individual saves if batch fails
                         int savedFiles = 0;
@@ -960,7 +959,7 @@ public class ImportOrganizeView extends BorderPane {
                     String errorMessage = getException().getMessage();
                     statusLabel.setText("Import failed: " + errorMessage);
                     progressDialog.setCompleted(false, errorMessage);
-                    logger.error("Import operation failed: {}", errorMessage, getException());
+                    logger.error(String.format("Import operation failed: {}", errorMessage), getException());
                 });
             }
         };
@@ -1041,12 +1040,12 @@ public class ImportOrganizeView extends BorderPane {
                         
                         // Copy the file to the new location
                         java.nio.file.Files.copy(sourcePath, destinationFilePath);
-                        logger.debug("Copying file: {} -> {}", sourcePath, destinationFilePath);
+                        logger.debug(String.format("Copying file: {} -> {}", sourcePath, destinationFilePath));
                         
                         successfulCopies++;
                         
                     } catch (Exception e) {
-                        logger.error("Failed to copy file: {} - {}", musicFile.getFilePath(), e.getMessage(), e);
+                        logger.error(String.format("Failed to copy file: %s - %s", musicFile.getFilePath(), e.getMessage()), e);
                     }
                     
                     processedFiles++;
@@ -1081,7 +1080,7 @@ public class ImportOrganizeView extends BorderPane {
                     progressBar.setVisible(false);
                     progressLabel.setText("");
                     statusLabel.setText("Organization failed: " + getException().getMessage());
-                    logger.error("File organization failed: {}", getException().getMessage(), getException());
+                    logger.error(String.format("File organization failed: %s", getException().getMessage()), getException());
                 });
             }
         };
@@ -1109,7 +1108,7 @@ public class ImportOrganizeView extends BorderPane {
                     statusLabel.setText("Database cleared successfully");
                 } catch (Exception e) {
                     statusLabel.setText("Error clearing database: " + e.getMessage());
-                    logger.error("Error clearing database: {}", e.getMessage(), e);
+                    logger.error(String.format("Error clearing database: {}", e.getMessage()), e);
                 }
             }
         });
@@ -1182,10 +1181,10 @@ public class ImportOrganizeView extends BorderPane {
                 directoryData.add(item);
             }
             
-            logger.info("Loaded {} directories for rescanning from database", directories.size());
+            logger.info(String.format("Loaded {} directories for rescanning from database", directories.size()));
             
         } catch (Exception e) {
-            logger.error("Failed to load directories from database", e);
+            logger.error("Failed to load directories from database");
             statusLabel.setText("Error loading directories from database: " + e.getMessage());
         }
     }
@@ -1270,7 +1269,7 @@ public class ImportOrganizeView extends BorderPane {
                         
                     } catch (Exception e) {
                         Platform.runLater(() -> item.setStatus("Scan Error"));
-                        logger.error("Failed to scan directory: {}", item.getPath(), e);
+                        logger.error(String.format("Failed to scan directory: {}", item.getPath()), e);
                     }
                 }
                 
@@ -1301,7 +1300,7 @@ public class ImportOrganizeView extends BorderPane {
                         if (!newFiles.isEmpty()) {
                             int savedNew = DatabaseManager.saveMusicFilesBatch(newFiles);
                             totalProcessed += savedNew;
-                            logger.info("Batch inserted {} new files during rescan", savedNew);
+                            logger.info(String.format("Batch inserted {} new files during rescan", savedNew));
                         }
                         
                         // Handle existing files individually (upsert operations)
@@ -1312,7 +1311,7 @@ public class ImportOrganizeView extends BorderPane {
                                 DatabaseManager.saveOrUpdateMusicFile(musicFile);
                                 totalProcessed++;
                             } catch (Exception e) {
-                                logger.error("Failed to update music file: {}", musicFile.getFilePath(), e);
+                                logger.error(String.format("Failed to update music file: {}", musicFile.getFilePath()), e);
                             }
                         }
                         
@@ -1335,7 +1334,7 @@ public class ImportOrganizeView extends BorderPane {
                                 }
                             }
                         });
-                        logger.error("Failed to save rescanned files", e);
+                        logger.error("Failed to save rescanned files");
                     }
                 }
                 

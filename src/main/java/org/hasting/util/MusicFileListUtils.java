@@ -1,8 +1,8 @@
 package org.hasting.util;
 
 import org.hasting.model.MusicFile;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.util.Comparator;
 import java.util.Iterator;
@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 public class MusicFileListUtils {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(MusicFileListUtils.class);
+    private static final Logger logger = Log4Rich.getLogger(MusicFileListUtils.class);
 
     /**
      * Retrieves a list of MusicFiles from the database and finds those that have likely
@@ -27,8 +27,7 @@ public class MusicFileListUtils {
         return allMusicFiles.parallelStream()
                 .peek(musicFile -> {
                     int count = counter.incrementAndGet();
-                    logger.debug("Processing duplicate detection: {} by {} (Processed: {})", 
-                               musicFile.getTitle(), musicFile.getArtist(), count);
+                    logger.debug(String.format("Processing duplicate detection: {} by {} (Processed: {})", musicFile.getTitle()), musicFile.getArtist(), count);
                 })
                 .filter(musicFile -> musicFile.findMostSimilarFiles(allMusicFiles, 4).stream()
                         .anyMatch(similarFile -> musicFile.isItLikelyTheSameSong(similarFile)))

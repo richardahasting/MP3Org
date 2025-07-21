@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Represents a database profile configuration containing database location,
@@ -17,7 +17,7 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
  */
 public class DatabaseProfile {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseProfile.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseProfile.class);
     
     private String id;
     private String name;
@@ -192,7 +192,7 @@ public class DatabaseProfile {
                 Files.createDirectories(parentDir);
             }
         } catch (IOException e) {
-            logger.warning("Could not create database directory: {}", e.getMessage());
+            logger.warn(String.format("Could not create database directory: {}", e.getMessage()));
         }
         
         return dbPath.toString();
@@ -333,7 +333,7 @@ public class DatabaseProfile {
                 FuzzySearchConfig fuzzyConfig = FuzzySearchConfig.fromProperties(fuzzySearchProps);
                 profile.setFuzzySearchConfig(fuzzyConfig);
             } catch (Exception e) {
-                logger.warning("Could not load fuzzy search configuration, using defaults: {}", e.getMessage());
+                logger.warn(String.format("Could not load fuzzy search configuration, using defaults: {}", e.getMessage()));
                 profile.setFuzzySearchConfig(new FuzzySearchConfig());
             }
         }

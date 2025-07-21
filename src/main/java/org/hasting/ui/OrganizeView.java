@@ -14,8 +14,8 @@ import org.hasting.model.MusicFile;
 import org.hasting.model.PathTemplate;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.PathTemplateManager;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -57,7 +57,7 @@ import java.util.stream.Collectors;
  */
 public class OrganizeView extends BorderPane {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(OrganizeView.class);
+    private static final Logger logger = Log4Rich.getLogger(OrganizeView.class);
     
     // Search components
     private TextField searchField;
@@ -427,7 +427,7 @@ public class OrganizeView extends BorderPane {
             statusLabel.setText("Found " + results.size() + " files matching search criteria");
             
         } catch (Exception e) {
-            logger.error("Error performing search", e);
+            logger.error("Error performing search");
             statusLabel.setText("Search error: " + e.getMessage());
         }
     }
@@ -441,7 +441,7 @@ public class OrganizeView extends BorderPane {
                 .collect(Collectors.toList());
                 
         } catch (Exception e) {
-            logger.error("Error searching music files", e);
+            logger.error("Error searching music files");
             return new ArrayList<>();
         }
     }
@@ -485,7 +485,7 @@ public class OrganizeView extends BorderPane {
             statusLabel.setText("Showing all " + allFiles.size() + " imported files");
             
         } catch (Exception e) {
-            logger.error("Error refreshing search results", e);
+            logger.error("Error refreshing search results");
             statusLabel.setText("Error loading files: " + e.getMessage());
         }
     }
@@ -660,7 +660,7 @@ public class OrganizeView extends BorderPane {
                 organizeButton.setDisable(false);
                 progressBar.setVisible(false);
                 statusLabel.setText("Organization failed: " + organizeTask.getException().getMessage());
-                logger.error("Organization task failed", organizeTask.getException());
+                logger.error("Organization task failed");
             });
         });
         

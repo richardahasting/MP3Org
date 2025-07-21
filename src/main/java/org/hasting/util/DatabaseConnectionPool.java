@@ -1,7 +1,7 @@
 package org.hasting.util;
 
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 import java.sql.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * </ul>
  */
 public class DatabaseConnectionPool {
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseConnectionPool.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseConnectionPool.class);
     
     private static final int MIN_POOL_SIZE = 1;
     private static final int MAX_POOL_SIZE = 5;
@@ -50,10 +50,10 @@ public class DatabaseConnectionPool {
                 Connection conn = createNewConnection();
                 connectionPool.offer(conn);
             } catch (SQLException e) {
-                logger.error("Failed to create initial connection", e);
+                logger.error("Failed to create initial connection");
             }
         }
-        logger.info("Connection pool initialized with {} connections", connectionPool.size());
+        logger.info(String.format("Connection pool initialized with {} connections", connectionPool.size()));
     }
     
     /**
@@ -89,7 +89,7 @@ public class DatabaseConnectionPool {
                 // Pool is empty, create new connection if under limit
                 if (connectionPool.size() < MAX_POOL_SIZE) {
                     conn = createNewConnection();
-                    logger.debug("Created new connection, pool size: {}", connectionPool.size() + 1);
+                    logger.debug(String.format("Created new connection, pool size: {}", connectionPool.size()) + 1);
                 } else {
                     throw new SQLException("Connection pool exhausted, timeout waiting for connection");
                 }
@@ -138,11 +138,11 @@ public class DatabaseConnectionPool {
                 try {
                     conn.close();
                 } catch (SQLException e) {
-                    logger.debug("Error closing invalid connection", e);
+                    logger.debug("Error closing invalid connection");
                 }
             }
         } catch (SQLException e) {
-            logger.debug("Error resetting connection", e);
+            logger.debug("Error resetting connection");
             try {
                 conn.close();
             } catch (SQLException ex) {
@@ -187,7 +187,7 @@ public class DatabaseConnectionPool {
                 try {
                     conn.rollback();
                 } catch (SQLException ex) {
-                    logger.error("Failed to rollback transaction", ex);
+                    logger.error("Failed to rollback transaction");
                 }
             }
             throw e;
@@ -201,7 +201,7 @@ public class DatabaseConnectionPool {
                     try {
                         conn.close();
                     } catch (SQLException e) {
-                        logger.debug("Error closing failed connection", e);
+                        logger.debug("Error closing failed connection");
                     }
                 }
             }
@@ -220,7 +220,7 @@ public class DatabaseConnectionPool {
             try {
                 conn.close();
             } catch (SQLException e) {
-                logger.debug("Error closing connection during shutdown", e);
+                logger.debug("Error closing connection during shutdown");
             }
         }
         

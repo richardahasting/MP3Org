@@ -20,8 +20,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Logger logger = LoggerFactory.getLogger(MyClass.class);
  * 
  * logger.info("Starting operation");
- * logger.debug("Processing file: {}", fileName);
- * logger.error("Failed to process {}: {}", fileName, exception.getMessage(), exception);
+ * logger.debug(String.format("Processing file: {}", fileName));
+ * logger.error(String.format("Failed to process {}: {}", fileName, exception.getMessage()), exception);
  * </pre>
  * 
  * @since 1.0

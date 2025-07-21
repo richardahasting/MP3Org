@@ -5,8 +5,8 @@ import org.hasting.util.MusicFileComparator;
 import org.hasting.util.ArtistStatisticsManager;
 import org.hasting.util.FileOrganizer;
 import org.hasting.util.MetadataExtractor;
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
  */
 public class MusicFile {
 
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(MusicFile.class);
+    private static final Logger logger = Log4Rich.getLogger(MusicFile.class);
     final private static int DEFAULT_NUM_OF_SIMILAR_FILES = 10;
 
     private Long id;
@@ -598,13 +598,13 @@ public class MusicFile {
                     this.album = "****deleted****";
                     this.genre = "****deleted****";
                     this.fileType = "****deleted****";
-                    logger.info("Deleted file: {}", path);
+                    logger.info(String.format("Deleted file: {}", path));
                     return true;
                 } else {
-                    logger.error("Failed to delete file: {}", path);
+                    logger.error(String.format("Failed to delete file: {}", path));
                 }
             } else {
-                logger.warning("File does not exist: {}", path);
+                logger.warn(String.format("File does not exist: {}", path));
             }
         } else {
             logger.error("File cannot be deleted because filePath is null");

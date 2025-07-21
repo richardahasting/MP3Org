@@ -22,7 +22,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("commons-fileupload:commons-fileupload:1.5")
 
-    // Include all JARs from the lib directory
+    // Include all JARs from the lib directory (including log4Rich v1.0.1)
     implementation(files("lib").asFileTree.matching {
         include("**/*.jar")
     })

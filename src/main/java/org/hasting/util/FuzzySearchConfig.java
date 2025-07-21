@@ -1,8 +1,8 @@
 package org.hasting.util;
 
 import java.util.Properties;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Comprehensive configuration class for fine-tuning fuzzy search algorithms in duplicate detection.
@@ -90,7 +90,7 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
  */
 public class FuzzySearchConfig {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(FuzzySearchConfig.class);
+    private static final Logger logger = Log4Rich.getLogger(FuzzySearchConfig.class);
     
     // Default values
     public static final double DEFAULT_TITLE_SIMILARITY = 85.0;
@@ -399,7 +399,7 @@ public class FuzzySearchConfig {
             config.setMinimumFieldsToMatch(Integer.parseInt(props.getProperty("minimumFieldsToMatch", String.valueOf(DEFAULT_MIN_FIELDS_MATCH))));
             config.setBitrateToleranceKbps(Integer.parseInt(props.getProperty("bitrateToleranceKbps", String.valueOf(DEFAULT_BITRATE_TOLERANCE))));
         } catch (NumberFormatException e) {
-            logger.warning("Error parsing fuzzy search configuration, using defaults: {}", e.getMessage());
+            logger.warn(String.format("Error parsing fuzzy search configuration, using defaults: {}", e.getMessage()));
         }
         
         return config;

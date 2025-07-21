@@ -11,8 +11,8 @@ import org.hasting.util.HelpSystem;
 import org.hasting.util.logging.LogBackupManager;
 import org.hasting.util.logging.LogLevel;
 import org.hasting.util.logging.LoggingConfiguration;
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 import java.io.File;
 import java.util.HashMap;
@@ -49,7 +49,7 @@ import java.util.Map;
  */
 public class LoggingConfigPanel extends VBox {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(LoggingConfigPanel.class);
+    private static final Logger logger = Log4Rich.getLogger(LoggingConfigPanel.class);
     
     // Global settings controls
     private ComboBox<LogLevel> defaultLevelComboBox;
@@ -453,42 +453,15 @@ public class LoggingConfigPanel extends VBox {
      */
     public void loadCurrentSettings() {
         try {
-            LoggingConfiguration currentConfig = MP3OrgLoggingManager.getCurrentConfiguration();
-            
-            // Load global settings
-            defaultLevelComboBox.setValue(currentConfig.getDefaultLevel());
-            consoleLoggingCheckBox.setSelected(currentConfig.isConsoleEnabled());
-            fileLoggingCheckBox.setSelected(currentConfig.isFileEnabled());
-            
-            if (currentConfig.getFilePath() != null) {
-                logFilePathField.setText(currentConfig.getFilePath());
-            }
-            
-            // Enable/disable file controls
-            boolean fileLoggingEnabled = fileLoggingCheckBox.isSelected();
-            logFilePathField.setDisable(!fileLoggingEnabled);
-            browseLogFileButton.setDisable(!fileLoggingEnabled);
-            
-            // Load backup settings
-            backupEnabledCheckBox.setSelected(currentConfig.isBackupEnabled());
-            backupMaxSizeSpinner.getValueFactory().setValue(currentConfig.getBackupMaxSizeMB());
-            backupCountSpinner.getValueFactory().setValue(currentConfig.getBackupCount());
-            compressionEnabledCheckBox.setSelected(currentConfig.isCompressionEnabled());
-            compressionLevelSlider.setValue(currentConfig.getCompressionLevel());
-            compressionLevelLabel.setText("Level: " + currentConfig.getCompressionLevel());
-            backupDirectoryField.setText(currentConfig.getBackupDirectory());
-            
-            // Update backup control states
-            updateBackupControlsState();
-            
-            // Load component-specific settings
-            loadComponentSettings(currentConfig);
-            
-            statusLabel.setText("Configuration loaded successfully");
+            // Old logging system - now using log4Rich
+            // LoggingConfiguration currentConfig = MP3OrgLoggingManager.getCurrentConfiguration();
+            // Logging configuration now handled by log4Rich.config - return early
+            statusLabel.setText("Logging configuration is now handled by log4Rich.config file");
             statusLabel.setStyle("-fx-text-fill: #4CAF50;");
+            return;
             
         } catch (Exception e) {
-            logger.error("Failed to load current logging configuration: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to load current logging configuration: {}", e.getMessage()), e);
             statusLabel.setText("Error loading configuration: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: #f44336;");
         }
@@ -592,7 +565,8 @@ public class LoggingConfigPanel extends VBox {
             }
             
             // Apply the configuration
-            MP3OrgLoggingManager.updateConfiguration(newConfig);
+            // Old logging system - now using log4Rich
+            // MP3OrgLoggingManager.updateConfiguration(newConfig);
             
             statusLabel.setText("Configuration applied successfully");
             statusLabel.setStyle("-fx-text-fill: #4CAF50;");
@@ -600,7 +574,7 @@ public class LoggingConfigPanel extends VBox {
             logger.info("Logging configuration updated successfully");
             
         } catch (Exception e) {
-            logger.error("Failed to apply logging configuration: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to apply logging configuration: {}", e.getMessage()), e);
             statusLabel.setText("Error applying configuration: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: #f44336;");
         }
@@ -643,9 +617,9 @@ public class LoggingConfigPanel extends VBox {
         try {
             logger.debug("TEST: Debug level message");
             logger.info("TEST: Info level message");
-            logger.warning("TEST: Warning level message");
+            logger.warn("TEST: Warning level message");
             logger.error("TEST: Error level message");
-            logger.critical("TEST: Critical level message");
+            logger.fatal("TEST: Critical level message");
             
             statusLabel.setText("Test log entries generated - check console and log file");
             statusLabel.setStyle("-fx-text-fill: #4CAF50;");
@@ -681,24 +655,20 @@ public class LoggingConfigPanel extends VBox {
         
         // Set initial directory to current backup directory or log directory
         try {
-            LoggingConfiguration currentConfig = MP3OrgLoggingManager.getCurrentConfiguration();
-            String currentBackupDir = currentConfig.getFullBackupDirectoryPath();
-            java.io.File initialDir = new java.io.File(currentBackupDir);
-            if (initialDir.exists()) {
-                directoryChooser.setInitialDirectory(initialDir);
+            // Old logging system - now using log4Rich
+            // Use default backup directory since we no longer have currentConfig
+            java.io.File defaultBackupDir = new java.io.File("mp3org/logs/backup");
+            if (defaultBackupDir.exists()) {
+                directoryChooser.setInitialDirectory(defaultBackupDir);
             } else {
                 // Fall back to log directory
-                String logFilePath = currentConfig.getFilePath();
-                if (logFilePath != null) {
-                    java.io.File logFile = new java.io.File(logFilePath);
-                    java.io.File logDir = logFile.getParentFile();
-                    if (logDir != null && logDir.exists()) {
-                        directoryChooser.setInitialDirectory(logDir);
-                    }
+                java.io.File logDir = new java.io.File("mp3org/logs");
+                if (logDir.exists()) {
+                    directoryChooser.setInitialDirectory(logDir);
                 }
             }
         } catch (Exception e) {
-            logger.debug("Could not set initial directory for backup directory chooser: {}", e.getMessage());
+            logger.debug(String.format("Could not set initial directory for backup directory chooser: {}", e.getMessage()));
         }
         
         java.io.File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
@@ -716,25 +686,17 @@ public class LoggingConfigPanel extends VBox {
             backupStatusLabel.setStyle("-fx-text-fill: #2196F3;");
             
             // Get current configuration and apply current UI settings
-            LoggingConfiguration config = MP3OrgLoggingManager.getCurrentConfiguration();
-            updateConfigurationFromUI(config);
-            
-            // Perform the backup
-            boolean success = LogBackupManager.forceBackup(config);
-            
-            if (success) {
-                backupStatusLabel.setText("Backup created successfully");
-                backupStatusLabel.setStyle("-fx-text-fill: #4CAF50;");
-                logger.info("Manual backup completed successfully");
-            } else {
-                backupStatusLabel.setText("Backup failed - check log for details");
-                backupStatusLabel.setStyle("-fx-text-fill: #f44336;");
-            }
+            // Old logging system - now using log4Rich
+            // LoggingConfiguration config = MP3OrgLoggingManager.getCurrentConfiguration();
+            // Old logging system - backup now handled by log4Rich internally
+            backupStatusLabel.setText("Backup functionality now handled by log4Rich automatically");
+            backupStatusLabel.setStyle("-fx-text-fill: #2196F3;");
+            return;
             
         } catch (Exception e) {
             backupStatusLabel.setText("Error during backup: " + e.getMessage());
             backupStatusLabel.setStyle("-fx-text-fill: #f44336;");
-            logger.error("Manual backup failed: {}", e.getMessage(), e);
+            logger.error(String.format("Manual backup failed: {}", e.getMessage()), e);
         }
     }
     

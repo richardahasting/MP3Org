@@ -7,8 +7,8 @@ import org.hasting.model.MusicFile;
 import java.io.File;
 import java.util.*;
 import java.util.function.Consumer;
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 /**
  * High-performance music file scanner for recursive directory traversal and metadata extraction.
@@ -63,7 +63,7 @@ import org.hasting.util.logging.Logger;
  * @since 1.0
  */
 public class MusicFileScanner {
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(MusicFileScanner.class);
+    private static final Logger logger = Log4Rich.getLogger(MusicFileScanner.class);
     // List of supported music file extensions
     private static final String[] SUPPORTED_EXTENSIONS = {
         "mp3", "flac", "ogg", "wav", "aac", "m4a", "wma", "aiff", "ape", "opus"
@@ -101,7 +101,7 @@ public class MusicFileScanner {
     
     
     public List<MusicFile> scanMusicFiles(List<String> directoryPaths) {
-        logger.debug("scanMusicFiles() - entry: {} directories to scan", directoryPaths != null ? directoryPaths.size() : 0);
+        logger.debug(String.format("scanMusicFiles() - entry: %d directories to scan", directoryPaths != null ? directoryPaths.size() : 0));
         List<MusicFile> musicFiles = new ArrayList<>();
         musicFiles = DatabaseManager.getAllMusicFiles();   // Add this line to load music files from the database
         if (musicFiles.isEmpty()) {
@@ -117,7 +117,7 @@ public class MusicFileScanner {
             .map(this::findAllMusicFiles)
             .forEach(musicFiles::addAll);
         
-        logger.debug("scanMusicFiles() - exit: found {} music files", musicFiles.size());
+        logger.debug(String.format("scanMusicFiles() - exit: found {} music files", musicFiles.size()));
         return musicFiles;
     }
     
@@ -125,7 +125,7 @@ public class MusicFileScanner {
      * Enhanced method for scanning with detailed progress feedback.
      */
     public List<MusicFile> findAllMusicFilesWithProgress(List<String> directoryPaths) {
-        logger.info("Starting enhanced music file scan with progress tracking for {} directories", directoryPaths != null ? directoryPaths.size() : 0);
+        logger.info(String.format("Starting enhanced music file scan with progress tracking for %d directories", directoryPaths != null ? directoryPaths.size() : 0));
         List<MusicFile> allMusicFiles = new ArrayList<>();
         int totalDirectories = directoryPaths.size();
         int directoriesProcessed = 0;
@@ -137,11 +137,11 @@ public class MusicFileScanner {
             
             File directory = new File(directoryPath.trim());
             if (!directory.exists() || !directory.isDirectory()) {
-                logger.warning("Invalid directory: {}", directoryPath);
+                logger.warn(String.format("Invalid directory: {}", directoryPath));
                 continue;
             }
             
-            logger.debug("Scanning directory: {}", directoryPath);
+            logger.debug(String.format("Scanning directory: {}", directoryPath));
             
             // Stage 1: Directory scanning
             if (detailedProgressCallback != null) {
@@ -201,14 +201,14 @@ public class MusicFileScanner {
                                   musicFile.getTitle());
                         
                     } catch (Exception e) {
-                        logger.warning("Error processing file " + fileName + ": " + e.getMessage());
+                        logger.warn("Error processing file " + fileName + ": " + e.getMessage());
                     }
                 }
                 
                 totalFilesProcessed += newFiles.size();
                 
             } catch (Exception e) {
-                logger.error("Error scanning directory: {}", e.getMessage(), e);
+                logger.error(String.format("Error scanning directory: {}", e.getMessage()), e);
                 if (statusCallback != null) {
                     statusCallback.accept("Error scanning directory: " + e.getMessage());
                 }
@@ -231,7 +231,7 @@ public class MusicFileScanner {
         List<MusicFile> musicFiles = new ArrayList<>();
         
         if (!directory.exists() || !directory.isDirectory()) {
-            logger.warning("Invalid directory: " + directoryPath);
+            logger.warn("Invalid directory: " + directoryPath);
             if (statusCallback != null) {
                 statusCallback.accept("Invalid directory: " + directoryPath);
             }
@@ -266,7 +266,7 @@ public class MusicFileScanner {
             }
             
         } catch (Exception e) {
-            logger.error("Error scanning directory: {}", e.getMessage(), e);
+            logger.error(String.format("Error scanning directory: {}", e.getMessage()), e);
             if (statusCallback != null) {
                 statusCallback.accept("Error scanning directory: " + e.getMessage());
             }
@@ -368,7 +368,7 @@ public class MusicFileScanner {
         // Test with a single directory
         List<String> singleDirectory = Arrays.asList("/Users/richard/Music");
         List<MusicFile> singleDirMusicFiles = scanner.scanMusicFiles(singleDirectory);
-        logger.info("Music files found in single directory: {}", singleDirMusicFiles.size());
+        logger.info(String.format("Music files found in single directory: {}", singleDirMusicFiles.size()));
 
         // Test with multiple directories
         List<String> multipleDirectories = Arrays.asList(
@@ -376,6 +376,6 @@ public class MusicFileScanner {
             "/Users/richard/Music/Music/Media"
         );
         List<MusicFile> multipleDirMusicFiles = scanner.scanMusicFiles(multipleDirectories);
-        logger.info("Music files found in multiple directories: {}", multipleDirMusicFiles.size());
+        logger.info(String.format("Music files found in multiple directories: {}", multipleDirMusicFiles.size()));
     }
 }

@@ -17,8 +17,8 @@ import org.hasting.util.FuzzyMatcher;
 import org.hasting.util.HelpSystem;
 import org.hasting.util.ProfileChangeListener;
 import org.hasting.util.ProfileChangeNotifier;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -65,7 +65,7 @@ import java.util.concurrent.Executors;
  */
 public class DuplicateManagerView extends BorderPane implements ProfileChangeListener {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(DuplicateManagerView.class);
+    private static final Logger logger = Log4Rich.getLogger(DuplicateManagerView.class);
     
     /**
      * Enumeration for different display modes in the duplicate manager.
@@ -418,7 +418,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
                     statusLabel.setText("Error loading duplicates: " + errorMsg);
                     updateUIAfterLoad(0, true);
-                    logger.error("Failed to detect duplicates: {}", errorMsg, exception);
+                    logger.error(String.format("Failed to detect duplicates: {}", errorMsg, exception));
                 });
             }
             
@@ -538,7 +538,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     Throwable exception = getException();
                     String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
                     statusLabel.setText("Error loading files: " + errorMsg);
-                    logger.error("Failed to load all music files: {}", errorMsg, exception);
+                    logger.error(String.format("Failed to load all music files: {}", errorMsg, exception));
                 });
             }
             
@@ -651,7 +651,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     Throwable exception = getException();
                     String errorMsg = exception != null ? exception.getMessage() : "Unknown error";
                     statusLabel.setText("Error loading similar files: " + errorMsg);
-                    logger.error("Failed to load similar files: {}", errorMsg, exception);
+                    logger.error(String.format("Failed to load similar files: {}", errorMsg, exception));
                 });
             }
             
@@ -690,7 +690,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                         }
                     } catch (Exception e) {
                         statusLabel.setText("Error deleting file: " + e.getMessage());
-                        logger.error("Failed to delete selected file: {}", e.getMessage(), e);
+                        logger.error(String.format("Failed to delete selected file: {}", e.getMessage()), e);
                     }
                 }
             });
@@ -728,7 +728,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                         }
                     } catch (Exception e) {
                         statusLabel.setText("Error deleting file: " + e.getMessage());
-                        logger.error("Failed to delete file during keep better quality operation: {}", e.getMessage(), e);
+                        logger.error(String.format("Failed to delete file during keep better quality operation: {}", e.getMessage()), e);
                     }
                 }
             });
@@ -853,7 +853,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
                     }
                 } catch (Exception e) {
                     statusLabel.setText("Error deleting file: " + e.getMessage());
-                    logger.error("Failed to delete file: {}", e.getMessage(), e);
+                    logger.error(String.format("Failed to delete file: {}", e.getMessage()), e);
                 }
             }
         });
@@ -920,7 +920,7 @@ public class DuplicateManagerView extends BorderPane implements ProfileChangeLis
             }
         } catch (Exception e) {
             statusLabel.setText("Error opening file location: " + e.getMessage());
-            logger.error("Failed to open file location: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to open file location: {}", e.getMessage()), e);
         }
     }
     

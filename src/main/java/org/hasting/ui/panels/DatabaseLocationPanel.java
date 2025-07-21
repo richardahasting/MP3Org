@@ -6,8 +6,8 @@ import javafx.stage.DirectoryChooser;
 import org.hasting.util.DatabaseConfig;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.HelpSystem;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.File;
 import java.awt.Desktop;
@@ -18,7 +18,7 @@ import java.awt.Desktop;
  */
 public class DatabaseLocationPanel extends VBox {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(DatabaseLocationPanel.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseLocationPanel.class);
     
     private TextField currentPathField;
     private TextArea configInfoArea;
@@ -134,7 +134,7 @@ public class DatabaseLocationPanel extends VBox {
         } catch (Exception e) {
             statusLabel.setText("Error loading configuration: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
-            logger.error("Error loading configuration: {}", e.getMessage(), e);
+            logger.error(String.format("Error loading configuration: {}", e.getMessage()), e);
         }
     }
     
@@ -153,7 +153,7 @@ public class DatabaseLocationPanel extends VBox {
                 directoryChooser.setInitialDirectory(parentDir);
             }
         } catch (Exception e) {
-            logger.debug("Could not set initial directory, using default: {}", e.getMessage());
+            logger.debug(String.format("Could not set initial directory, using default: {}", e.getMessage()));
         }
         
         File selectedDirectory = directoryChooser.showDialog(getScene().getWindow());
@@ -183,7 +183,7 @@ public class DatabaseLocationPanel extends VBox {
                 
             } catch (Exception e) {
                 showError("Failed to change database location: " + e.getMessage());
-                logger.error("Failed to validate new database location: {}", e.getMessage(), e);
+                logger.error(String.format("Failed to validate new database location: {}", e.getMessage()), e);
             }
         }
     }
@@ -216,7 +216,7 @@ public class DatabaseLocationPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to change database location: " + e.getMessage());
-            logger.error("Failed to change database location: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to change database location: {}", e.getMessage()), e);
         }
     }
     
@@ -255,7 +255,7 @@ public class DatabaseLocationPanel extends VBox {
             }
             
             showError(errorMessage);
-            logger.error("Configuration reload failed: {}", e.getMessage(), e);
+            logger.error(String.format("Configuration reload failed: {}", e.getMessage()), e);
             
             // Try to at least update the display with current info
             try {
@@ -296,7 +296,7 @@ public class DatabaseLocationPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to open database location: " + e.getMessage());
-            logger.error("Failed to open database location in file manager: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to open database location in file manager: {}", e.getMessage()), e);
         }
     }
     

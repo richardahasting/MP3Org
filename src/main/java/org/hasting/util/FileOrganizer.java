@@ -2,8 +2,8 @@ package org.hasting.util;
 
 import org.hasting.model.MusicFile;
 import org.hasting.model.PathTemplate;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,7 +16,7 @@ import java.nio.file.Paths;
  */
 public class FileOrganizer {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(FileOrganizer.class);
+    private static final Logger logger = Log4Rich.getLogger(FileOrganizer.class);
     
     /**
      * Private constructor to prevent instantiation of utility class.
@@ -115,7 +115,7 @@ public class FileOrganizer {
 
         // Copy the file to the new location
         Files.copy(sourcePath, destinationPath);
-        logger.info("Copied file: {} -> {}", sourcePath, destinationPath);
+        logger.info(String.format("Copied file: {} -> {}", sourcePath, destinationPath));
     }
     
     /**
