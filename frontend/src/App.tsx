@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { TabId } from './types/music';
 import MetadataEditor from './components/metadata/MetadataEditor';
+import ImportView from './components/import/ImportView';
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'duplicates', label: 'Duplicates', icon: '◎' },
@@ -39,7 +40,7 @@ function App() {
       <main className="main-content">
         {activeTab === 'metadata' && <MetadataEditor />}
         {activeTab === 'duplicates' && <PlaceholderView title="Duplicate Manager" description="Find and manage duplicate music files" />}
-        {activeTab === 'import' && <PlaceholderView title="Import" description="Scan directories for music files" />}
+        {activeTab === 'import' && <ImportView />}
         {activeTab === 'organize' && <PlaceholderView title="Organize" description="Organize your music collection" />}
         {activeTab === 'config' && <PlaceholderView title="Configuration" description="Manage application settings" />}
       </main>

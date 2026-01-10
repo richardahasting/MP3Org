@@ -27,3 +27,32 @@ export interface PageResponse<T> {
 }
 
 export type TabId = 'duplicates' | 'metadata' | 'import' | 'organize' | 'config';
+
+// Scanning types for Phase 2
+export interface ScanProgress {
+  sessionId: string;
+  stage: 'starting' | 'scanning' | 'reading_tags' | 'saving' | 'completed' | 'cancelled' | 'error';
+  currentDirectory: string;
+  currentFile: string;
+  filesFound: number;
+  filesProcessed: number;
+  totalDirectories: number;
+  directoriesProcessed: number;
+  percentComplete: number;
+  message: string;
+  isComplete: boolean;
+  isCancelled: boolean;
+  error: string | null;
+}
+
+export interface DirectoryEntry {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+  canRead: boolean;
+}
+
+export interface BrowseResponse {
+  currentPath: string | null;
+  entries: DirectoryEntry[];
+}
