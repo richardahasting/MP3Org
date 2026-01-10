@@ -103,10 +103,10 @@ public class DatabaseConfig {
     };
     private static final Set<String> DEFAULT_ENABLED_TYPES = new HashSet<>(Arrays.asList(ALL_SUPPORTED_TYPES));
     
-    // JDBC configuration
-    private static final String JDBC_DRIVER = "org.apache.derby.jdbc.EmbeddedDriver";
-    private static final String JDBC_URL_PREFIX = "jdbc:derby:";
-    private static final String JDBC_URL_SUFFIX = ";create=true";
+    // JDBC configuration - SQLite (Issue #72 migration from Derby)
+    private static final String JDBC_DRIVER = "org.sqlite.JDBC";
+    private static final String JDBC_URL_PREFIX = "jdbc:sqlite:";
+    private static final String JDBC_URL_SUFFIX = "";  // SQLite auto-creates
     private static final String DEFAULT_USER = "";
     private static final String DEFAULT_PASSWORD = "";
     
@@ -247,20 +247,26 @@ public class DatabaseConfig {
     
     /**
      * Normalizes the database path to ensure it's properly formatted.
+     * For SQLite, ensures the path ends with .db extension.
      */
     private String normalizePath(String path) {
         if (path == null || path.trim().isEmpty()) {
-            return DEFAULT_DB_PATH;
+            return DEFAULT_DB_PATH + ".db";
         }
-        
+
         path = path.trim();
-        
+
+        // Ensure SQLite database file has .db extension
+        if (!path.toLowerCase().endsWith(".db")) {
+            path = path + ".db";
+        }
+
         // If it's a relative path, make it relative to current working directory
         Path dbPath = Paths.get(path);
         if (!dbPath.isAbsolute()) {
             dbPath = Paths.get(System.getProperty("user.dir")).resolve(path);
         }
-        
+
         // Ensure parent directories exist
         try {
             Path parentDir = dbPath.getParent();
@@ -271,7 +277,7 @@ public class DatabaseConfig {
         } catch (IOException e) {
             logger.warn("Could not create database directory: " + e.getMessage());
         }
-        
+
         return dbPath.toString();
     }
     

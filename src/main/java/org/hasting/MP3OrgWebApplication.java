@@ -24,16 +24,21 @@ public class MP3OrgWebApplication {
     /**
      * Initialize the database when the application is ready.
      * This reuses the existing DatabaseManager infrastructure.
+     *
+     * Uses SQLite as the database backend (Issue #72 migration from Derby).
      */
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         try {
-            DatabaseManager.initializeWithAutomaticFallback(null);
+            // Use basic initialization - SQLite doesn't have lock issues like Derby
+            DatabaseManager.initialize();
             System.out.println("MP3Org Web Application started successfully");
             System.out.println("Database initialized: " + DatabaseManager.getMusicFileCount() + " music files");
+            System.out.println("Database location: " + DatabaseManager.getConfig().getDatabasePath());
         } catch (Exception e) {
             System.err.println("Warning: Database initialization failed: " + e.getMessage());
             System.err.println("Application will continue but database features may be limited");
+            e.printStackTrace();
         }
     }
 }

@@ -40,12 +40,14 @@ dependencies {
     compileOnly("org.openjfx:javafx-graphics:21.0.2:mac-aarch64")
     compileOnly("org.openjfx:javafx-base:21.0.2:mac-aarch64")
 
-    // Derby database (embedded)
-    implementation("org.apache.derby:derby:10.16.1.1")
-    implementation("org.apache.derby:derbyclient:10.16.1.1")
+    // SQLite database (embedded) - replaces Derby for Issue #72
+    implementation("org.xerial:sqlite-jdbc:3.45.1.0")
 
     // Connection pooling
     implementation("com.zaxxer:HikariCP:5.0.1")
+
+    // Keep Derby temporarily for data migration
+    implementation("org.apache.derby:derby:10.16.1.1")
 
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.7")
@@ -82,14 +84,6 @@ tasks.register<Exec>("killPrevious") {
     isIgnoreExitValue = true
 }
 
-// Also kill Derby lock files to prevent database conflicts
-tasks.register<Delete>("cleanDerbyLocks") {
-    description = "Removes Derby database lock files"
-    delete(fileTree(System.getProperty("user.home")) {
-        include("**/mp3org/db.lck", "**/mp3org/dbex.lck")
-    })
-}
-
 tasks.named("bootRun") {
-    dependsOn("killPrevious", "cleanDerbyLocks")
+    dependsOn("killPrevious")
 }

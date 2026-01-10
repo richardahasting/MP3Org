@@ -223,22 +223,23 @@ public class DatabaseManager {
             logger.debug("Music files table does not exist, creating it");
         }
         
+        // SQLite-compatible schema (Issue #72 - migrated from Derby)
         String sql = "CREATE TABLE music_files (" +
-                "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, " +
-                "file_path VARCHAR(1024) NOT NULL UNIQUE, " +
-                "title VARCHAR(255), " +
-                "artist VARCHAR(255), " +
-                "album VARCHAR(255), " +
-                "genre VARCHAR(50), " +
-                "track_number INT, " +
-                "yr INT, " +
-                "duration_seconds INT, " +
-                "file_size_bytes BIGINT, " +
-                "bit_rate INT, " +
-                "sample_rate INT, " +
-                "file_type VARCHAR(10), " +
-                "last_modified TIMESTAMP, " +
-                "date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "file_path TEXT NOT NULL UNIQUE, " +
+                "title TEXT, " +
+                "artist TEXT, " +
+                "album TEXT, " +
+                "genre TEXT, " +
+                "track_number INTEGER, " +
+                "yr INTEGER, " +
+                "duration_seconds INTEGER, " +
+                "file_size_bytes INTEGER, " +
+                "bit_rate INTEGER, " +
+                "sample_rate INTEGER, " +
+                "file_type TEXT, " +
+                "last_modified TEXT, " +
+                "date_added TEXT DEFAULT CURRENT_TIMESTAMP" +
                 ")";
 
         try (Statement stmt = connection.createStatement()) {
@@ -280,12 +281,13 @@ public class DatabaseManager {
             logger.debug("Scan directories table does not exist, creating it");
         }
         
+        // SQLite-compatible schema (Issue #72 - migrated from Derby)
         String sql = "CREATE TABLE scan_directories (" +
-                "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, " +
-                "root_path VARCHAR(1024) NOT NULL UNIQUE, " +
-                "scan_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "last_rescan TIMESTAMP, " +
-                "file_count INT DEFAULT 0" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "root_path TEXT NOT NULL UNIQUE, " +
+                "scan_date TEXT DEFAULT CURRENT_TIMESTAMP, " +
+                "last_rescan TEXT, " +
+                "file_count INTEGER DEFAULT 0" +
                 ")";
 
         try (Statement stmt = connection.createStatement()) {
