@@ -59,6 +59,13 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+
+    // JavaFX for existing UI tests (will be removed after migration)
+    testImplementation("org.openjfx:javafx-controls:21.0.2:mac-aarch64")
+    testImplementation("org.openjfx:javafx-fxml:21.0.2:mac-aarch64")
+    testImplementation("org.openjfx:javafx-graphics:21.0.2:mac-aarch64")
+    testImplementation("org.openjfx:javafx-base:21.0.2:mac-aarch64")
+    testImplementation("org.openjfx:javafx-swing:21.0.2:mac-aarch64")
 }
 
 springBoot {
