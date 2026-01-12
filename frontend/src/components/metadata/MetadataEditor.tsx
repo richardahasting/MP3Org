@@ -15,7 +15,7 @@ export default function MetadataEditor() {
     loading,
     error,
     searchQuery,
-    searchType,
+    searchType: _searchType,
     search,
     clearSearch,
     goToPage,

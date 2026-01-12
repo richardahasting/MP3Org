@@ -1568,14 +1568,15 @@ public class DatabaseManager {
 
         musicFile.setFileType(rs.getString("file_type"));
 
-        Timestamp lastModified = rs.getTimestamp("last_modified");
-        if (lastModified != null) {
-            musicFile.setLastModified(new Date(lastModified.getTime()));
+        // SQLite stores timestamps as milliseconds (long), not formatted dates
+        if (rs.getObject("last_modified") != null) {
+            long lastModifiedMs = rs.getLong("last_modified");
+            musicFile.setLastModified(new Date(lastModifiedMs));
         }
 
-        Timestamp dateAdded = rs.getTimestamp("date_added");
-        if (dateAdded != null) {
-            musicFile.setDateAdded(new Date(dateAdded.getTime()));
+        if (rs.getObject("date_added") != null) {
+            long dateAddedMs = rs.getLong("date_added");
+            musicFile.setDateAdded(new Date(dateAddedMs));
         }
 
         return musicFile;

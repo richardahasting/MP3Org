@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { startScan, cancelScan, browseDirectory, getScanDirectories } from '../../api/scanningApi';
 import type { DirectoryEntry, ScanProgress } from '../../types/music';

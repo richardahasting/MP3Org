@@ -47,9 +47,9 @@ export function useWebSocket({
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      debug: (str) => {
+      debug: (_str) => {
         // Uncomment for debugging
-        // console.log('STOMP:', str);
+        // console.log('STOMP:', _str);
       },
       onConnect: () => {
         setIsConnected(true);
