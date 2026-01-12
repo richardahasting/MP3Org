@@ -19,8 +19,9 @@ describe('MP3Org Import View E2E Tests', () => {
 
   beforeAll(async () => {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,  // Headed mode - browser visible
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      slowMo: 50,  // Slow down for visibility
     });
   });
 
@@ -305,5 +306,122 @@ describe('MP3Org Import View E2E Tests', () => {
       );
       expect(icons.some(icon => icon === '📁')).toBe(true);
     });
+  });
+
+  describe('Import View - Full Import from ~/Music', () => {
+    beforeEach(async () => {
+      await page.goto(FRONTEND_URL, { waitUntil: 'domcontentloaded' });
+      await waitForReact(page);
+      await page.click('.tab-nav .tab-button:nth-child(3)');
+      await page.waitForSelector('.import-view', { timeout: 5000 });
+    });
+
+    test('Should navigate to Music folder and verify import capability', async () => {
+      // Check if files are already imported
+      const countResponse = await fetch(`${BACKEND_URL}/api/v1/music/count`);
+      const countData = await countResponse.json();
+
+      if (countData.count > 0) {
+        // Files already exist - just verify the UI navigation works
+        console.log(`Database already has ${countData.count} files - skipping import, verifying UI only`);
+
+        // Wait for directory browser to load
+        await page.waitForSelector('.browser-entry', { timeout: 5000 });
+
+        // Click on Home directory
+        const homeEntry = await page.$('.browser-entry:first-child');
+        await homeEntry?.click();
+
+        // Wait for home directory contents
+        await page.waitForFunction(
+          () => document.querySelector('.path-value')?.textContent?.includes('/Users/'),
+          { timeout: 5000 }
+        );
+
+        // Find and click Music folder
+        const entries = await page.$$('.browser-entry');
+        for (const entry of entries) {
+          const name = await entry.$eval('.entry-name', el => el.textContent);
+          if (name === 'Music') {
+            await entry.click();
+            break;
+          }
+        }
+
+        // Wait for Music directory to load
+        await page.waitForFunction(
+          () => document.querySelector('.path-value')?.textContent?.includes('/Music'),
+          { timeout: 5000 }
+        );
+
+        // Verify "Add to Queue" button exists
+        const addButton = await page.$('.select-current-btn');
+        expect(addButton).not.toBeNull();
+
+        return; // Skip actual import since we already have files
+      }
+
+      // Full import flow when database is empty
+      await page.waitForSelector('.browser-entry', { timeout: 5000 });
+
+      const homeEntry = await page.$('.browser-entry:first-child');
+      await homeEntry?.click();
+
+      await page.waitForFunction(
+        () => document.querySelector('.path-value')?.textContent?.includes('/Users/'),
+        { timeout: 5000 }
+      );
+
+      await page.waitForSelector('.browser-entry', { timeout: 5000 });
+
+      const entries = await page.$$('.browser-entry');
+      for (const entry of entries) {
+        const name = await entry.$eval('.entry-name', el => el.textContent);
+        if (name === 'Music') {
+          await entry.click();
+          break;
+        }
+      }
+
+      await page.waitForFunction(
+        () => document.querySelector('.path-value')?.textContent?.includes('/Music'),
+        { timeout: 5000 }
+      );
+
+      const addButton = await page.$('.select-current-btn');
+      expect(addButton).not.toBeNull();
+      await addButton?.click();
+
+      await page.waitForSelector('.queue-item', { timeout: 5000 });
+
+      const queuePath = await page.$eval('.queue-item-path', el => el.textContent);
+      expect(queuePath).toContain('Music');
+
+      const startButton = await page.$('.start-scan-btn');
+      const isDisabled = await page.$eval('.start-scan-btn', el => (el as HTMLButtonElement).disabled);
+      expect(isDisabled).toBe(false);
+
+      await startButton?.click();
+
+      await page.waitForSelector('.progress-section', { timeout: 10000 });
+
+      await page.waitForFunction(
+        () => {
+          const stageEl = document.querySelector('.stage-badge');
+          if (stageEl?.textContent?.toLowerCase().includes('completed')) return true;
+          if (stageEl?.textContent?.toLowerCase().includes('error')) return true;
+          const percentEl = document.querySelector('.progress-percent');
+          if (percentEl?.textContent === '100%') return true;
+          return false;
+        },
+        { timeout: 300000 }
+      );
+
+      const response = await fetch(`${BACKEND_URL}/api/v1/music/count`);
+      const data = await response.json();
+      expect(data.count).toBeGreaterThan(0);
+
+      console.log(`Successfully imported ${data.count} music files`);
+    }, 360000);
   });
 });

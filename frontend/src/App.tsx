@@ -2,6 +2,9 @@ import { useState } from 'react';
 import type { TabId } from './types/music';
 import MetadataEditor from './components/metadata/MetadataEditor';
 import ImportView from './components/import/ImportView';
+import DuplicateManager from './components/duplicates/DuplicateManager';
+import OrganizeView from './components/organize/OrganizeView';
+import ConfigurationView from './components/config/ConfigurationView';
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'duplicates', label: 'Duplicates', icon: '◎' },
@@ -39,28 +42,15 @@ function App() {
 
       <main className="main-content">
         {activeTab === 'metadata' && <MetadataEditor />}
-        {activeTab === 'duplicates' && <PlaceholderView title="Duplicate Manager" description="Find and manage duplicate music files" />}
+        {activeTab === 'duplicates' && <DuplicateManager />}
         {activeTab === 'import' && <ImportView />}
-        {activeTab === 'organize' && <PlaceholderView title="Organize" description="Organize your music collection" />}
-        {activeTab === 'config' && <PlaceholderView title="Configuration" description="Manage application settings" />}
+        {activeTab === 'organize' && <OrganizeView />}
+        {activeTab === 'config' && <ConfigurationView />}
       </main>
 
       <footer className="footer">
         <span className="footer-text">◉ MP3Org — Crafted for music lovers</span>
       </footer>
-    </div>
-  );
-}
-
-function PlaceholderView({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="placeholder-view">
-      <div className="placeholder-content">
-        <h2 className="placeholder-title">{title}</h2>
-        <p className="placeholder-description">{description}</p>
-        <div className="placeholder-icon">◎</div>
-        <p className="placeholder-note">Coming soon in Phase 2+</p>
-      </div>
     </div>
   );
 }

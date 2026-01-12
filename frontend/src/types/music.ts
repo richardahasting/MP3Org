@@ -56,3 +56,34 @@ export interface BrowseResponse {
   currentPath: string | null;
   entries: DirectoryEntry[];
 }
+
+// Duplicate detection types for Phase 3
+export interface DuplicateGroup {
+  groupId: number;
+  fileCount: number;
+  files: MusicFile[];
+  representativeTitle: string;
+  representativeArtist: string;
+}
+
+export interface DuplicateScanStatus {
+  sessionId: string;
+  stage: 'starting' | 'loading' | 'scanning' | 'completed' | 'cancelled' | 'error';
+  totalFiles: number;
+  filesProcessed: number;
+  totalComparisons: number;
+  comparisonsCompleted: number;
+  groupsFound: number;
+  percentComplete: number;
+  isCancelled: boolean;
+  isComplete: boolean;
+  error: string | null;
+}
+
+export interface CompareResult {
+  file1: MusicFile;
+  file2: MusicFile;
+  similarity: number;
+  areDuplicates: boolean;
+  breakdown: string;
+}
