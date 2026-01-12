@@ -13,8 +13,8 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import org.hasting.util.logging.LogLevel;
-import org.hasting.util.logging.MP3OrgLoggingManager;
-import org.hasting.util.logging.Logger;
+import com.log4rich.Log4Rich;
+import com.log4rich.core.Logger;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  */
 public class LogViewerDialog extends Stage {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(LogViewerDialog.class);
+    private static final Logger logger = Log4Rich.getLogger(LogViewerDialog.class);
     
     // UI Components
     private TextArea logTextArea;
@@ -260,7 +260,8 @@ public class LogViewerDialog extends Stage {
      */
     private void loadDefaultLogFile() {
         try {
-            String defaultLogPath = MP3OrgLoggingManager.getCurrentConfiguration().getFilePath();
+            // Use log4Rich default log path
+            String defaultLogPath = "mp3org/logs/mp3org.log";
             if (defaultLogPath != null && !defaultLogPath.isEmpty()) {
                 File defaultFile = new File(defaultLogPath);
                 if (defaultFile.exists()) {
@@ -288,7 +289,7 @@ public class LogViewerDialog extends Stage {
             updateStatus("No default log file found. Use 'Open Log File...' to select a file.");
             
         } catch (Exception e) {
-            logger.error("Error loading default log file: {}", e.getMessage(), e);
+            logger.error(String.format("Error loading default log file: {}", e.getMessage()), e);
             updateStatus("Error loading default log file: " + e.getMessage());
         }
     }
@@ -326,7 +327,7 @@ public class LogViewerDialog extends Stage {
         currentLogFile = file;
         refreshLogContent();
         setTitle("MP3Org Log Viewer - " + file.getName());
-        logger.info("Loaded log file: {}", file.getAbsolutePath());
+        logger.info(String.format("Loaded log file: {}", file.getAbsolutePath()));
     }
     
     /**
@@ -348,7 +349,7 @@ public class LogViewerDialog extends Stage {
                 });
             } catch (IOException e) {
                 Platform.runLater(() -> {
-                    logger.error("Error reading log file: {}", e.getMessage(), e);
+                    logger.error(String.format("Error reading log file: {}", e.getMessage()), e);
                     updateStatus("Error reading log file: " + e.getMessage());
                 });
             }
@@ -439,7 +440,7 @@ public class LogViewerDialog extends Stage {
         applyFilters();
         
         if (!currentSearchTerm.isEmpty()) {
-            logger.debug("Performed log search: '{}' (regex: {})", currentSearchTerm, useRegexSearch);
+            logger.debug(String.format("Performed log search: '{}' (regex: {})", currentSearchTerm, useRegexSearch));
         }
     }
     
@@ -456,7 +457,7 @@ public class LogViewerDialog extends Stage {
             updateStatus("Tail mode disabled");
         }
         
-        logger.info("Tail mode {}", tailModeActive ? "enabled" : "disabled");
+        logger.info(String.format("Tail mode {}", tailModeActive ? "enabled" : "disabled"));
     }
     
     /**
@@ -480,7 +481,7 @@ public class LogViewerDialog extends Stage {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
-                    logger.error("Error in tail mode: {}", e.getMessage(), e);
+                    logger.error(String.format("Error in tail mode: {}", e.getMessage()), e);
                     Platform.runLater(() -> {
                         tailModeCheckBox.setSelected(false);
                         tailModeActive = false;
@@ -513,12 +514,12 @@ public class LogViewerDialog extends Stage {
                     Files.write(exportFile.toPath(), logTextArea.getText().getBytes());
                     Platform.runLater(() -> {
                         updateStatus("Exported filtered logs to: " + exportFile.getName());
-                        logger.info("Exported filtered logs to: {}", exportFile.getAbsolutePath());
+                        logger.info(String.format("Exported filtered logs to: {}", exportFile.getAbsolutePath()));
                     });
                 } catch (IOException e) {
                     Platform.runLater(() -> {
                         updateStatus("Export failed: " + e.getMessage());
-                        logger.error("Failed to export logs: {}", e.getMessage(), e);
+                        logger.error(String.format("Failed to export logs: {}", e.getMessage()), e);
                     });
                 }
             });

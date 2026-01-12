@@ -6,8 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.LoggerFactory;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Centralized configuration management for database connectivity and application settings.
@@ -87,7 +87,7 @@ import org.hasting.util.logging.LoggerFactory;
  * @since 1.0
  */
 public class DatabaseConfig {
-    private static final Logger logger = LoggerFactory.getLogger(DatabaseConfig.class);
+    private static final Logger logger = Log4Rich.getLogger(DatabaseConfig.class);
     
     // Configuration keys
     private static final String SYSTEM_PROPERTY_DB_PATH = "mp3org.database.path";
@@ -103,10 +103,10 @@ public class DatabaseConfig {
     };
     private static final Set<String> DEFAULT_ENABLED_TYPES = new HashSet<>(Arrays.asList(ALL_SUPPORTED_TYPES));
     
-    // JDBC configuration
-    private static final String JDBC_DRIVER = "org.apache.derby.jdbc.EmbeddedDriver";
-    private static final String JDBC_URL_PREFIX = "jdbc:derby:";
-    private static final String JDBC_URL_SUFFIX = ";create=true";
+    // JDBC configuration - SQLite (Issue #72 migration from Derby)
+    private static final String JDBC_DRIVER = "org.sqlite.JDBC";
+    private static final String JDBC_URL_PREFIX = "jdbc:sqlite:";
+    private static final String JDBC_URL_SUFFIX = "";  // SQLite auto-creates
     private static final String DEFAULT_USER = "";
     private static final String DEFAULT_PASSWORD = "";
     
@@ -162,7 +162,7 @@ public class DatabaseConfig {
                 configProperties.load(input);
                 logger.info("Loaded configuration from: " + configPath.toAbsolutePath());
             } catch (IOException e) {
-                logger.warning("Could not load configuration file: " + e.getMessage());
+                logger.warn("Could not load configuration file: " + e.getMessage());
             }
         }
         
@@ -174,7 +174,7 @@ public class DatabaseConfig {
                     configProperties.load(input);
                     logger.info("Loaded configuration from: " + homeConfigPath.toAbsolutePath());
                 } catch (IOException e) {
-                    logger.warning("Could not load configuration file from home: " + e.getMessage());
+                    logger.warn("Could not load configuration file from home: " + e.getMessage());
                 }
             }
         }
@@ -247,20 +247,26 @@ public class DatabaseConfig {
     
     /**
      * Normalizes the database path to ensure it's properly formatted.
+     * For SQLite, ensures the path ends with .db extension.
      */
     private String normalizePath(String path) {
         if (path == null || path.trim().isEmpty()) {
-            return DEFAULT_DB_PATH;
+            return DEFAULT_DB_PATH + ".db";
         }
-        
+
         path = path.trim();
-        
+
+        // Ensure SQLite database file has .db extension
+        if (!path.toLowerCase().endsWith(".db")) {
+            path = path + ".db";
+        }
+
         // If it's a relative path, make it relative to current working directory
         Path dbPath = Paths.get(path);
         if (!dbPath.isAbsolute()) {
             dbPath = Paths.get(System.getProperty("user.dir")).resolve(path);
         }
-        
+
         // Ensure parent directories exist
         try {
             Path parentDir = dbPath.getParent();
@@ -269,9 +275,9 @@ public class DatabaseConfig {
                 logger.info("Created database directory: " + parentDir);
             }
         } catch (IOException e) {
-            logger.warning("Could not create database directory: " + e.getMessage());
+            logger.warn("Could not create database directory: " + e.getMessage());
         }
-        
+
         return dbPath.toString();
     }
     
@@ -399,7 +405,7 @@ public class DatabaseConfig {
                 logger.info("Saved configuration to: " + configPath.toAbsolutePath());
             }
         } catch (IOException e) {
-            logger.warning("Could not save configuration file: " + e.getMessage());
+            logger.warn("Could not save configuration file: " + e.getMessage());
         }
     }
     
@@ -437,7 +443,7 @@ public class DatabaseConfig {
                 }
             }
         } catch (IOException e) {
-            logger.warning("Could not create sample configuration file: " + e.getMessage());
+            logger.warn("Could not create sample configuration file: " + e.getMessage());
         }
     }
     
@@ -596,7 +602,7 @@ public class DatabaseConfig {
         } catch (Exception e) {
             // Log the error but don't throw - return -1 to indicate error state
             // This is especially important during config reloads when connection might be temporarily unavailable
-            logger.warning("Could not retrieve music file count (possibly during config reload): " + e.getMessage());
+            logger.warn("Could not retrieve music file count (possibly during config reload): " + e.getMessage());
             return -1;
         }
     }

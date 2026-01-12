@@ -60,8 +60,7 @@ public class LogBackupManager {
         boolean shouldRotate = fileSizeBytes >= maxSizeBytes;
         
         if (shouldRotate) {
-            logger.info("Log file {} has reached size limit: {} bytes (limit: {} MB)", 
-                       logFilePath, fileSizeBytes, maxSizeMB);
+            logger.info(String.format("Log file {} has reached size limit: {} bytes (limit: {} MB)", logFilePath, fileSizeBytes, maxSizeMB));
         }
         
         return shouldRotate;
@@ -81,7 +80,7 @@ public class LogBackupManager {
         
         File logFile = new File(config.getFilePath());
         if (!logFile.exists() || logFile.length() == 0) {
-            logger.debug("Log file does not exist or is empty, skipping backup: {}", config.getFilePath());
+            logger.debug(String.format("Log file does not exist or is empty, skipping backup: {}", config.getFilePath()));
             return false;
         }
         
@@ -91,10 +90,10 @@ public class LogBackupManager {
             File backupDir = new File(backupDirPath);
             if (!backupDir.exists()) {
                 if (!backupDir.mkdirs()) {
-                    logger.error("Failed to create backup directory: {}", backupDirPath);
+                    logger.error(String.format("Failed to create backup directory: {}", backupDirPath));
                     return false;
                 }
-                logger.info("Created backup directory: {}", backupDirPath);
+                logger.info(String.format("Created backup directory: {}", backupDirPath));
             }
             
             // Generate backup file name with timestamp
@@ -119,19 +118,19 @@ public class LogBackupManager {
             }
             
             if (success) {
-                logger.info("Successfully created backup: {}", backupFile.getAbsolutePath());
+                logger.info(String.format("Successfully created backup: {}", backupFile.getAbsolutePath()));
                 
                 // Clean up old backups
                 cleanupOldBackups(config);
                 
                 return true;
             } else {
-                logger.error("Failed to create backup: {}", backupFile.getAbsolutePath());
+                logger.error(String.format("Failed to create backup: {}", backupFile.getAbsolutePath()));
                 return false;
             }
             
         } catch (Exception e) {
-            logger.error("Unexpected error during backup creation: {}", e.getMessage(), e);
+            logger.error(String.format("Unexpected error during backup creation: {}", e.getMessage()), e);
             return false;
         }
     }
@@ -146,10 +145,10 @@ public class LogBackupManager {
     private static boolean createUncompressedBackup(File sourceFile, File backupFile) {
         try {
             Files.copy(sourceFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            logger.debug("Created uncompressed backup: {}", backupFile.getAbsolutePath());
+            logger.debug(String.format("Created uncompressed backup: {}", backupFile.getAbsolutePath()));
             return true;
         } catch (IOException e) {
-            logger.error("Failed to create uncompressed backup: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to create uncompressed backup: {}", e.getMessage()), e);
             return false;
         }
     }
@@ -181,11 +180,11 @@ public class LogBackupManager {
                 bos.write(buffer, 0, bytesRead);
             }
             
-            logger.debug("Created compressed backup (level {}): {}", compressionLevel, backupFile.getAbsolutePath());
+            logger.debug(String.format("Created compressed backup (level {}): {}", compressionLevel, backupFile.getAbsolutePath()));
             return true;
             
         } catch (IOException e) {
-            logger.error("Failed to create compressed backup: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to create compressed backup: {}", e.getMessage()), e);
             return false;
         }
     }
@@ -205,7 +204,7 @@ public class LogBackupManager {
             File backupDir = new File(backupDirPath);
             
             if (!backupDir.exists() || !backupDir.isDirectory()) {
-                logger.debug("Backup directory does not exist, no cleanup needed: {}", backupDirPath);
+                logger.debug(String.format("Backup directory does not exist, no cleanup needed: {}", backupDirPath));
                 return;
             }
             
@@ -229,23 +228,22 @@ public class LogBackupManager {
                 for (File fileToDelete : filesToDelete) {
                     try {
                         if (fileToDelete.delete()) {
-                            logger.info("Deleted old backup file: {}", fileToDelete.getName());
+                            logger.info(String.format("Deleted old backup file: {}", fileToDelete.getName()));
                         } else {
-                            logger.warning("Failed to delete old backup file: {}", fileToDelete.getName());
+                            logger.warning(String.format("Failed to delete old backup file: %s", fileToDelete.getName()));
                         }
                     } catch (Exception e) {
-                        logger.error("Error deleting backup file {}: {}", fileToDelete.getName(), e.getMessage());
+                        logger.error(String.format("Error deleting backup file {}: {}", fileToDelete.getName()), e.getMessage());
                     }
                 }
                 
-                logger.info("Cleanup completed: kept {} backups, removed {} old files", 
-                          maxBackups, filesToDelete.size());
+                logger.info(String.format("Cleanup completed: kept {} backups, removed {} old files", maxBackups, filesToDelete.size()));
             } else {
-                logger.debug("No cleanup needed: {} backups (limit: {})", backupFiles.size(), maxBackups);
+                logger.debug(String.format("No cleanup needed: {} backups (limit: {})", backupFiles.size()), maxBackups);
             }
             
         } catch (Exception e) {
-            logger.error("Error during backup cleanup: {}", e.getMessage(), e);
+            logger.error(String.format("Error during backup cleanup: {}", e.getMessage()), e);
         }
     }
     
@@ -263,11 +261,11 @@ public class LogBackupManager {
         
         File logFile = new File(config.getFilePath());
         if (!logFile.exists()) {
-            logger.debug("Log file does not exist, no rotation needed: {}", config.getFilePath());
+            logger.debug(String.format("Log file does not exist, no rotation needed: {}", config.getFilePath()));
             return true;
         }
         
-        logger.info("Starting log file rotation for: {}", config.getFilePath());
+        logger.info(String.format("Starting log file rotation for: {}", config.getFilePath()));
         
         // Create backup first
         boolean backupSuccess = createBackup(config);
@@ -283,11 +281,11 @@ public class LogBackupManager {
                 // Opening in overwrite mode truncates the file
             }
             
-            logger.info("Successfully rotated log file: {}", config.getFilePath());
+            logger.info(String.format("Successfully rotated log file: {}", config.getFilePath()));
             return true;
             
         } catch (IOException e) {
-            logger.error("Failed to clear log file after backup: {}", e.getMessage(), e);
+            logger.error(String.format("Failed to clear log file after backup: {}", e.getMessage()), e);
             return false;
         }
     }
@@ -344,7 +342,7 @@ public class LogBackupManager {
             backupInfo.sort((a, b) -> b.getCreationTime().compareTo(a.getCreationTime()));
             
         } catch (Exception e) {
-            logger.error("Error getting backup file information: {}", e.getMessage(), e);
+            logger.error(String.format("Error getting backup file information: {}", e.getMessage()), e);
         }
         
         return backupInfo;

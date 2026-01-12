@@ -9,8 +9,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -21,7 +21,7 @@ import java.util.function.Consumer;
  */
 public class BulkEditPanel extends VBox {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(BulkEditPanel.class);
+    private static final Logger logger = Log4Rich.getLogger(BulkEditPanel.class);
     
     private CheckBox bulkEditModeCheckBox;
     private VBox bulkEditSection;
@@ -264,7 +264,7 @@ public class BulkEditPanel extends VBox {
                     
                 } catch (Exception e) {
                     errorCount++;
-                    logger.error("Error updating file {}: {}", file.getTitle(), e.getMessage(), e);
+                    logger.error(String.format("Error updating file %s: %s", file.getTitle(), e.getMessage()), e);
                 }
             }
             
@@ -287,7 +287,7 @@ public class BulkEditPanel extends VBox {
             
         } catch (Exception e) {
             updateStatus("Bulk update failed: " + e.getMessage());
-            logger.error("Bulk update failed: {}", e.getMessage(), e);
+            logger.error(String.format("Bulk update failed: {}", e.getMessage()), e);
         }
     }
     

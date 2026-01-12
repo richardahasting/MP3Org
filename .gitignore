@@ -39,6 +39,10 @@ mp3org.properties
 mp3org-profiles.properties
 derby.log
 
+# SQLite databases
+*.db
+:memory:.db
+
 # Test databases
 temp-test-db-*/
 

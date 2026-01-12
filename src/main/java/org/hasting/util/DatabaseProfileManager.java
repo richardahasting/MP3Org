@@ -6,8 +6,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Manages multiple database profiles and handles profile switching.
@@ -23,7 +23,7 @@ public class DatabaseProfileManager {
      */
     private static Logger getLogger() {
         if (logger == null) {
-            logger = MP3OrgLoggingManager.getLogger(DatabaseProfileManager.class);
+            logger = Log4Rich.getLogger(DatabaseProfileManager.class);
         }
         return logger;
     }
@@ -108,14 +108,14 @@ public class DatabaseProfileManager {
                     DatabaseProfile profile = DatabaseProfile.fromProperties(entry.getValue());
                     profiles.put(profile.getId(), profile);
                 } catch (Exception e) {
-                    getLogger().warning("Could not load profile {}: {}", entry.getKey(), e.getMessage());
+                    getLogger().warn(String.format("Could not load profile %s: %s", entry.getKey(), e.getMessage()));
                 }
             }
             
-            getLogger().info("Loaded {} database profiles", profiles.size());
+            getLogger().info(String.format("Loaded %d database profiles", profiles.size()));
             
         } catch (IOException e) {
-            getLogger().warning("Could not load profiles configuration: {}", e.getMessage());
+            getLogger().warn(String.format("Could not load profiles configuration: %s", e.getMessage()));
         }
     }
     
@@ -144,11 +144,11 @@ public class DatabaseProfileManager {
             Path configPath = Paths.get(PROFILES_CONFIG_FILE);
             try (OutputStream output = Files.newOutputStream(configPath)) {
                 profilesProperties.store(output, "MP3Org Database Profiles Configuration");
-                getLogger().info("Saved {} profiles to: {}", profiles.size(), configPath.toAbsolutePath());
+                getLogger().info(String.format("Saved %d profiles to: %s", profiles.size(), configPath.toAbsolutePath()));
             }
             
         } catch (IOException e) {
-            getLogger().warning("Could not save profiles configuration: {}", e.getMessage());
+            getLogger().warn(String.format("Could not save profiles configuration: %s", e.getMessage()));
         }
     }
     
@@ -222,7 +222,7 @@ public class DatabaseProfileManager {
         profiles.put(profile.getId(), profile);
         saveProfiles();
         
-        getLogger().info("Added profile: {} (ID: {})", profile.getName(), profile.getId());
+        getLogger().info(String.format("Added profile: %s (ID: %s)", profile.getName(), profile.getId()));
     }
     
     /**
@@ -236,7 +236,7 @@ public class DatabaseProfileManager {
         profiles.put(profile.getId(), profile);
         saveProfiles();
         
-        getLogger().info("Updated profile: {}", profile.getName());
+        getLogger().info(String.format("Updated profile: %s", profile.getName()));
     }
     
     /**
@@ -272,7 +272,7 @@ public class DatabaseProfileManager {
             DatabaseManager.shutdown();
             getLogger().debug("Closed database connection before profile deletion");
         } catch (Exception e) {
-            getLogger().warning("Could not close database connection before profile deletion: {}", e.getMessage());
+            getLogger().warn(String.format("Could not close database connection before profile deletion: %s", e.getMessage()));
         }
         
         // Remove profile from registry
@@ -282,11 +282,11 @@ public class DatabaseProfileManager {
         // Delete the database directory and all its files
         boolean databaseDeleted = deleteDatabaseFiles(databasePath);
         
-        getLogger().info("Removed profile: {}", removed != null ? removed.getName() : profileId);
+        getLogger().info(String.format("Removed profile: %s", removed != null ? removed.getName() : profileId));
         if (databaseDeleted) {
-            getLogger().info("Successfully deleted database files at: {}", databasePath);
+            getLogger().info(String.format("Successfully deleted database files at: %s", databasePath));
         } else {
-            getLogger().warning("Could not delete database files at: {}", databasePath);
+            getLogger().warn(String.format("Could not delete database files at: %s", databasePath));
         }
         
         return true;
@@ -298,14 +298,14 @@ public class DatabaseProfileManager {
      */
     private boolean deleteDatabaseFiles(String databasePath) {
         if (databasePath == null || databasePath.trim().isEmpty()) {
-            getLogger().warning("Cannot delete database files: path is null or empty");
+            getLogger().warn("Cannot delete database files: path is null or empty");
             return false;
         }
         
         java.io.File databaseDir = new java.io.File(databasePath);
         if (!databaseDir.exists()) {
             // Database directory doesn't exist, consider this success
-            getLogger().debug("Database directory does not exist: {}", databasePath);
+            getLogger().debug(String.format("Database directory does not exist: %s", databasePath));
             return true;
         }
         
@@ -316,7 +316,7 @@ public class DatabaseProfileManager {
             if (deleted) {
                 getLogger().debug("Successfully deleted database file: {}", databasePath);
             } else {
-                getLogger().warning("Failed to delete database file: {}", databasePath);
+                getLogger().warn("Failed to delete database file: {}", databasePath);
             }
             return deleted;
         }
@@ -557,7 +557,7 @@ public class DatabaseProfileManager {
         
         DatabaseProfile preferredProfile = getProfile(preferredProfileId);
         if (preferredProfile == null) {
-            getLogger().warning("Preferred profile '{}' not found, searching for alternatives", preferredProfileId);
+            getLogger().warn("Preferred profile '{}' not found, searching for alternatives", preferredProfileId);
             return activateFirstAvailableProfileOrCreateTemporary();
         }
         
@@ -601,7 +601,7 @@ public class DatabaseProfileManager {
             }
         }
         
-        getLogger().warning("No existing profiles have available databases");
+        getLogger().warn("No existing profiles have available databases");
         return null;
     }
     
@@ -620,7 +620,7 @@ public class DatabaseProfileManager {
                                                                 DatabaseProfile originalProfile) {
         boolean activated = setActiveProfile(fallbackProfile.getId());
         if (activated) {
-            getLogger().warning("Automatically switched to profile '{}' because '{}' database was locked", 
+            getLogger().warn("Automatically switched to profile '{}' because '{}' database was locked", 
                              fallbackProfile.getName(), originalProfile.getName());
             getLogger().info("You can switch back to '{}' later when it becomes available", 
                              originalProfile.getName());
@@ -666,7 +666,7 @@ public class DatabaseProfileManager {
         boolean activated = setActiveProfile(tempProfile.getId());
         
         if (activated) {
-            getLogger().warning("Created temporary profile '{}' with database at: {}", 
+            getLogger().warn("Created temporary profile '{}' with database at: {}", 
                              tempProfile.getName(), tempDbPath);
             getLogger().info("This temporary profile will be available for future use");
             return tempProfile;
@@ -699,7 +699,7 @@ public class DatabaseProfileManager {
         addProfile(tempProfile);
         setActiveProfile(tempProfile.getId());
         
-        getLogger().warning("Created basic temporary profile as no alternatives were available");
+        getLogger().warn("Created basic temporary profile as no alternatives were available");
         return tempProfile;
     }
     

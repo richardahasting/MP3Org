@@ -3,51 +3,253 @@
 ## Overview
 This developer log tracks the evolution of MP3Org from a basic music organization tool to a sophisticated application with advanced directory management, test infrastructure, and user experience enhancements. The log spans multiple major development sessions between July 2025 and covers critical architectural improvements, database enhancements, and UI/UX refinements.
 
-## Latest Session: Issue #64 - Duplicate Panel Deletion Fix (July 15, 2025)
-**Duration**: ~1 hour | **Status**: ✅ COMPLETED | **Priority**: High
+## Latest Session: Issue #69 - Web UI Migration Phase 1 (January 10, 2026)
+**Duration**: ~4 hours | **Status**: ✅ PHASE 1 COMPLETED | **Priority**: High
 
 ### Problem Statement
-File deletion was failing in the duplicate panel with the error: "deleteMusicFile() - musicFile has no ID" and "Cannot delete MusicFile without ID". This prevented users from deleting duplicate files through the duplicate management interface.
+The JavaFX desktop application had UI issues and limitations. Decision was made to migrate to a web-based architecture using Spring Boot backend and React frontend, replacing the desktop app entirely.
 
-### Root Cause Analysis
-The issue was incorrect **order of operations** in `DuplicateManagerView.java`:
-1. **Wrong sequence**: `file.deleteFile()` called first (sets ID to null) → `DatabaseManager.deleteMusicFile(file)` called second (requires non-null ID)
-2. **Result**: DatabaseManager validation failed because ID was already cleared
-3. **Location**: Lines 684, 721, and 846 in DuplicateManagerView.java
+### Architectural Decisions
+- **Backend**: Keep Java 21 + add Spring Boot REST API layer (wrapping existing services)
+- **Frontend**: React + TypeScript with Vite, using distinctive "Analog Warmth" design theme
+- **Deployment**: Replace desktop app entirely (web-only)
+- **Port**: 9090 for backend (avoiding conflicts with commonly used ports 8080, 3000, 8000, 8001)
 
-### Technical Solution Implemented
-**Fixed DuplicateManagerView.java** - Corrected operation order in three methods:
-1. **Main delete action (line 684-690)**: Use `DatabaseManager.deleteMusicFile(selected)` first
-2. **Keep better quality (line 721-728)**: Use `DatabaseManager.deleteMusicFile(toDelete)` first  
-3. **Context menu delete (line 846-853)**: Use `DatabaseManager.deleteMusicFile(file)` first
+### Phase 1 Implementation
 
-**Correct sequence**: `DatabaseManager.deleteMusicFile()` handles both database removal AND calls `file.deleteFile()` internally
+#### Backend (Spring Boot 3.2.1)
+**Files Created**:
+- `src/main/java/org/hasting/MP3OrgWebApplication.java` - Spring Boot entry point
+- `src/main/java/org/hasting/config/WebSocketConfig.java` - WebSocket for real-time progress
+- `src/main/java/org/hasting/config/CorsConfig.java` - CORS configuration for dev
+- `src/main/java/org/hasting/controller/MusicFileController.java` - REST endpoints
+- `src/main/java/org/hasting/dto/MusicFileDTO.java` - Data transfer object
+- `src/main/java/org/hasting/dto/PageResponse.java` - Pagination wrapper
+- `src/main/java/org/hasting/service/MusicFileService.java` - Service layer wrapping DatabaseManager
+- `src/main/resources/application.yml` - Server configuration
 
-### Code Changes Summary
-**DuplicateManagerView.java** - Fixed three deletion methods:
+**Files Modified**:
+- `build.gradle.kts` - Added Spring Boot plugins, Java 21 toolchain, JavaFX as compileOnly
 
-**Before (incorrect)**:
-```java
-if (selected.deleteFile()) {            // Sets ID to null
-    DatabaseManager.deleteMusicFile(selected);  // Fails - needs ID
-    duplicatesData.remove(selected);
-}
+**REST Endpoints Implemented**:
+```
+GET    /api/v1/music?page=0&size=50  - Paginated list
+GET    /api/v1/music/{id}            - Single file
+PUT    /api/v1/music/{id}            - Update metadata
+DELETE /api/v1/music/{id}            - Delete file
+GET    /api/v1/music/search?q=...    - Search (multiple fields)
+PUT    /api/v1/music/bulk            - Bulk update
+GET    /api/v1/music/count           - Total count
 ```
 
-**After (correct)**:
-```java
-if (DatabaseManager.deleteMusicFile(selected)) {  // Handles both DB and file
-    duplicatesData.remove(selected);               // Just update UI
-}
+#### Frontend (React + TypeScript + Vite)
+**Design Theme**: "Analog Warmth" - vinyl-inspired, dark with amber/gold accents
+
+**Key Design Tokens**:
+```css
+--bg-deep: #0a0908;          /* Near-black base */
+--accent-primary: #d4a574;    /* Warm amber */
+--font-display: 'Instrument Serif', Georgia, serif;
+--font-body: 'Outfit', sans-serif;
+--font-mono: 'JetBrains Mono', monospace;
 ```
 
-### Validation and Testing
-- ✅ **Compilation successful**: All changes compile without errors
-- ✅ **MusicFileTestComprehensive**: All delete-related tests pass
-- ✅ **GitHub Issue #64**: Updated and closed as resolved
+**Files Created**:
+- `frontend/package.json` - React 18, Vite 5, TypeScript
+- `frontend/vite.config.ts` - Dev server with API proxy
+- `frontend/src/types/music.ts` - TypeScript interfaces
+- `frontend/src/api/musicApi.ts` - API client functions
+- `frontend/src/hooks/useMusicFiles.ts` - Custom hook for data fetching
+- `frontend/src/App.tsx` - Main app with 5-tab navigation
+- `frontend/src/App.css` - Full "Analog Warmth" theme (~1100 lines)
+- `frontend/src/components/metadata/MetadataEditor.tsx` - Search + table + inline editing
+
+**5-Tab Interface**:
+1. Duplicates - Find and manage duplicate files (placeholder)
+2. Metadata - Search and edit music metadata (functional)
+3. Import - Scan directories (placeholder)
+4. Organize - File organization (placeholder)
+5. Config - Settings (placeholder)
+
+### Technical Challenges Resolved
+
+1. **JDK 25 + Gradle 8.10 Incompatibility**: Error message was just "25". Fixed by using JDK 21: `export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home`
+
+2. **JavaFX Class Version Mismatch**: lib/ had JavaFX JARs for JDK 22+ (class version 66), but JDK 21 only supports version 65. Fixed by excluding old JARs and adding `compileOnly("org.openjfx:javafx-controls:21.0.2:mac-aarch64")`
+
+3. **Derby Database Lock**: Database at `/Users/richard/myNewProfile/dolt/mp3org` required removing lock files (`db.lck`, `dbex.lck`)
+
+### Verification Results
+- **Backend**: `curl http://localhost:9090/api/v1/music/count` returns `{"count":6791}`
+- **Frontend**: http://localhost:5173 loads with API proxy working
+- **All commits**: 46f7dee (backend), e258c39 (frontend)
+
+### Remaining Phases
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 2 | Import/Scanning with WebSocket progress | Pending |
+| Phase 3 | Duplicate Detection | Pending |
+| Phase 4 | Metadata Editor bulk operations | Pending |
+| Phase 5 | Organization with templates | Pending |
+| Phase 6 | Configuration panels | Pending |
+| Phase 7 | UI Polish with frontend-design skill | Pending |
+
+### GitHub Integration
+- ✅ **Issue #69**: Web UI Migration tracked
+- ✅ **Branch**: feature/issue-69-web-ui (later renamed from feature/log4Rich-integration)
+- ✅ **Commits**: Backend (10 files, 701 insertions), Frontend (14 files, 3567 insertions)
+
+---
+
+## Previous Session: Issue #67 - Separate Import and Organize Tabs with Search (July 15, 2025)
+**Duration**: ~3 hours | **Status**: ✅ COMPLETED | **Priority**: High
+
+### Problem Statement
+The application had a single "Import & Organize" tab that combined file importing and organization functionality, making the interface cluttered and limiting user workflow flexibility. Users needed a better way to search and select specific files for organization operations from multiple search sessions.
+
+### Solution Architecture
+**UI Redesign**: Split the monolithic ImportOrganizeView into two focused, separate components:
+
+1. **ImportView** (src/main/java/org/hasting/ui/ImportView.java)
+   - Dedicated to importing music files from directories
+   - Directory scanning and database import operations
+   - Selective rescanning of previously imported directories
+   - Database management (clear database functionality)
+
+2. **OrganizeView** (src/main/java/org/hasting/ui/OrganizeView.java)
+   - Advanced music file search with multiple criteria (Artist, Title, Album, File Path, All Fields)
+   - Multi-selection from search results with accumulated organization queue
+   - Batch organization operations from multiple search sessions
+   - Template-based file organization with destination selection
+
+### New Features Implemented
+**Enhanced Search Functionality**:
+- **Multi-criteria search**: Users can search by artist, title, album, file path, or all fields
+- **Search result accumulation**: Multiple searches can add files to a single organization queue
+- **Flexible file selection**: Users can select specific files from search results
+- **Organization queue management**: View, modify, and execute organization on accumulated files
+
+**Improved User Workflow**:
+1. **Import Phase**: Use Import tab to scan and import music files
+2. **Search Phase**: Use Organize tab to search for specific files
+3. **Selection Phase**: Select desired files from search results
+4. **Accumulation**: Add files from multiple searches to organization queue
+5. **Organization Phase**: Execute organization on all queued files
+
+### Technical Implementation
+**Code Architecture Changes**:
+- **Created UIStyleHelper.java**: Centralized styling utilities for consistent UI appearance
+- **Updated MP3OrgApplication.java**: Modified main application to use separate Import and Organize tabs
+- **Refactored functionality**: Cleanly separated import logic from organization logic
+
+**New Components Structure**:
+```
+ImportView.java (481 lines)
+├── Directory selection and scanning
+├── Database management operations  
+├── Selective rescanning functionality
+└── Progress tracking for import operations
+
+OrganizeView.java (623 lines)
+├── Advanced search functionality
+├── Multi-selection search results table
+├── Organization queue management
+├── Template-based organization execution
+└── Progress tracking for organization operations
+
+UIStyleHelper.java (118 lines)
+└── Shared styling and layout utilities
+```
+
+### Database Integration
+**Search Implementation**:
+- **Real-time search**: Queries DatabaseManager.getAllMusicFiles() for comprehensive results
+- **Flexible filtering**: Supports fuzzy matching across multiple music file attributes
+- **Performance optimized**: Efficient filtering using Java streams and lowercase matching
+
+### Testing and Validation
+**Comprehensive Test Coverage**:
+- **ImportViewTest.java**: Tests DirectoryItem data structures and selection logic
+- **OrganizeViewTest.java**: Tests MusicFileSearchResult and MusicFileSelection components
+- **Unit tests**: Focus on data integrity and selection state management
+- **All new component tests pass**: Validated core functionality without UI dependencies
+
+### GitHub Integration
+- ✅ **Issue #67**: Created comprehensive feature request with detailed requirements
+- ✅ **Branch**: feature/separate-import-organize-tabs created and active
+- ✅ **Compilation**: All code compiles successfully without errors
+- ✅ **Testing**: New component tests pass, core functionality validated
 
 ### Impact Assessment
-- **User Experience**: Duplicate file deletion now works correctly in all contexts
+**User Experience Improvements**:
+- **Better organization**: Clear separation between importing and organizing operations
+- **Enhanced flexibility**: Multiple searches can contribute to single organization operation
+- **Improved workflow**: Logical progression from import → search → select → organize
+- **Reduced cognitive load**: Focused interfaces for specific tasks
+
+**Technical Benefits**:
+- **Maintainability**: Separated concerns make code easier to maintain and extend
+- **Testability**: Smaller, focused components are easier to test thoroughly
+- **Extensibility**: New search features can be added to OrganizeView independently
+- **Performance**: Search and organization operations don't interfere with import processes
+
+## Previous Session: Issue #65 - Metadata Editor Delete Failure Fix (July 15, 2025)
+**Duration**: ~1.5 hours | **Status**: ✅ COMPLETED | **Priority**: High
+
+### Problem Statement
+File deletion was failing in the metadata editor duplicate panel with errors: "deleteMusicFile() - musicFile has no ID" and "Cannot delete MusicFile without ID". This prevented users from deleting duplicate files discovered through the metadata editor interface.
+
+### Root Cause Analysis
+The issue was in the **duplicate detection flow** in `MusicFile.findFuzzyMatches()`:
+1. **Missing ID assignment**: Duplicate matches found by fuzzy matching were not getting database IDs assigned
+2. **Result**: When attempting to delete these matches, DatabaseManager validation failed due to null IDs
+3. **Location**: MusicFile.findFuzzyMatches() method around line 394
+
+### Technical Solution Implemented
+**Fixed MusicFile.java** - Enhanced findFuzzyMatches() method:
+1. **Added ID assignment logic**: All matched duplicate files now get proper database IDs
+2. **Ensured database consistency**: Matches are fully hydrated with database information
+3. **Maintained performance**: ID assignment adds minimal overhead to duplicate detection
+
+**Enhanced logging and error handling**:
+- **MetadataEditorView.java**: Added better logging for duplicate panel operations
+- **DuplicateManagerView.java**: Improved error handling and user feedback
+
+### Code Changes Summary
+**MusicFile.java** - Enhanced duplicate detection:
+
+**Before (missing ID assignment)**:
+```java
+// Found duplicates but no ID assignment
+List<MusicFile> matches = findMatches();
+return matches; // IDs still null
+```
+
+**After (proper ID assignment)**:
+```java
+// Found duplicates with proper ID assignment
+List<MusicFile> matches = findMatches();
+// Ensure all matches have database IDs for deletion operations
+assignDatabaseIds(matches);
+return matches;
+```
+
+### Testing and Validation
+- ✅ **All tests pass**: Existing test suite validates changes
+- ✅ **New test coverage**: Added comprehensive tests for ID assignment in duplicate detection
+- ✅ **Manual testing**: Duplicate deletion now works correctly in metadata editor
+- ✅ **Compilation successful**: All changes compile without errors
+
+### GitHub Integration
+- ✅ **Issue #65**: Created and documented the problem and solution
+- ✅ **Pull Request #66**: Created with comprehensive description and test plan
+- ✅ **Code Review**: Performed detailed review with security and quality assessment
+- ✅ **Branch**: fix/metadata-editor-delete-failure ready for merge
+
+### Impact Assessment
+- **User Experience**: Metadata editor duplicate deletion now works reliably
+- **Data Integrity**: Proper ID assignment ensures consistent database operations
+- **Performance**: Minimal overhead added to duplicate detection process
 - **Error Resolution**: Eliminates "musicFile has no ID" errors during deletion
 - **Code Quality**: Follows proper separation of concerns (DatabaseManager handles persistence)
 - **Risk**: Low - Only affects order of operations, no logic changes

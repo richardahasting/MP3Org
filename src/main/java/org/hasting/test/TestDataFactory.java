@@ -3,8 +3,8 @@ package org.hasting.test;
 import org.hasting.model.MusicFile;
 import org.hasting.test.spec.*;
 import org.hasting.test.generator.TestFileGenerator;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TestDataFactory {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(TestDataFactory.class);
+    private static final Logger logger = Log4Rich.getLogger(TestDataFactory.class);
     
     // Track all generated files for cleanup
     private static final Set<Path> generatedFiles = ConcurrentHashMap.newKeySet();
@@ -41,7 +41,7 @@ public class TestDataFactory {
     static {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (!generatedFiles.isEmpty()) {
-                logger.info("Cleaning up {} generated test files on JVM shutdown", generatedFiles.size());
+                logger.info(String.format("Cleaning up {} generated test files on JVM shutdown", generatedFiles.size()));
                 cleanupGeneratedFiles();
             }
         }));
@@ -55,7 +55,7 @@ public class TestDataFactory {
      * @throws IOException if file generation fails
      */
     public static List<MusicFile> createDuplicateSet(DuplicateSpec spec) throws IOException {
-        logger.info("Creating duplicate set with {} variations", spec.getVariationCount());
+        logger.info(String.format("Creating duplicate set with {} variations", spec.getVariationCount()));
         
         List<MusicFile> duplicates = new ArrayList<>();
         
@@ -77,7 +77,7 @@ public class TestDataFactory {
             duplicates.add(variant);
         }
         
-        logger.info("Successfully created {} duplicate files", duplicates.size());
+        logger.info(String.format("Successfully created {} duplicate files", duplicates.size()));
         return duplicates;
     }
     
@@ -89,7 +89,7 @@ public class TestDataFactory {
      * @throws IOException if file generation fails
      */
     public static List<MusicFile> createEdgeCaseSet(EdgeCaseSpec spec) throws IOException {
-        logger.info("Creating edge case set with {} types", spec.getTypes().size());
+        logger.info(String.format("Creating edge case set with %d types", spec.getTypes().size()));
         
         List<MusicFile> edgeCases = new ArrayList<>();
         
@@ -99,7 +99,7 @@ public class TestDataFactory {
             edgeCases.add(edgeCase);
         }
         
-        logger.info("Successfully created {} edge case files", edgeCases.size());
+        logger.info(String.format("Successfully created {} edge case files", edgeCases.size()));
         return edgeCases;
     }
     
@@ -111,7 +111,7 @@ public class TestDataFactory {
      * @throws IOException if file generation fails
      */
     public static List<MusicFile> createFormatTestSet(FormatSpec spec) throws IOException {
-        logger.info("Creating format test set for {} formats", spec.getFormats().size());
+        logger.info(String.format("Creating format test set for %d formats", spec.getFormats().size()));
         
         List<MusicFile> formatFiles = new ArrayList<>();
         
@@ -126,7 +126,7 @@ public class TestDataFactory {
             formatFiles.add(formatFile);
         }
         
-        logger.info("Successfully created {} format test files", formatFiles.size());
+        logger.info(String.format("Successfully created {} format test files", formatFiles.size()));
         return formatFiles;
     }
     
@@ -138,7 +138,7 @@ public class TestDataFactory {
      * @throws IOException if file generation fails
      */
     public static MusicFile createCustomFile(TestFileSpec spec) throws IOException {
-        logger.debug("Creating custom file: {}", spec);
+        logger.debug(String.format("Creating custom file: {}", spec));
         
         File generatedFile = fileGenerator.generateFromSpec(spec);
         generatedFiles.add(generatedFile.toPath());
@@ -161,7 +161,7 @@ public class TestDataFactory {
      * @throws IOException if file generation fails
      */
     public static TestDataSet createTestDataSet(TestDataSetSpec spec) throws IOException {
-        logger.info("Creating test data set with {} files", spec.getFileCount());
+        logger.info(String.format("Creating test data set with {} files", spec.getFileCount()));
         
         List<MusicFile> allFiles = new ArrayList<>();
         
@@ -188,7 +188,7 @@ public class TestDataFactory {
         // Add duplicates if requested
         if (spec.isIncludeDuplicates()) {
             int duplicateCount = (int) (spec.getFileCount() * spec.getDuplicatePercentage() / 100.0);
-            logger.info("Adding {} duplicate files", duplicateCount);
+            logger.info(String.format("Adding {} duplicate files", duplicateCount));
             
             for (int i = 0; i < duplicateCount && i < allFiles.size(); i++) {
                 MusicFile original = allFiles.get(i);
@@ -203,7 +203,7 @@ public class TestDataFactory {
             }
         }
         
-        logger.info("Successfully created test data set with {} files", allFiles.size());
+        logger.info(String.format("Successfully created test data set with {} files", allFiles.size()));
         return new TestDataSet(allFiles, spec);
     }
     
@@ -212,7 +212,7 @@ public class TestDataFactory {
      * This method will delete all files created by this factory.
      */
     public static void cleanupGeneratedFiles() {
-        logger.info("Cleaning up {} generated files", generatedFiles.size());
+        logger.info(String.format("Cleaning up {} generated files", generatedFiles.size()));
         
         int deleted = 0;
         int failed = 0;
@@ -222,13 +222,13 @@ public class TestDataFactory {
                 Files.deleteIfExists(path);
                 deleted++;
             } catch (IOException e) {
-                logger.error("Failed to delete generated file: {}", path, e);
+                logger.error(String.format("Failed to delete generated file: {}", path), e);
                 failed++;
             }
         }
         
         generatedFiles.clear();
-        logger.info("Cleanup complete: {} files deleted, {} failed", deleted, failed);
+        logger.info(String.format("Cleanup complete: {} files deleted, {} failed", deleted, failed));
     }
     
     /**

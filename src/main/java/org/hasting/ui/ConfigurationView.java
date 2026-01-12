@@ -4,8 +4,8 @@ import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import org.hasting.ui.panels.*;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Main configuration view that orchestrates all configuration panels.
@@ -13,7 +13,7 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
  */
 public class ConfigurationView extends BorderPane {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(ConfigurationView.class);
+    private static final Logger logger = Log4Rich.getLogger(ConfigurationView.class);
     
     // Configuration panels
     private DatabaseLocationPanel databaseLocationPanel;
@@ -215,7 +215,7 @@ public class ConfigurationView extends BorderPane {
         } catch (Exception e) {
             statusLabel.setText("Error loading configuration: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
-            logger.error("Error loading configuration tab content: {}", e.getMessage(), e);
+            logger.error(String.format("Error loading configuration tab content: {}", e.getMessage()), e);
         }
     }
     
@@ -237,7 +237,7 @@ public class ConfigurationView extends BorderPane {
         } catch (Exception e) {
             statusLabel.setText("Error refreshing panels: " + e.getMessage());
             statusLabel.setStyle("-fx-text-fill: red;");
-            logger.error("Error loading configuration tab content: {}", e.getMessage(), e);
+            logger.error(String.format("Error loading configuration tab content: {}", e.getMessage()), e);
         }
     }
     
@@ -271,7 +271,7 @@ public class ConfigurationView extends BorderPane {
                     break;
             }
         } catch (Exception e) {
-            logger.error("Error refreshing current tab: {}", e.getMessage(), e);
+            logger.error(String.format("Error refreshing current tab: {}", e.getMessage()), e);
         }
     }
     

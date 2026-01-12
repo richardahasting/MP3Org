@@ -7,8 +7,8 @@ import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.FuzzySearchConfig;
 import org.hasting.util.HelpSystem;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * UI panel for configuring fuzzy search settings for duplicate detection.
@@ -16,7 +16,7 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
  */
 public class FuzzySearchConfigPanel extends VBox {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(FuzzySearchConfigPanel.class);
+    private static final Logger logger = Log4Rich.getLogger(FuzzySearchConfigPanel.class);
     
     // Preset and main controls
     private ComboBox<String> fuzzyPresetComboBox;
@@ -460,7 +460,7 @@ public class FuzzySearchConfigPanel extends VBox {
             
         } catch (Exception e) {
             showError("Failed to apply fuzzy search configuration: " + e.getMessage());
-            logger.error("Error applying fuzzy search configuration: {}", e.getMessage(), e);
+            logger.error(String.format("Error applying fuzzy search configuration: {}", e.getMessage()), e);
         }
     }
     

@@ -1,101 +1,179 @@
 # MP3Org - Music Collection Manager
 
-A powerful JavaFX application for organizing and managing large music collections. MP3Org helps you find and remove duplicate songs, organize files into structured folders, and edit metadata for better collection management.
+A powerful application for organizing and managing large music collections. MP3Org helps you find and remove duplicate songs, organize files into structured folders, and edit metadata for better collection management.
 
-![MP3Org Screenshot](https://via.placeholder.com/800x600/2C3E50/FFFFFF?text=MP3Org+Screenshot)
+**Now available as a modern web application!** The project is being migrated from JavaFX desktop to Spring Boot + React web interface.
 
-## ✨ Features
+## What's New (January 2026)
 
-### 🔍 Smart Duplicate Detection
+- **Web UI Migration** - Modern React frontend with Spring Boot REST API (Issue #69)
+- **SQLite Database** - Migrated from Apache Derby for better portability (Issue #72)
+- **Java 21 LTS** - Standardized on Java 21 for long-term support
+- **Real-time Scanning** - WebSocket-based progress updates during directory scans
+- **Comprehensive API** - Full REST API for music file management
+
+## Features
+
+### Smart Duplicate Detection
 - **Advanced fuzzy matching** algorithms find duplicates even when metadata differs slightly
 - **Configurable similarity thresholds** for title, artist, album, and duration
 - **Text normalization** handles artist prefixes, featuring artists, album editions
 - **Multiple detection presets**: Strict, Balanced, Lenient, or Custom settings
 
-### 📁 File Organization
+### File Organization
 - **Automatic folder structure** creation: Artist/Album/Track-Title format
 - **Preserves original files** while creating organized copies
 - **Batch processing** for large collections
 - **File type filtering** for selective organization
 
-### 🎵 Metadata Management
+### Metadata Management
 - **Search and edit** song information across your collection
 - **Batch metadata updates** for consistency
 - **Automatic metadata extraction** from file tags
 - **Support for all common fields**: title, artist, album, genre, year, track number
 
-### 🗂️ Multiple Database Profiles
+### Multiple Database Profiles
 - **Separate collections** for different music types (personal, work, classical, etc.)
 - **Profile-specific settings** for optimal duplicate detection
 - **Easy switching** between collections
-- **Independent configuration** per profile
 
-### 🎯 Format Support
+### Format Support
 Supports all major audio formats:
 - **Lossless**: FLAC, AIFF, APE, WAV
 - **Compressed**: MP3, M4A (AAC), OGG Vorbis, OPUS, WMA
 
-### 🆘 Comprehensive Help System
-- **Interactive tooltips** for all UI elements
-- **Context-sensitive help** dialogs
-- **Complete user guide** with best practices
-- **Getting started wizard** for new users
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
-- **Java 11 or higher** (download from [OpenJDK](https://openjdk.org/) or [Oracle](https://www.oracle.com/java/))
-- **JavaFX runtime** (included in most Java distributions)
+- **Java 21** (LTS) - download from [Adoptium](https://adoptium.net/) or [Oracle](https://www.oracle.com/java/)
+- **Node.js 18+** (for frontend development)
 
-### Download and Run
+### Using Version Managers
 
-1. **Download the latest release** from the [Releases](https://github.com/richardahasting/MP3Org/releases) page
-2. **Run the application**:
-   ```bash
-   java -jar mp3org-1.0.jar
-   ```
+```bash
+# With SDKMAN
+sdk env
 
-### Building from Source
+# With jenv
+jenv local
+```
+
+### Running the Web Application
 
 ```bash
 # Clone the repository
 git clone https://github.com/richardahasting/MP3Org.git
 cd MP3Org
 
-# Build the application
-./gradlew build
+# Start the backend (port 9090)
+./gradlew bootRun
 
-# Run the application
-./gradlew run
+# In another terminal, start the frontend (port 5173)
+cd frontend
+npm install
+npm run dev
 ```
 
-## 📖 Usage Guide
+Then open http://localhost:5173 in your browser.
 
-### 1. Initial Setup
-- Launch MP3Org and go to the **Config** tab
-- Choose which audio formats to include (all enabled by default)
-- Adjust duplicate detection settings if needed (defaults work well for most users)
+### Building from Source
 
-### 2. Import Your Music
-- Go to the **Import & Organize** tab
-- Click **"Add Directories to Scan"** and select your music folders
-- Wait for the scan to complete
+```bash
+# Build backend
+./gradlew build
 
-### 3. Find and Remove Duplicates
-- Go to the **Duplicate Manager** tab
-- Click **"Refresh Duplicates"** to analyze your collection
-- Review potential duplicates and remove unwanted files
+# Build frontend for production
+cd frontend
+npm run build
+```
 
-### 4. Organize Your Collection (Optional)
-- Return to the **Import & Organize** tab
-- Choose a destination folder
-- Click **"Organize Music Files"** to create a clean folder structure
+## Architecture
 
-### 5. Edit Metadata (As Needed)
-- Use the **Metadata Editor** tab to search and edit song information
-- This helps improve duplicate detection and organization
+MP3Org uses a modern full-stack architecture:
 
-## 🛠️ Advanced Configuration
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     React Frontend                          │
+│  ┌─────────┐ ┌──────────┐ ┌────────┐ ┌──────────┐ ┌───────┐ │
+│  │Duplicate│ │ Metadata │ │ Import │ │ Organize │ │Config │ │
+│  │ Manager │ │  Editor  │ │  View  │ │   View   │ │ View  │ │
+│  └────┬────┘ └────┬─────┘ └───┬────┘ └────┬─────┘ └───┬───┘ │
+└───────┼──────────┼─────────────┼───────────┼──────────┼─────┘
+        │          │             │           │          │
+        └──────────┴─────────────┴───────────┴──────────┘
+                              │ HTTP/WebSocket
+        ┌─────────────────────┴─────────────────────────┐
+        │              Spring Boot REST API              │
+        │  ┌─────────────────────────────────────────┐  │
+        │  │             Service Layer               │  │
+        │  │  MusicFileService, ScanningService,     │  │
+        │  │  DuplicateService, OrganizationService  │  │
+        │  └────────────────────┬────────────────────┘  │
+        └───────────────────────┼───────────────────────┘
+                                │
+                        ┌───────┴───────┐
+                        │ SQLite Database│
+                        └───────────────┘
+```
+
+### Project Structure
+
+```
+MP3Org/
+├── src/main/java/org/hasting/
+│   ├── MP3OrgWebApplication.java    # Spring Boot entry point
+│   ├── controller/                   # REST API endpoints
+│   ├── service/                      # Business logic
+│   ├── dto/                          # Data transfer objects
+│   ├── model/                        # Domain models
+│   └── util/                         # Core utilities
+├── frontend/
+│   ├── src/
+│   │   ├── components/               # React components
+│   │   ├── hooks/                    # Custom React hooks
+│   │   ├── api/                      # API client
+│   │   └── types/                    # TypeScript types
+│   └── tests/                        # Puppeteer E2E tests
+└── build.gradle.kts                  # Gradle build configuration
+```
+
+## REST API
+
+### Music Files (`/api/v1/music`)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/music` | GET | List all (paginated) |
+| `/api/v1/music/{id}` | GET | Get by ID |
+| `/api/v1/music/{id}` | PUT | Update metadata |
+| `/api/v1/music/{id}` | DELETE | Delete file |
+| `/api/v1/music/search` | GET | Search files |
+| `/api/v1/music/count` | GET | Get total count |
+| `/api/v1/music/bulk` | PUT | Bulk update |
+
+### Scanning (`/api/v1/scanning`)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/scanning/start` | POST | Start scan (returns sessionId) |
+| `/api/v1/scanning/status/{id}` | GET | Get scan status |
+| `/api/v1/scanning/cancel/{id}` | POST | Cancel scan |
+| `/api/v1/scanning/browse` | GET | Browse server directories |
+
+WebSocket: `/ws` with `/topic/scanning/{sessionId}` for real-time progress
+
+## Testing
+
+```bash
+# Run backend tests
+./gradlew test
+
+# Run frontend E2E tests
+cd frontend
+npm run build
+npm run preview &
+npm test
+```
+
+## Configuration
 
 ### Duplicate Detection Settings
 
@@ -105,104 +183,63 @@ cd MP3Org
 | **Artist Similarity** | How closely artist names must match | 90% |
 | **Album Similarity** | How closely album names must match | 85% |
 | **Duration Tolerance** | Maximum time difference allowed | 10 seconds |
-| **Minimum Fields** | Fields that must match for duplicates | 2 out of 4 |
 
-### Text Normalization Options
-- **Ignore Case**: Treats "Artist" and "artist" as identical
-- **Ignore Punctuation**: Handles "Rock 'n' Roll" vs "Rock n Roll"
-- **Ignore Artist Prefixes**: Treats "Beatles" and "The Beatles" as same
-- **Ignore Featuring**: Handles "Song" vs "Song (feat. Artist)"
-- **Ignore Album Editions**: Handles "Album" vs "Album - Deluxe Edition"
+## Contributing
 
-## 🏗️ Architecture
+Contributions are welcome! Please see our open issues:
 
-MP3Org is built with a modular architecture:
-
-```
-src/main/java/org/hasting/
-├── MP3OrgApplication.java          # Main JavaFX application
-├── model/
-│   └── MusicFile.java             # Music file data model
-├── ui/                            # User interface components
-│   ├── ConfigurationView.java     # Settings and configuration
-│   ├── DuplicateManagerView.java  # Duplicate detection and management
-│   ├── ImportOrganizeView.java    # File import and organization
-│   └── MetadataEditorView.java    # Metadata search and editing
-└── util/                          # Core utilities and algorithms
-    ├── DatabaseManager.java       # Database operations
-    ├── FuzzyMatcher.java          # Similarity algorithms
-    ├── HelpSystem.java           # Tooltip and help system
-    └── ...
-```
-
-## 🧪 Testing
-
-The project includes comprehensive test coverage:
-
-```bash
-# Run all tests
-./gradlew test
-
-# Run specific test categories
-./gradlew test --tests "*FuzzyMatcher*"
-./gradlew test --tests "*DatabaseManager*"
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to:
-
-1. **Report bugs** or request features via [Issues](https://github.com/richardahasting/MP3Org/issues)
-2. **Submit pull requests** with improvements
-3. **Improve documentation** or add examples
-4. **Share feedback** on your experience
+- **Issue #69** - Web UI Migration (in progress)
+- **Issue #70** - API Test Suite
+- **Issue #72** - SQLite Migration (completed)
 
 ### Development Setup
 
 1. **Fork and clone** the repository
-2. **Open in your IDE** (IntelliJ IDEA recommended)
-3. **Run tests** to ensure everything works: `./gradlew test`
-4. **Make your changes** and add tests
+2. **Set Java version**: `sdk env` or `jenv local`
+3. **Run tests**: `./gradlew test`
+4. **Create a feature branch**: `git checkout -b feature/issue-XX-description`
 5. **Submit a pull request**
 
-## 📄 License
+## Tech Stack
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+- **Backend**: Java 21, Spring Boot 3.4, SQLite, WebSocket
+- **Frontend**: React 18, TypeScript, Vite
+- **Build**: Gradle 8.12, npm
+- **Testing**: JUnit 5, Puppeteer
 
-## 🔒 Privacy and Security
+## Privacy and Security
 
 MP3Org prioritizes your privacy:
 - **Local processing only** - no data sent to external servers
 - **No telemetry or tracking**
-- **Local database storage** using Apache Derby
+- **Local database storage** using SQLite
 - **Open source** - audit the code yourself
 
-## 📞 Support
+## Roadmap
 
-- **User Guide**: See [MP3Org_User_Guide.md](MP3Org_User_Guide.md) for detailed instructions
-- **Built-in Help**: Press F1 in the application or use the Help menu
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/richardahasting/MP3Org/issues)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/richardahasting/MP3Org/discussions)
+- [x] Spring Boot REST API (Phase 1)
+- [x] React frontend foundation (Phase 1)
+- [x] SQLite database migration
+- [x] Import/Scanning with WebSocket progress (Phase 2)
+- [ ] Duplicate Detection UI (Phase 3)
+- [ ] Metadata Editor enhancements (Phase 4)
+- [ ] File Organization UI (Phase 5)
+- [ ] Configuration UI (Phase 6)
+- [ ] UI Polish (Phase 7)
 
-## 🎯 Roadmap
+## License
 
-Future enhancements planned:
-- [ ] **Native installers** for Windows, macOS, and Linux
-- [ ] **Playlist management** and export
-- [ ] **Audio fingerprinting** for more accurate duplicate detection
-- [ ] **Cloud storage integration** (Google Drive, Dropbox, etc.)
-- [ ] **Music streaming service** metadata lookup
-- [ ] **Plugin system** for extensibility
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **JAudioTagger** library for metadata extraction
-- **Apache Derby** for embedded database functionality
-- **JavaFX** for the modern user interface
-- **OpenJDK** community for the Java platform
+- **SQLite** for embedded database functionality
+- **Spring Boot** for the backend framework
+- **React** for the modern user interface
 
 ---
 
-**Made with ❤️ for music lovers who want organized collections**
+**Made with care for music lovers who want organized collections**
 
-*Star ⭐ this repository if MP3Org helps you organize your music collection!*
+*Star this repository if MP3Org helps you organize your music collection!*

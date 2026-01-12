@@ -18,8 +18,8 @@ import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.ProfileChangeListener;
 import org.hasting.util.ProfileChangeNotifier;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 import java.awt.Desktop;
 import java.io.File;
@@ -64,7 +64,7 @@ import java.util.List;
  */
 public class MetadataEditorView extends BorderPane implements ProfileChangeListener {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(MetadataEditorView.class);
+    private static final Logger logger = Log4Rich.getLogger(MetadataEditorView.class);
     
     private TextField searchField;
     private ComboBox<String> searchTypeCombo;
@@ -496,7 +496,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             
         } catch (Exception e) {
             statusLabel.setText("Search error: " + e.getMessage());
-            logger.error("Error performing search with term '{}' and type '{}'", searchTerm, searchTypeCombo.getValue(), e);
+            logger.error(String.format("Error performing search with term '{}' and type '{}'", searchTerm, searchTypeCombo.getValue()), e);
         }
     }
     
@@ -580,7 +580,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             
         } catch (Exception e) {
             statusLabel.setText("Error saving changes: " + e.getMessage());
-            logger.error("Error saving metadata changes for file: {}", currentFile != null ? currentFile.getFilePath() : "unknown", e);
+            logger.error(String.format("Error saving metadata changes for file: %s", currentFile != null ? currentFile.getFilePath() : "unknown"), e);
         }
     }
     
@@ -617,7 +617,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
                     }
                 } catch (Exception e) {
                     statusLabel.setText("Error deleting file: " + e.getMessage());
-                    logger.error("Error deleting current file: {}", currentFile != null ? currentFile.getFilePath() : "unknown", e);
+                    logger.error(String.format("Error deleting current file: %s", currentFile != null ? currentFile.getFilePath() : "unknown"), e);
                 }
             }
         });
@@ -712,7 +712,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
                 
             } catch (Exception e) {
                 errorCount++;
-                logger.error("Error updating file: {} - {}", file.getTitle(), e.getMessage(), e);
+                logger.error(String.format("Error updating file: %s - %s", file.getTitle(), e.getMessage()), e);
             }
         }
         
@@ -897,7 +897,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
                     }
                 } catch (Exception e) {
                     statusLabel.setText("Error deleting file: " + e.getMessage());
-                    logger.error("Error deleting file: {}", file.getFilePath(), e);
+                    logger.error(String.format("Error deleting file: {}", file.getFilePath()), e);
                 }
             }
         });
@@ -921,7 +921,7 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             }
         } catch (Exception e) {
             statusLabel.setText("Error opening file location: " + e.getMessage());
-            logger.error("Error opening file location for file: {}", file.getFilePath(), e);
+            logger.error(String.format("Error opening file location for file: {}", file.getFilePath()), e);
         }
     }
     
@@ -1080,13 +1080,13 @@ public class MetadataEditorView extends BorderPane implements ProfileChangeListe
             } else {
                 statusLabel.setText("Failed to switch to Import & Organize tab");
                 statusLabel.setStyle("-fx-text-fill: red;");
-                logger.warning("Failed to switch to Import & Organize tab - tab not found");
+                logger.warn("Failed to switch to Import & Organize tab - tab not found");
             }
         } else {
             // Fallback behavior when no callback is available
             statusLabel.setText("Please switch to 'Import & Organize' tab to add music files");
             statusLabel.setStyle("-fx-text-fill: orange;");
-            logger.warning("No tab switch callback available - user must manually switch tabs");
+            logger.warn("No tab switch callback available - user must manually switch tabs");
         }
     }
     

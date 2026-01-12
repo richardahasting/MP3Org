@@ -156,7 +156,7 @@ public class MP3OrgLoggingManager {
         }
         
         Logger logger = LoggerFactory.getLogger(MP3OrgLoggingManager.class);
-        logger.debug("Set log level for {}: {}", component, level);
+        logger.debug(String.format("Set log level for {}: {}", component, level));
     }
     
     /**
@@ -178,8 +178,7 @@ public class MP3OrgLoggingManager {
             LoggerFactory.configure(currentConfig);
             
             Logger logger = LoggerFactory.getLogger(MP3OrgLoggingManager.class);
-            logger.info("File logging {}: {}", enabled ? "enabled" : "disabled", 
-                       enabled ? currentConfig.getFilePath() : "N/A");
+            logger.info(String.format("File logging %s: %s", enabled ? "enabled" : "disabled", enabled ? currentConfig.getFilePath() : "N/A"));
         }
     }
     
@@ -243,7 +242,7 @@ public class MP3OrgLoggingManager {
             currentConfig.saveToFile(configFile);
             
             Logger logger = LoggerFactory.getLogger(MP3OrgLoggingManager.class);
-            logger.debug("Logging configuration saved to {}", configFile.getAbsolutePath());
+            logger.debug(String.format("Logging configuration saved to {}", configFile.getAbsolutePath()));
         }
     }
     
@@ -270,9 +269,8 @@ public class MP3OrgLoggingManager {
      */
     public static void logApplicationStartup(String applicationName, String version) {
         Logger logger = getLogger("org.hasting.Application");
-        logger.info("Starting {} version {}", applicationName, version);
-        logger.debug("Logging configuration: console={}, file={}, level={}", 
-                    currentConfig.isConsoleEnabled(),
+        logger.info(String.format("Starting {} version {}", applicationName, version));
+        logger.debug(String.format("Logging configuration: console={}, file={}, level={}", currentConfig.isConsoleEnabled()),
                     currentConfig.isFileEnabled() ? currentConfig.getFilePath() : "disabled",
                     currentConfig.getDefaultLevel());
     }
@@ -306,7 +304,7 @@ public class MP3OrgLoggingManager {
             
         } catch (Exception e) {
             Logger logger = getLogger(MP3OrgLoggingManager.class);
-            logger.warning("Failed to reload logging configuration from database: {}", e.getMessage());
+            logger.warning(String.format("Failed to reload logging configuration from database: %s", e.getMessage()));
             // Keep current configuration on failure
         }
     }
@@ -337,7 +335,7 @@ public class MP3OrgLoggingManager {
             }
         } catch (Exception e) {
             Logger logger = getLogger(MP3OrgLoggingManager.class);
-            logger.error("Error during log rotation check: {}", e.getMessage(), e);
+            logger.error(String.format("Error during log rotation check: {}", e.getMessage()), e);
         }
     }
     
@@ -365,7 +363,7 @@ public class MP3OrgLoggingManager {
             return success;
         } catch (Exception e) {
             Logger logger = getLogger(MP3OrgLoggingManager.class);
-            logger.error("Error during manual backup: {}", e.getMessage(), e);
+            logger.error(String.format("Error during manual backup: {}", e.getMessage()), e);
             return false;
         }
     }

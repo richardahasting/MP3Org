@@ -2,8 +2,8 @@ package org.hasting.util;
 
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
-import org.hasting.util.logging.Logger;
-import org.hasting.util.logging.MP3OrgLoggingManager;
+import com.log4rich.core.Logger;
+import com.log4rich.Log4Rich;
 
 /**
  * Manages profile change notifications to UI components.
@@ -11,7 +11,7 @@ import org.hasting.util.logging.MP3OrgLoggingManager;
  */
 public class ProfileChangeNotifier {
     
-    private static final Logger logger = MP3OrgLoggingManager.getLogger(ProfileChangeNotifier.class);
+    private static final Logger logger = Log4Rich.getLogger(ProfileChangeNotifier.class);
     
     private static ProfileChangeNotifier instance;
     private final List<ProfileChangeListener> listeners;
@@ -36,7 +36,7 @@ public class ProfileChangeNotifier {
     public void addListener(ProfileChangeListener listener) {
         if (listener != null && !listeners.contains(listener)) {
             listeners.add(listener);
-            logger.debug("Registered profile change listener: {}", listener.getClass().getSimpleName());
+            logger.debug(String.format("Registered profile change listener: %s", listener.getClass().getSimpleName()));
         }
     }
     
@@ -47,7 +47,7 @@ public class ProfileChangeNotifier {
         if (listener != null) {
             boolean removed = listeners.remove(listener);
             if (removed) {
-                logger.debug("Unregistered profile change listener: {}", listener.getClass().getSimpleName());
+                logger.debug(String.format("Unregistered profile change listener: %s", listener.getClass().getSimpleName()));
             }
         }
     }
@@ -56,14 +56,13 @@ public class ProfileChangeNotifier {
      * Notifies all listeners that the active profile has changed.
      */
     public void notifyProfileChanged(String oldProfileId, String newProfileId, DatabaseProfile newProfile) {
-        logger.info("Notifying {} listeners of profile change: {} -> {}", listeners.size(), oldProfileId, newProfileId);
+        logger.info(String.format("Notifying {} listeners of profile change: {} -> {}", listeners.size()), oldProfileId, newProfileId);
         
         for (ProfileChangeListener listener : listeners) {
             try {
                 listener.onProfileChanged(oldProfileId, newProfileId, newProfile);
             } catch (Exception e) {
-                logger.error("Error notifying profile change listener {}: {}", 
-                           listener.getClass().getSimpleName(), e.getMessage(), e);
+                logger.error(String.format("Error notifying profile change listener %s: %s", listener.getClass().getSimpleName(), e.getMessage()), e);
             }
         }
     }
@@ -72,15 +71,13 @@ public class ProfileChangeNotifier {
      * Notifies all listeners that the database location has changed.
      */
     public void notifyDatabaseChanged(String oldDatabasePath, String newDatabasePath, boolean isNewDatabase) {
-        logger.info("Notifying {} listeners of database change: {} -> {} (new: {})", 
-                   listeners.size(), oldDatabasePath, newDatabasePath, isNewDatabase);
+        logger.info(String.format("Notifying {} listeners of database change: {} -> {} (new: {})", listeners.size()), oldDatabasePath, newDatabasePath, isNewDatabase);
         
         for (ProfileChangeListener listener : listeners) {
             try {
                 listener.onDatabaseChanged(oldDatabasePath, newDatabasePath, isNewDatabase);
             } catch (Exception e) {
-                logger.error("Error notifying database change listener {}: {}", 
-                           listener.getClass().getSimpleName(), e.getMessage(), e);
+                logger.error(String.format("Error notifying database change listener %s: %s", listener.getClass().getSimpleName(), e.getMessage()), e);
             }
         }
     }
