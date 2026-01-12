@@ -1,9 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useMusicFiles } from '../../hooks/useMusicFiles';
 import type { MusicFile } from '../../types/music';
-import { updateMusicFile, deleteMusicFile } from '../../api/musicApi';
+import { updateMusicFile, deleteMusicFile, bulkUpdateMusicFiles } from '../../api/musicApi';
 
 type SearchField = 'all' | 'title' | 'artist' | 'album';
+
+interface BulkEditForm {
+  artist: string;
+  album: string;
+  genre: string;
+  applyArtist: boolean;
+  applyAlbum: boolean;
+  applyGenre: boolean;
+}
 
 export default function MetadataEditor() {
   const {
@@ -27,15 +36,41 @@ export default function MetadataEditor() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<MusicFile>>({});
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkEditForm, setBulkEditForm] = useState<BulkEditForm>({
+    artist: '',
+    album: '',
+    genre: '',
+    applyArtist: false,
+    applyAlbum: false,
+    applyGenre: false,
+  });
+  const [bulkEditLoading, setBulkEditLoading] = useState(false);
+
+  // Computed values for selection
+  const allSelected = useMemo(() =>
+    files.length > 0 && files.every(f => selectedIds.has(f.id)),
+    [files, selectedIds]
+  );
+
+  const someSelected = useMemo(() =>
+    files.some(f => selectedIds.has(f.id)),
+    [files, selectedIds]
+  );
+
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     search(localQuery, localField);
+    setSelectedIds(new Set()); // Clear selection on new search
   }, [localQuery, localField, search]);
 
   const handleClear = useCallback(() => {
     setLocalQuery('');
     setLocalField('all');
     clearSearch();
+    setSelectedIds(new Set());
   }, [clearSearch]);
 
   const startEdit = useCallback((file: MusicFile) => {
@@ -71,11 +106,103 @@ export default function MetadataEditor() {
     if (!confirm('Are you sure you want to delete this file from the database?')) return;
     try {
       await deleteMusicFile(id);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       refresh();
     } catch (err) {
       console.error('Failed to delete:', err);
     }
   }, [refresh]);
+
+  // Selection handlers
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) {
+      // Deselect all on current page
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        files.forEach(f => next.delete(f.id));
+        return next;
+      });
+    } else {
+      // Select all on current page
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        files.forEach(f => next.add(f.id));
+        return next;
+      });
+    }
+  }, [allSelected, files]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setShowBulkEdit(false);
+  }, []);
+
+  // Bulk edit handlers
+  const openBulkEdit = useCallback(() => {
+    setBulkEditForm({
+      artist: '',
+      album: '',
+      genre: '',
+      applyArtist: false,
+      applyAlbum: false,
+      applyGenre: false,
+    });
+    setShowBulkEdit(true);
+  }, []);
+
+  const closeBulkEdit = useCallback(() => {
+    setShowBulkEdit(false);
+  }, []);
+
+  const handleBulkUpdate = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+
+    const updates: { artist?: string; album?: string; genre?: string } = {};
+    if (bulkEditForm.applyArtist && bulkEditForm.artist) {
+      updates.artist = bulkEditForm.artist;
+    }
+    if (bulkEditForm.applyAlbum && bulkEditForm.album) {
+      updates.album = bulkEditForm.album;
+    }
+    if (bulkEditForm.applyGenre && bulkEditForm.genre) {
+      updates.genre = bulkEditForm.genre;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      alert('Please select at least one field to update and provide a value.');
+      return;
+    }
+
+    try {
+      setBulkEditLoading(true);
+      const result = await bulkUpdateMusicFiles(Array.from(selectedIds), updates);
+      alert(`Successfully updated ${result.updated} files.`);
+      setShowBulkEdit(false);
+      setSelectedIds(new Set());
+      refresh();
+    } catch (err) {
+      console.error('Bulk update failed:', err);
+      alert('Bulk update failed. Please try again.');
+    } finally {
+      setBulkEditLoading(false);
+    }
+  }, [selectedIds, bulkEditForm, refresh]);
 
   const renderPagination = () => {
     if (totalPages <= 1) return null;
@@ -152,6 +279,12 @@ export default function MetadataEditor() {
               <span className="stat-value">{totalElements.toLocaleString()}</span>
             </span>
           )}
+          {selectedIds.size > 0 && (
+            <span className="stat-item selected-count">
+              <span className="stat-label">Selected</span>
+              <span className="stat-value">{selectedIds.size.toLocaleString()}</span>
+            </span>
+          )}
         </div>
 
         <form className="search-form" onSubmit={handleSearch}>
@@ -187,6 +320,108 @@ export default function MetadataEditor() {
         </form>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-count">{selectedIds.size} file{selectedIds.size !== 1 ? 's' : ''} selected</span>
+          <div className="bulk-actions">
+            <button className="bulk-btn edit" onClick={openBulkEdit}>
+              <span className="btn-icon">✎</span> Edit Selected
+            </button>
+            <button className="bulk-btn clear" onClick={clearSelection}>
+              <span className="btn-icon">×</span> Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEdit && (
+        <div className="modal-overlay" onClick={closeBulkEdit}>
+          <div className="bulk-edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Bulk Edit {selectedIds.size} Files</h3>
+              <button className="modal-close" onClick={closeBulkEdit}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="modal-description">
+                Select the fields you want to update and provide new values.
+                Only checked fields will be modified.
+              </p>
+
+              <div className="bulk-field">
+                <label className="bulk-field-label">
+                  <input
+                    type="checkbox"
+                    checked={bulkEditForm.applyArtist}
+                    onChange={(e) => setBulkEditForm(f => ({ ...f, applyArtist: e.target.checked }))}
+                  />
+                  Artist
+                </label>
+                <input
+                  type="text"
+                  className="bulk-field-input"
+                  placeholder="New artist name"
+                  value={bulkEditForm.artist}
+                  onChange={(e) => setBulkEditForm(f => ({ ...f, artist: e.target.value }))}
+                  disabled={!bulkEditForm.applyArtist}
+                />
+              </div>
+
+              <div className="bulk-field">
+                <label className="bulk-field-label">
+                  <input
+                    type="checkbox"
+                    checked={bulkEditForm.applyAlbum}
+                    onChange={(e) => setBulkEditForm(f => ({ ...f, applyAlbum: e.target.checked }))}
+                  />
+                  Album
+                </label>
+                <input
+                  type="text"
+                  className="bulk-field-input"
+                  placeholder="New album name"
+                  value={bulkEditForm.album}
+                  onChange={(e) => setBulkEditForm(f => ({ ...f, album: e.target.value }))}
+                  disabled={!bulkEditForm.applyAlbum}
+                />
+              </div>
+
+              <div className="bulk-field">
+                <label className="bulk-field-label">
+                  <input
+                    type="checkbox"
+                    checked={bulkEditForm.applyGenre}
+                    onChange={(e) => setBulkEditForm(f => ({ ...f, applyGenre: e.target.checked }))}
+                  />
+                  Genre
+                </label>
+                <input
+                  type="text"
+                  className="bulk-field-input"
+                  placeholder="New genre"
+                  value={bulkEditForm.genre}
+                  onChange={(e) => setBulkEditForm(f => ({ ...f, genre: e.target.value }))}
+                  disabled={!bulkEditForm.applyGenre}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn cancel" onClick={closeBulkEdit}>
+                Cancel
+              </button>
+              <button
+                className="modal-btn apply"
+                onClick={handleBulkUpdate}
+                disabled={bulkEditLoading}
+              >
+                {bulkEditLoading ? 'Updating...' : `Update ${selectedIds.size} Files`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="error-message">
           <span className="error-icon">⚠</span>
@@ -211,6 +446,17 @@ export default function MetadataEditor() {
             <table className="music-table">
               <thead>
                 <tr>
+                  <th className="col-select">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={el => {
+                        if (el) el.indeterminate = someSelected && !allSelected;
+                      }}
+                      onChange={toggleSelectAll}
+                      title="Select all on this page"
+                    />
+                  </th>
                   <th className="col-title">Title</th>
                   <th className="col-artist">Artist</th>
                   <th className="col-album">Album</th>
@@ -223,7 +469,17 @@ export default function MetadataEditor() {
               </thead>
               <tbody>
                 {files.map((file) => (
-                  <tr key={file.id} className={editingId === file.id ? 'editing' : ''}>
+                  <tr
+                    key={file.id}
+                    className={`${editingId === file.id ? 'editing' : ''} ${selectedIds.has(file.id) ? 'selected' : ''}`}
+                  >
+                    <td className="cell-select">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(file.id)}
+                        onChange={() => toggleSelect(file.id)}
+                      />
+                    </td>
                     {editingId === file.id ? (
                       <>
                         <td>

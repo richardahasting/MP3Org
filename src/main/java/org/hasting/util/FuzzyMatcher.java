@@ -94,8 +94,8 @@ public class FuzzyMatcher {
             return 0.0;
         }
         
-        logger.debug(String.format("calculateSimilarity() - comparing: {} vs {}", file1.getTitle()) + " by " + file1.getArtist(),
-                   file2.getTitle() + " by " + file2.getArtist());
+        logger.debug("calculateSimilarity() - comparing: {} by {} vs {} by {}",
+                   file1.getTitle(), file1.getArtist(), file2.getTitle(), file2.getArtist());
         
         double titleSim = calculateFieldSimilarity(file1.getTitle(), file2.getTitle(), config, FieldType.TITLE);
         double artistSim = calculateFieldSimilarity(file1.getArtist(), file2.getArtist(), config, FieldType.ARTIST);
@@ -127,7 +127,9 @@ public class FuzzyMatcher {
         // Calculate weighted average (equal weights for now)
         double similarity = (titleSim + artistSim + albumSim) / 3.0;
         
-        logger.debug(String.format("calculateSimilarity() - result: {:.2f}% (title: {:.1f}%, artist: {:.1f}%, album: {:.1f}%, {} matching fields)", similarity * 100, titleSim, artistSim, albumSim, matchingFields));
+        logger.debug("calculateSimilarity() - result: {}% (title: {}%, artist: {}%, album: {}%, {} matching fields)",
+                   String.format("%.2f", similarity * 100), String.format("%.1f", titleSim),
+                   String.format("%.1f", artistSim), String.format("%.1f", albumSim), matchingFields);
         
         return similarity;
     }
@@ -173,7 +175,8 @@ public class FuzzyMatcher {
         }
         
         boolean result = matchingFields >= config.getMinimumFieldsToMatch();
-        logger.debug(String.format("areDuplicates() - exit: {} ({} matching fields, {} required)", result, matchingFields, config.getMinimumFieldsToMatch()));
+        logger.debug("areDuplicates() - exit: {} ({} matching fields, {} required)",
+                   result, matchingFields, config.getMinimumFieldsToMatch());
         return result;
     }
     
