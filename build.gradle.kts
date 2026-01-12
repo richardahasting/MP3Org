@@ -1,7 +1,7 @@
 plugins {
     id("java")
-    id("org.springframework.boot") version "3.2.1"
-    id("io.spring.dependency-management") version "1.1.4"
+    id("org.springframework.boot") version "3.4.1"
+    id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "org.hasting"
@@ -24,7 +24,7 @@ dependencies {
 
     // Existing dependencies (preserved from original build)
     implementation("org.apache.commons:commons-lang3:3.13.0")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("commons-fileupload:commons-fileupload:1.5")
 
     // Include all JARs from the lib directory (excluding JavaFX - using Maven for JDK 21 compatible version)
