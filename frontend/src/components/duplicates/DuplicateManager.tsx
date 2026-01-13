@@ -61,26 +61,41 @@ export default function DuplicateManager() {
     try {
       setLoading(true);
       setError(null);
-      const [groupsData, count] = await Promise.all([
-        fetchDuplicateGroups(),
-        getDuplicateCount(),
-      ]);
-      setGroups(groupsData);
-      setDuplicateCount(count);
+
+      // Load first page immediately
+      const firstPage = await fetchDuplicateGroups(0, 25);
+      setGroups(firstPage.groups);
+      setDuplicateCount(firstPage.totalGroups);
+      setLoading(false); // Show first results immediately
+
+      // Load remaining pages progressively in background
+      if (firstPage.hasMore) {
+        let currentPage = 1;
+        let allGroups = [...firstPage.groups];
+
+        while (currentPage < firstPage.totalPages) {
+          const nextPage = await fetchDuplicateGroups(currentPage, 25);
+          allGroups = [...allGroups, ...nextPage.groups];
+          setGroups(allGroups);
+          currentPage++;
+        }
+      }
 
       // If we had a selected group, try to re-select it
       if (selectedGroup) {
-        const updated = groupsData.find(g => g.groupId === selectedGroup.groupId);
-        if (updated) {
-          setSelectedGroup(updated);
-        } else {
-          setSelectedGroup(null);
-          setSelectedFileId(null);
-        }
+        setGroups(currentGroups => {
+          const updated = currentGroups.find(g => g.groupId === selectedGroup.groupId);
+          if (updated) {
+            setSelectedGroup(updated);
+          } else {
+            setSelectedGroup(null);
+            setSelectedFileId(null);
+          }
+          return currentGroups;
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load duplicates');
-    } finally {
       setLoading(false);
     }
   }, [selectedGroup]);
