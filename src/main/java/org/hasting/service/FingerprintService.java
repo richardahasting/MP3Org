@@ -94,9 +94,11 @@ public class FingerprintService {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String fingerprint = null;
             int fpDuration = 0;
+            StringBuilder output = new StringBuilder();
 
             String line;
             while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
                 if (line.startsWith("FINGERPRINT=")) {
                     fingerprint = line.substring("FINGERPRINT=".length());
                 } else if (line.startsWith("DURATION=")) {
@@ -107,12 +109,46 @@ public class FingerprintService {
             int exitCode = process.waitFor();
             if (exitCode == 0 && fingerprint != null) {
                 return new FingerprintResult(fingerprint, fpDuration);
+            } else {
+                // Log the failure with details
+                String errorOutput = output.toString().trim();
+                if (errorOutput.isEmpty()) {
+                    errorOutput = "No output from fpcalc";
+                }
+                logger.warn("fpcalc failed for '{}': exit code {}, output: {}",
+                    filePath, exitCode, errorOutput);
+                trackFailedFile(filePath, "fpcalc exit code " + exitCode + ": " + errorOutput);
             }
         } catch (Exception e) {
-            logger.debug("Failed to generate fingerprint for: " + filePath + " - " + e.getMessage());
+            logger.warn("Exception generating fingerprint for '{}': {}", filePath, e.getMessage());
+            trackFailedFile(filePath, "Exception: " + e.getMessage());
         }
 
         return null;
+    }
+
+    // Track failed files for reporting
+    private final java.util.concurrent.ConcurrentHashMap<String, String> failedFiles = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void trackFailedFile(String filePath, String reason) {
+        // Keep only the last 100 failures to avoid memory issues
+        if (failedFiles.size() < 100) {
+            failedFiles.put(filePath, reason);
+        }
+    }
+
+    /**
+     * Get the list of files that failed fingerprint generation.
+     */
+    public java.util.Map<String, String> getFailedFiles() {
+        return new java.util.HashMap<>(failedFiles);
+    }
+
+    /**
+     * Clear the failed files list.
+     */
+    public void clearFailedFiles() {
+        failedFiles.clear();
     }
 
     /**
@@ -128,6 +164,9 @@ public class FingerprintService {
             return 0;
         }
 
+        // Clear previous failures
+        clearFailedFiles();
+
         List<MusicFile> filesWithoutFingerprints = DatabaseManager.getFilesWithoutFingerprints();
         int total = filesWithoutFingerprints.size();
 
@@ -136,7 +175,7 @@ public class FingerprintService {
             return 0;
         }
 
-        logger.info("Generating fingerprints for " + total + " files using " + DEFAULT_THREAD_COUNT + " threads");
+        logger.info("Generating fingerprints for {} files using {} threads", total, DEFAULT_THREAD_COUNT);
 
         AtomicInteger completed = new AtomicInteger(0);
         AtomicInteger successful = new AtomicInteger(0);
@@ -173,7 +212,17 @@ public class FingerprintService {
         // Wait for all tasks to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        logger.info("Fingerprint generation complete: " + successful.get() + "/" + total + " successful");
+        int failed = total - successful.get();
+        logger.info("Fingerprint generation complete: {}/{} successful, {} failed", successful.get(), total, failed);
+
+        // Log details of failed files
+        if (!failedFiles.isEmpty()) {
+            logger.warn("Failed to generate fingerprints for {} files:", failedFiles.size());
+            failedFiles.forEach((path, reason) -> {
+                logger.warn("  {} - {}", path, reason);
+            });
+        }
+
         return successful.get();
     }
 

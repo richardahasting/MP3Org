@@ -76,10 +76,36 @@ public class FingerprintController {
         activeSessions.put(sessionId, session);
 
         // Run fingerprint generation asynchronously
+        final long totalToProcess = filesNeeded;
         CompletableFuture.runAsync(() -> {
             try {
                 int generated = fingerprintService.generateMissingFingerprints(sessionId);
-                session.setCompleted(generated);
+                int failed = (int) totalToProcess - generated;
+                session.setCompleted(generated, failed);
+
+                // If there were failures, set an error message with summary
+                if (failed > 0) {
+                    Map<String, String> failures = fingerprintService.getFailedFiles();
+                    if (!failures.isEmpty()) {
+                        // Get the first few failure reasons for the error message
+                        StringBuilder errorMsg = new StringBuilder();
+                        errorMsg.append(failed).append(" files failed. ");
+                        int shown = 0;
+                        for (Map.Entry<String, String> entry : failures.entrySet()) {
+                            if (shown >= 3) {
+                                errorMsg.append("... and ").append(failures.size() - 3).append(" more");
+                                break;
+                            }
+                            if (shown > 0) errorMsg.append("; ");
+                            // Extract just the filename from the path
+                            String path = entry.getKey();
+                            String filename = path.substring(path.lastIndexOf('/') + 1);
+                            errorMsg.append(filename).append(": ").append(entry.getValue());
+                            shown++;
+                        }
+                        session.setError(errorMsg.toString());
+                    }
+                }
             } catch (Exception e) {
                 session.setError(e.getMessage());
             }
@@ -104,12 +130,26 @@ public class FingerprintController {
             return ResponseEntity.notFound().build();
         }
 
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("sessionId", sessionId);
+        response.put("status", session.getStatus());
+        response.put("totalFiles", session.getTotalFiles());
+        response.put("completed", session.getCompleted());
+        response.put("failed", session.getFailed());
+        response.put("error", session.getError() != null ? session.getError() : "");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get the list of files that failed fingerprint generation.
+     */
+    @GetMapping("/failures")
+    public ResponseEntity<Map<String, Object>> getFailedFiles() {
+        Map<String, String> failures = fingerprintService.getFailedFiles();
         return ResponseEntity.ok(Map.of(
-            "sessionId", sessionId,
-            "status", session.getStatus(),
-            "totalFiles", session.getTotalFiles(),
-            "completed", session.getCompleted(),
-            "error", session.getError() != null ? session.getError() : ""
+            "count", failures.size(),
+            "failures", failures
         ));
     }
 
@@ -130,6 +170,7 @@ public class FingerprintController {
         private final String sessionId;
         private final long totalFiles;
         private int completed = 0;
+        private int failed = 0;
         private String status = "running";
         private String error = null;
 
@@ -141,11 +182,13 @@ public class FingerprintController {
         String getSessionId() { return sessionId; }
         long getTotalFiles() { return totalFiles; }
         int getCompleted() { return completed; }
+        int getFailed() { return failed; }
         String getStatus() { return status; }
         String getError() { return error; }
 
-        void setCompleted(int completed) {
+        void setCompleted(int completed, int failed) {
             this.completed = completed;
+            this.failed = failed;
             this.status = "completed";
         }
 
