@@ -2,6 +2,10 @@ package org.hasting.controller;
 
 import org.hasting.dto.AutoResolutionPreviewDTO;
 import org.hasting.dto.AutoResolutionResultDTO;
+import org.hasting.dto.DirectoryConflictDTO;
+import org.hasting.dto.DirectoryResolutionPreviewDTO;
+import org.hasting.dto.DirectoryResolutionRequest;
+import org.hasting.dto.DirectoryResolutionResultDTO;
 import org.hasting.dto.DuplicateGroupDTO;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.service.DuplicateService;
@@ -275,6 +279,49 @@ public class DuplicateController {
             ));
         }
     }
+
+    // ============================================================
+    // Directory-based duplicate grouping endpoints (Issue #92)
+    // ============================================================
+
+    /**
+     * Get all directory conflicts.
+     * Returns pairs of directories that contain duplicate files.
+     */
+    @GetMapping("/by-directory")
+    public ResponseEntity<List<DirectoryConflictDTO>> getDirectoryConflicts() {
+        return ResponseEntity.ok(duplicateService.getDirectoryConflicts());
+    }
+
+    /**
+     * Preview directory resolution.
+     * Shows which files would be deleted when resolving a directory conflict.
+     */
+    @PostMapping("/resolve-directory/preview")
+    public ResponseEntity<DirectoryResolutionPreviewDTO> previewDirectoryResolution(
+            @RequestBody DirectoryResolutionRequest request) {
+        return ResponseEntity.ok(duplicateService.previewDirectoryResolution(
+            request.directoryToKeep(),
+            request.directoryToDelete()
+        ));
+    }
+
+    /**
+     * Execute directory resolution.
+     * Deletes all duplicate files from the specified directory.
+     */
+    @PostMapping("/resolve-directory/execute")
+    public ResponseEntity<DirectoryResolutionResultDTO> executeDirectoryResolution(
+            @RequestBody DirectoryResolutionRequest request) {
+        return ResponseEntity.ok(duplicateService.resolveDirectoryConflict(
+            request.directoryToKeep(),
+            request.directoryToDelete()
+        ));
+    }
+
+    // ============================================================
+    // Request/Response records
+    // ============================================================
 
     /**
      * Request body for comparing two files.

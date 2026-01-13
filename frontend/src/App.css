@@ -237,7 +237,8 @@ body::before {
   margin: 0 auto;
   width: 100%;
   min-height: 0; /* Allow flex child to shrink */
-  overflow: hidden; /* Establish scroll context for children */
+  overflow-y: auto; /* Allow vertical scrolling */
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -1328,26 +1329,16 @@ body::before {
 }
 
 .bulk-field {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 
 .bulk-field-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+  display: block;
   font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: var(--space-xs);
-  cursor: pointer;
-}
-
-.bulk-field-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent-primary);
-  cursor: pointer;
 }
 
 .bulk-field-input {
@@ -1368,9 +1359,52 @@ body::before {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.bulk-field-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.bulk-field-year {
+  max-width: 150px;
+}
+
+/* Suggestion chips for bulk edit */
+.bulk-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: rgba(0, 255, 255, 0.05);
+}
+
+.suggestion-chip.active {
+  border-color: var(--accent-primary);
+  background: var(--accent-glow);
+  color: var(--accent-primary);
+}
+
+.suggestion-chip .chip-count {
+  color: var(--text-muted);
+  font-size: 0.7rem;
 }
 
 .modal-footer {
@@ -4401,4 +4435,295 @@ body::before {
 .organize-header-top h2,
 .config-header-top h2 {
   margin-bottom: 0;
+}
+
+/* ============================================
+   Directory-Based Duplicate View (Issue #92)
+   ============================================ */
+
+.view-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.view-mode-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+}
+
+.view-mode-btn {
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  border-radius: var(--radius-sm);
+}
+
+.view-mode-btn:first-of-type {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-right: none;
+}
+
+.view-mode-btn:last-of-type {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.view-mode-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.view-mode-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--bg-base);
+  font-weight: 500;
+}
+
+/* Directory conflict item in list */
+.directory-conflict-item {
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: var(--space-xs);
+}
+
+.conflict-dirs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.conflict-dir {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conflict-vs {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.conflict-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.conflict-count {
+  font-size: 0.75rem;
+  color: var(--accent-secondary);
+  background: rgba(0, 255, 157, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* Directory conflict detail panel */
+.directory-conflict-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.directory-choice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.directory-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.directory-option:hover {
+  border-color: var(--accent-primary);
+  background: rgba(0, 255, 255, 0.02);
+}
+
+.directory-option.selected {
+  border-color: var(--accent-primary);
+  background: var(--accent-glow);
+}
+
+.directory-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--accent-primary);
+}
+
+.directory-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  overflow: hidden;
+}
+
+.directory-path {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.directory-file-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Directory preview */
+.directory-preview {
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.preview-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.preview-keep {
+  color: var(--accent-secondary);
+  font-size: 0.875rem;
+}
+
+.preview-delete {
+  color: var(--status-error);
+  font-size: 0.875rem;
+}
+
+.files-to-delete-list {
+  padding: var(--space-sm);
+  background: rgba(255, 70, 100, 0.05);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 70, 100, 0.2);
+}
+
+.files-to-delete-list h4 {
+  font-size: 0.8125rem;
+  color: var(--status-error);
+  margin-bottom: var(--space-sm);
+}
+
+.file-to-delete-item {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  font-size: 0.8125rem;
+}
+
+.file-to-delete-item .file-title {
+  color: var(--text-primary);
+}
+
+.file-to-delete-item .file-artist {
+  color: var(--text-muted);
+}
+
+.more-files {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-top: var(--space-xs);
+}
+
+.directory-execute {
+  align-self: flex-end;
+  background: var(--status-error);
+  border-color: var(--status-error);
+}
+
+.directory-execute:hover:not(:disabled) {
+  background: #ff3355;
+  border-color: #ff3355;
+}
+
+/* Duplicate pairs section */
+.duplicate-pairs-section {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-md);
+}
+
+.duplicate-pairs-section h4 {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.pairs-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.pair-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.pair-file {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pair-title {
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pair-path {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-pairs {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-sm);
 }

@@ -2,16 +2,35 @@
 
 *This file tracks active work, current context, and session-to-session continuity*
 
-## Current Status: Session 2025-01-09
+## Current Status: Session 2026-01-13
 
 ### **Active Work Item**
+**Issue #92 - Directory-Based Duplicate Resolution**
+- ✅ **COMPLETED - Directory-Based Duplicate Grouping**
+  - Goal: Group duplicates by directory and resolve by choosing a preferred directory
+  - Status: Fully implemented (backend + frontend)
+  - Branch: feature/log4Rich-integration
+  - Commit: 74c8f89
+
+### **Session Work Completed**
+1. ✅ Directory-based duplicate grouping UI (view mode toggle, conflict list, detail panel)
+2. ✅ Config help updated with Chromaprint installation instructions (macOS/Windows/Linux)
+3. ✅ Metadata page scrolling fix (`overflow-y: auto`)
+4. ✅ Edit form value display fix (`??` instead of `||`)
+5. ✅ Bulk edit redesign with:
+   - Combobox inputs using HTML5 datalist
+   - Suggestion chips showing distinct values with frequency counts
+   - Pre-selection of most common value
+   - Year field added to bulk edit
+   - Title/track# excluded from multi-file edit
+
+### **Previous Active Work**
 **Issue #69 - Web UI Migration**
-- 🔧 **ACTIVE - Complete UI Redesign**
+- ✅ **COMPLETED - Complete UI Redesign**
   - Goal: Migrate from JavaFX desktop app to Spring Boot + React web application
   - Stack: Java 21 + Spring Boot 3.2 backend, React + TypeScript frontend
   - Design: Using frontend-design skill for distinctive, high-quality UI
-  - Status: Phase 1 - Foundation
-  - Branch: feature/issue-69-web-ui
+  - Status: Phase 1 - Foundation Complete
   - Plan: /Users/richard/.claude/plans/snoopy-pondering-conway.md
 
 ### **Migration Phases**

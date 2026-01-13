@@ -39,6 +39,18 @@ mp3org.properties
 mp3org-profiles.properties
 derby.log
 
+# Platform-specific native libraries (download via Maven/Gradle instead)
+lib/*.dylib
+lib/*.dll
+lib/*.so
+
+# JARs that are now Maven dependencies
+lib/jaudiotagger*.jar
+lib/miglayout*.jar
+lib/javafx*.jar
+lib/jdk.jsobject.jar
+lib/jfx.incubator*.jar
+
 # SQLite databases
 *.db
 :memory:.db

@@ -61,7 +61,7 @@ export async function deleteMusicFile(id: number): Promise<void> {
 
 export async function bulkUpdateMusicFiles(
   ids: number[],
-  updates: { artist?: string; album?: string; genre?: string }
+  updates: { artist?: string; album?: string; genre?: string; year?: number }
 ): Promise<{ updated: number }> {
   const response = await fetch(`${API_BASE}/bulk`, {
     method: 'PUT',

@@ -291,20 +291,34 @@ export const organizeHelp: HelpSection[] = [
 // Config Tab Help
 export const configHelp: HelpSection[] = [
   {
-    title: 'Overview',
-    content: 'The Config tab contains settings for duplicate detection and audio fingerprinting. Adjust these settings to fine-tune how duplicates are identified in your collection.'
-  },
-  {
-    title: 'Fuzzy Matching Settings',
+    title: 'Audio Fingerprinting Setup (Required)',
     content: (
       <div>
-        <p>These settings control metadata-based duplicate detection:</p>
-        <ul>
-          <li><strong>Title Threshold</strong> - How similar titles must be (0-100%)</li>
-          <li><strong>Artist Threshold</strong> - How similar artist names must be</li>
-          <li><strong>Duration Tolerance</strong> - Allowed difference in track length (seconds)</li>
-        </ul>
-        <p>Higher thresholds require closer matches; lower values find more potential duplicates.</p>
+        <p>Audio fingerprinting requires <strong>Chromaprint</strong>, an external tool that analyzes audio content. You must install it for accurate duplicate detection.</p>
+
+        <h4 style={{ marginTop: '1rem', marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>macOS</h4>
+        <p>Install using Homebrew:</p>
+        <pre style={{ background: 'var(--bg-base)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8125rem' }}>brew install chromaprint</pre>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>If you don't have Homebrew, install it first from <a href="https://brew.sh" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>brew.sh</a></p>
+
+        <h4 style={{ marginTop: '1rem', marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Windows</h4>
+        <ol style={{ fontSize: '0.875rem' }}>
+          <li>Download Chromaprint from <a href="https://acoustid.org/chromaprint" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-primary)' }}>acoustid.org/chromaprint</a></li>
+          <li>Extract the ZIP file</li>
+          <li>Copy <code>fpcalc.exe</code> to a folder in your PATH (e.g., <code>C:\Windows</code>)</li>
+          <li>Or add the extraction folder to your system PATH</li>
+        </ol>
+
+        <h4 style={{ marginTop: '1rem', marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Linux (Ubuntu/Debian)</h4>
+        <pre style={{ background: 'var(--bg-base)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8125rem' }}>sudo apt install libchromaprint-tools</pre>
+
+        <h4 style={{ marginTop: '1rem', marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Linux (Fedora/RHEL)</h4>
+        <pre style={{ background: 'var(--bg-base)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8125rem' }}>sudo dnf install chromaprint-tools</pre>
+
+        <h4 style={{ marginTop: '1rem', marginBottom: '0.5rem', color: 'var(--accent-primary)' }}>Linux (Arch)</h4>
+        <pre style={{ background: 'var(--bg-base)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.8125rem' }}>sudo pacman -S chromaprint</pre>
+
+        <p style={{ marginTop: '1rem' }}><strong>Verify installation:</strong> Open a terminal and run <code>fpcalc -version</code>. You should see version information. Restart MP3Org after installing.</p>
       </div>
     )
   },
@@ -345,6 +359,24 @@ export const configHelp: HelpSection[] = [
           <li><strong>Files without Fingerprints</strong> - Need fingerprint generation</li>
           <li><strong>fpcalc Status</strong> - Whether the fingerprint tool is available</li>
         </ul>
+      </div>
+    )
+  },
+  {
+    title: 'Overview',
+    content: 'The Config tab contains settings for duplicate detection and audio fingerprinting. Adjust these settings to fine-tune how duplicates are identified in your collection.'
+  },
+  {
+    title: 'Fuzzy Matching Settings',
+    content: (
+      <div>
+        <p>These settings control metadata-based duplicate detection:</p>
+        <ul>
+          <li><strong>Title Threshold</strong> - How similar titles must be (0-100%)</li>
+          <li><strong>Artist Threshold</strong> - How similar artist names must be</li>
+          <li><strong>Duration Tolerance</strong> - Allowed difference in track length (seconds)</li>
+        </ul>
+        <p>Higher thresholds require closer matches; lower values find more potential duplicates.</p>
       </div>
     )
   },

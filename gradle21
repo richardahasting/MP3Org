@@ -1,0 +1,185 @@
+#!/bin/bash
+#
+# Gradle wrapper that automatically locates and uses Java 21
+# This ensures consistent builds regardless of system JAVA_HOME
+#
+# Supports: macOS, Linux, Windows (Git Bash/WSL/MSYS2)
+#
+
+set -e
+
+# Function to find Java 21 on macOS
+find_java21_macos() {
+    /usr/libexec/java_home -v 21 2>/dev/null || true
+}
+
+# Function to find Java 21 on Linux
+find_java21_linux() {
+    # Check SDKMAN first (user installation, highest priority)
+    if [[ -d "$HOME/.sdkman/candidates/java" ]]; then
+        for dir in "$HOME"/.sdkman/candidates/java/*21*; do
+            if [[ -d "$dir" && -x "$dir/bin/java" ]]; then
+                echo "$dir"
+                return
+            fi
+        done
+    fi
+
+    # Check system package manager locations
+    # Ubuntu/Debian: /usr/lib/jvm/java-21-openjdk-amd64
+    # Fedora/RHEL: /usr/lib/jvm/java-21-openjdk
+    # Arch: /usr/lib/jvm/java-21-openjdk
+    for dir in \
+        /usr/lib/jvm/java-21-openjdk* \
+        /usr/lib/jvm/jdk-21* \
+        /usr/lib/jvm/temurin-21* \
+        /usr/lib/jvm/zulu-21* \
+        /usr/lib/jvm/bellsoft-java21* \
+        /usr/lib/jvm/java-21-amazon-corretto* \
+        /usr/java/jdk-21* \
+        /opt/java/jdk-21* \
+        /opt/jdk-21* \
+        /opt/openjdk-21* \
+        /snap/openjdk/current/jdk \
+    ; do
+        if [[ -d "$dir" && -x "$dir/bin/java" ]]; then
+            # Verify it's actually Java 21
+            local ver=$("$dir/bin/java" -version 2>&1 | head -1 | grep -oE '"[0-9]+' | tr -d '"')
+            if [[ "$ver" == "21" ]]; then
+                echo "$dir"
+                return
+            fi
+        fi
+    done
+
+    # Check Homebrew on Linux
+    if [[ -d "/home/linuxbrew/.linuxbrew/opt/openjdk@21" ]]; then
+        echo "/home/linuxbrew/.linuxbrew/opt/openjdk@21"
+        return
+    fi
+    if [[ -d "$HOME/.linuxbrew/opt/openjdk@21" ]]; then
+        echo "$HOME/.linuxbrew/opt/openjdk@21"
+        return
+    fi
+}
+
+# Function to find Java 21 on Windows (Git Bash, MSYS2, Cygwin)
+find_java21_windows() {
+    # Convert Windows paths to Unix-style for bash
+    local program_files="/c/Program Files"
+    local program_files_x86="/c/Program Files (x86)"
+
+    # Check common Windows Java locations
+    for base in "$program_files" "$program_files_x86" "/c"; do
+        for dir in \
+            "$base/Java/jdk-21"* \
+            "$base/Eclipse Adoptium/jdk-21"* \
+            "$base/Temurin/jdk-21"* \
+            "$base/Amazon Corretto/jdk21"* \
+            "$base/Microsoft/jdk-21"* \
+            "$base/Zulu/zulu-21"* \
+            "$base/BellSoft/LibericaJDK-21"* \
+            "$base/OpenJDK/jdk-21"* \
+        ; do
+            if [[ -d "$dir" && -x "$dir/bin/java" ]]; then
+                echo "$dir"
+                return
+            fi
+        done
+    done
+
+    # Check SDKMAN on Windows (if using WSL or Git Bash with SDKMAN)
+    if [[ -d "$HOME/.sdkman/candidates/java" ]]; then
+        for dir in "$HOME"/.sdkman/candidates/java/*21*; do
+            if [[ -d "$dir" && -x "$dir/bin/java" ]]; then
+                echo "$dir"
+                return
+            fi
+        done
+    fi
+}
+
+# Detect OS and find Java 21
+case "$(uname -s)" in
+    Darwin)
+        JAVA21_HOME=$(find_java21_macos)
+        OS_TYPE="macOS"
+        ;;
+    Linux)
+        JAVA21_HOME=$(find_java21_linux)
+        OS_TYPE="Linux"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        JAVA21_HOME=$(find_java21_windows)
+        OS_TYPE="Windows"
+        ;;
+    *)
+        echo "ERROR: Unsupported operating system: $(uname -s)"
+        echo "Supported: macOS, Linux, Windows (Git Bash/MSYS2/Cygwin)"
+        exit 1
+        ;;
+esac
+
+# Verify Java 21 was found
+if [[ -z "$JAVA21_HOME" || ! -d "$JAVA21_HOME" ]]; then
+    echo "==========================================================="
+    echo "  ERROR: Java 21 is required but not found on $OS_TYPE"
+    echo "==========================================================="
+    echo ""
+    echo "Please install Java 21 using one of these methods:"
+    echo ""
+
+    case "$OS_TYPE" in
+        macOS)
+            echo "  Homebrew:"
+            echo "    brew install openjdk@21"
+            echo ""
+            echo "  SDKMAN:"
+            echo "    sdk install java 21.0.5-tem"
+            echo ""
+            echo "  Oracle:"
+            echo "    https://www.oracle.com/java/technologies/downloads/#java21"
+            ;;
+        Linux)
+            echo "  Ubuntu/Debian:"
+            echo "    sudo apt install openjdk-21-jdk"
+            echo ""
+            echo "  Fedora/RHEL:"
+            echo "    sudo dnf install java-21-openjdk-devel"
+            echo ""
+            echo "  Arch Linux:"
+            echo "    sudo pacman -S jdk21-openjdk"
+            echo ""
+            echo "  SDKMAN (recommended):"
+            echo "    sdk install java 21.0.5-tem"
+            ;;
+        Windows)
+            echo "  Adoptium (recommended):"
+            echo "    https://adoptium.net/temurin/releases/?version=21"
+            echo ""
+            echo "  Microsoft Build of OpenJDK:"
+            echo "    winget install Microsoft.OpenJDK.21"
+            echo ""
+            echo "  Amazon Corretto:"
+            echo "    https://aws.amazon.com/corretto/"
+            echo ""
+            echo "  Or use the native Windows script:"
+            echo "    .\\gradle21.cmd build"
+            ;;
+    esac
+    echo ""
+    exit 1
+fi
+
+# Verify it's actually Java 21
+JAVA_VERSION=$("$JAVA21_HOME/bin/java" -version 2>&1 | head -1 | grep -oE '"[0-9]+' | tr -d '"')
+if [[ "$JAVA_VERSION" != "21" ]]; then
+    echo "ERROR: Found Java at $JAVA21_HOME but it's version $JAVA_VERSION, not 21"
+    exit 1
+fi
+
+echo "Using Java 21: $JAVA21_HOME"
+
+# Export JAVA_HOME and run Gradle
+export JAVA_HOME="$JAVA21_HOME"
+exec ./gradlew "$@"

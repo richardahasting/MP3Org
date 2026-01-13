@@ -2,8 +2,12 @@ package org.hasting.service;
 
 import org.hasting.dto.AutoResolutionPreviewDTO;
 import org.hasting.dto.AutoResolutionResultDTO;
+import org.hasting.dto.DirectoryConflictDTO;
+import org.hasting.dto.DirectoryResolutionPreviewDTO;
+import org.hasting.dto.DirectoryResolutionResultDTO;
 import org.hasting.dto.DuplicateFileDTO;
 import org.hasting.dto.DuplicateGroupDTO;
+import org.hasting.dto.DuplicatePairDTO;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
@@ -15,6 +19,8 @@ import org.springframework.stereotype.Service;
 import com.log4rich.core.Logger;
 import com.log4rich.Log4Rich;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -773,6 +779,242 @@ public class DuplicateService {
         List<DuplicateGroupDTO> groups,
         int totalGroupsFound
     ) {}
+
+    // ============================================================
+    // Directory-based duplicate grouping (Issue #92)
+    // ============================================================
+
+    /**
+     * Helper record to represent a pair of directories for grouping.
+     * Ensures consistent ordering (alphabetically) for map keys.
+     */
+    private record DirectoryPair(String dirA, String dirB) {
+        DirectoryPair {
+            // Ensure consistent ordering for map keys
+            if (dirA.compareTo(dirB) > 0) {
+                String temp = dirA;
+                dirA = dirB;
+                dirB = temp;
+            }
+        }
+    }
+
+    /**
+     * Gets duplicate files grouped by directory pairs.
+     * Shows which directories have overlapping (duplicate) content.
+     *
+     * @return List of directory conflicts, sorted by number of duplicate pairs (descending)
+     */
+    public List<DirectoryConflictDTO> getDirectoryConflicts() {
+        logger.info("Computing directory conflicts...");
+
+        // Get all duplicate groups first
+        List<DuplicateGroupDTO> groups = getDuplicateGroups();
+
+        // Build map: (dirA, dirB) → List<DuplicatePair>
+        Map<DirectoryPair, List<DuplicatePairDTO>> conflicts = new HashMap<>();
+
+        for (DuplicateGroupDTO group : groups) {
+            List<DuplicateFileDTO> files = group.files();
+
+            // Compare each pair of files in the group
+            for (int i = 0; i < files.size(); i++) {
+                for (int j = i + 1; j < files.size(); j++) {
+                    String dirA = getParentDirectory(files.get(i).file().filePath());
+                    String dirB = getParentDirectory(files.get(j).file().filePath());
+
+                    // Only consider cross-directory duplicates
+                    if (!dirA.equals(dirB)) {
+                        DirectoryPair key = new DirectoryPair(dirA, dirB);
+                        conflicts.computeIfAbsent(key, k -> new ArrayList<>())
+                            .add(new DuplicatePairDTO(
+                                files.get(i).file(),
+                                files.get(j).file(),
+                                files.get(i).similarity()
+                            ));
+                    }
+                }
+            }
+        }
+
+        // Convert to DTOs with counts
+        List<DirectoryConflictDTO> result = conflicts.entrySet().stream()
+            .map(e -> {
+                DirectoryPair pair = e.getKey();
+                List<DuplicatePairDTO> pairs = e.getValue();
+
+                // Count unique files in each directory
+                Set<Long> filesInA = new HashSet<>();
+                Set<Long> filesInB = new HashSet<>();
+
+                for (DuplicatePairDTO p : pairs) {
+                    String fileADir = getParentDirectory(p.fileA().filePath());
+                    if (fileADir.equals(pair.dirA())) {
+                        filesInA.add(p.fileA().id());
+                        filesInB.add(p.fileB().id());
+                    } else {
+                        filesInB.add(p.fileA().id());
+                        filesInA.add(p.fileB().id());
+                    }
+                }
+
+                return new DirectoryConflictDTO(
+                    pair.dirA(),
+                    pair.dirB(),
+                    filesInA.size(),
+                    filesInB.size(),
+                    pairs.size(),
+                    pairs
+                );
+            })
+            .sorted(Comparator.comparingInt(DirectoryConflictDTO::totalDuplicatePairs).reversed())
+            .collect(Collectors.toList());
+
+        logger.info("Found {} directory conflicts", result.size());
+        return result;
+    }
+
+    /**
+     * Gets the parent directory of a file path.
+     */
+    private String getParentDirectory(String filePath) {
+        Path path = Paths.get(filePath);
+        Path parent = path.getParent();
+        return parent != null ? parent.toString() : "";
+    }
+
+    /**
+     * Previews what would happen when resolving a directory conflict.
+     *
+     * @param directoryToKeep The directory whose files should be preserved
+     * @param directoryToDelete The directory whose duplicate files should be deleted
+     * @return Preview of the resolution operation
+     */
+    public DirectoryResolutionPreviewDTO previewDirectoryResolution(
+            String directoryToKeep,
+            String directoryToDelete) {
+
+        logger.info("Previewing directory resolution: keep='{}', delete='{}'",
+            directoryToKeep, directoryToDelete);
+
+        // Find the conflict between these directories
+        List<DirectoryConflictDTO> allConflicts = getDirectoryConflicts();
+        DirectoryConflictDTO conflict = findConflict(allConflicts, directoryToKeep, directoryToDelete);
+
+        if (conflict == null) {
+            logger.warn("No conflict found between directories: {} and {}", directoryToKeep, directoryToDelete);
+            return new DirectoryResolutionPreviewDTO(
+                directoryToKeep,
+                directoryToDelete,
+                Collections.emptyList(),
+                Collections.emptyList(),
+                0
+            );
+        }
+
+        // Separate files to delete and files to keep
+        Set<Long> deleteIds = new HashSet<>();
+        Set<Long> keepIds = new HashSet<>();
+        List<MusicFileDTO> filesToDelete = new ArrayList<>();
+        List<MusicFileDTO> filesToKeep = new ArrayList<>();
+
+        for (DuplicatePairDTO pair : conflict.pairs()) {
+            MusicFileDTO fileA = pair.fileA();
+            MusicFileDTO fileB = pair.fileB();
+
+            String dirA = getParentDirectory(fileA.filePath());
+
+            if (dirA.equals(directoryToDelete)) {
+                if (deleteIds.add(fileA.id())) {
+                    filesToDelete.add(fileA);
+                }
+                if (keepIds.add(fileB.id())) {
+                    filesToKeep.add(fileB);
+                }
+            } else {
+                if (deleteIds.add(fileB.id())) {
+                    filesToDelete.add(fileB);
+                }
+                if (keepIds.add(fileA.id())) {
+                    filesToKeep.add(fileA);
+                }
+            }
+        }
+
+        return new DirectoryResolutionPreviewDTO(
+            directoryToKeep,
+            directoryToDelete,
+            filesToDelete,
+            filesToKeep,
+            filesToDelete.size()
+        );
+    }
+
+    /**
+     * Executes directory-based duplicate resolution.
+     * Deletes all duplicate files from the specified directory.
+     *
+     * @param directoryToKeep The directory whose files should be preserved
+     * @param directoryToDelete The directory whose duplicate files should be deleted
+     * @return Result of the resolution operation
+     */
+    public DirectoryResolutionResultDTO resolveDirectoryConflict(
+            String directoryToKeep,
+            String directoryToDelete) {
+
+        logger.info("Executing directory resolution: keep='{}', delete='{}'",
+            directoryToKeep, directoryToDelete);
+
+        // Get the preview to know which files to delete
+        DirectoryResolutionPreviewDTO preview = previewDirectoryResolution(directoryToKeep, directoryToDelete);
+
+        int deleted = 0;
+        int attempted = preview.filesToDelete().size();
+
+        for (MusicFileDTO file : preview.filesToDelete()) {
+            try {
+                if (deleteFile(file.id())) {
+                    deleted++;
+                    logger.debug("Deleted file: {}", file.filePath());
+                }
+            } catch (Exception e) {
+                logger.error("Failed to delete file {}: {}", file.filePath(), e.getMessage());
+            }
+        }
+
+        // Invalidate cache since we modified files
+        invalidateCache();
+
+        logger.info("Directory resolution complete: deleted {}/{} files", deleted, attempted);
+
+        return new DirectoryResolutionResultDTO(
+            deleted,
+            attempted,
+            directoryToKeep,
+            directoryToDelete
+        );
+    }
+
+    /**
+     * Finds a conflict between two specific directories.
+     */
+    private DirectoryConflictDTO findConflict(
+            List<DirectoryConflictDTO> conflicts,
+            String dir1,
+            String dir2) {
+
+        for (DirectoryConflictDTO conflict : conflicts) {
+            if ((conflict.directoryA().equals(dir1) && conflict.directoryB().equals(dir2)) ||
+                (conflict.directoryA().equals(dir2) && conflict.directoryB().equals(dir1))) {
+                return conflict;
+            }
+        }
+        return null;
+    }
+
+    // ============================================================
+    // End of directory-based duplicate grouping
+    // ============================================================
 
     /**
      * Inner class to track duplicate scan session state.

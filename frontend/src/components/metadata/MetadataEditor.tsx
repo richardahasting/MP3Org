@@ -11,9 +11,12 @@ interface BulkEditForm {
   artist: string;
   album: string;
   genre: string;
-  applyArtist: boolean;
-  applyAlbum: boolean;
-  applyGenre: boolean;
+  year: string;
+}
+
+interface ValueSuggestion {
+  value: string;
+  count: number;
 }
 
 export default function MetadataEditor() {
@@ -45,11 +48,35 @@ export default function MetadataEditor() {
     artist: '',
     album: '',
     genre: '',
-    applyArtist: false,
-    applyAlbum: false,
-    applyGenre: false,
+    year: '',
   });
   const [bulkEditLoading, setBulkEditLoading] = useState(false);
+
+  // Compute suggestions for bulk edit fields based on selected files
+  const bulkEditSuggestions = useMemo(() => {
+    const selectedFiles = files.filter(f => selectedIds.has(f.id));
+
+    const countValues = (getter: (f: MusicFile) => string | number | null): ValueSuggestion[] => {
+      const counts = new Map<string, number>();
+      for (const file of selectedFiles) {
+        const val = getter(file);
+        if (val !== null && val !== undefined && val !== '') {
+          const strVal = String(val);
+          counts.set(strVal, (counts.get(strVal) || 0) + 1);
+        }
+      }
+      return Array.from(counts.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count);
+    };
+
+    return {
+      artist: countValues(f => f.artist),
+      album: countValues(f => f.album),
+      genre: countValues(f => f.genre),
+      year: countValues(f => f.year),
+    };
+  }, [files, selectedIds]);
 
   // Audio player state
   const [playingFile, setPlayingFile] = useState<MusicFile | null>(null);
@@ -86,10 +113,10 @@ export default function MetadataEditor() {
   const startEdit = useCallback((file: MusicFile) => {
     setEditingId(file.id);
     setEditForm({
-      title: file.title,
-      artist: file.artist,
-      album: file.album,
-      genre: file.genre,
+      title: file.title ?? '',
+      artist: file.artist ?? '',
+      album: file.album ?? '',
+      genre: file.genre ?? '',
       trackNumber: file.trackNumber,
       year: file.year,
     });
@@ -165,16 +192,15 @@ export default function MetadataEditor() {
 
   // Bulk edit handlers
   const openBulkEdit = useCallback(() => {
+    // Pre-select the most common value for each field (first in sorted list)
     setBulkEditForm({
-      artist: '',
-      album: '',
-      genre: '',
-      applyArtist: false,
-      applyAlbum: false,
-      applyGenre: false,
+      artist: bulkEditSuggestions.artist[0]?.value ?? '',
+      album: bulkEditSuggestions.album[0]?.value ?? '',
+      genre: bulkEditSuggestions.genre[0]?.value ?? '',
+      year: bulkEditSuggestions.year[0]?.value ?? '',
     });
     setShowBulkEdit(true);
-  }, []);
+  }, [bulkEditSuggestions]);
 
   const closeBulkEdit = useCallback(() => {
     setShowBulkEdit(false);
@@ -183,19 +209,25 @@ export default function MetadataEditor() {
   const handleBulkUpdate = useCallback(async () => {
     if (selectedIds.size === 0) return;
 
-    const updates: { artist?: string; album?: string; genre?: string } = {};
-    if (bulkEditForm.applyArtist && bulkEditForm.artist) {
-      updates.artist = bulkEditForm.artist;
+    const updates: { artist?: string; album?: string; genre?: string; year?: number } = {};
+    if (bulkEditForm.artist.trim()) {
+      updates.artist = bulkEditForm.artist.trim();
     }
-    if (bulkEditForm.applyAlbum && bulkEditForm.album) {
-      updates.album = bulkEditForm.album;
+    if (bulkEditForm.album.trim()) {
+      updates.album = bulkEditForm.album.trim();
     }
-    if (bulkEditForm.applyGenre && bulkEditForm.genre) {
-      updates.genre = bulkEditForm.genre;
+    if (bulkEditForm.genre.trim()) {
+      updates.genre = bulkEditForm.genre.trim();
+    }
+    if (bulkEditForm.year.trim()) {
+      const yearNum = parseInt(bulkEditForm.year.trim(), 10);
+      if (!isNaN(yearNum) && yearNum > 0) {
+        updates.year = yearNum;
+      }
     }
 
     if (Object.keys(updates).length === 0) {
-      alert('Please select at least one field to update and provide a value.');
+      alert('Please provide at least one value to update.');
       return;
     }
 
@@ -385,77 +417,153 @@ export default function MetadataEditor() {
         <div className="modal-overlay" onClick={closeBulkEdit}>
           <div className="bulk-edit-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Bulk Edit {selectedIds.size} Files</h3>
-              <button className="modal-close" onClick={closeBulkEdit}>×</button>
+              <h3>Edit {selectedIds.size} Files</h3>
+              <button type="button" className="modal-close" onClick={closeBulkEdit}>×</button>
             </div>
             <div className="modal-body">
               <p className="modal-description">
-                Select the fields you want to update and provide new values.
-                Only checked fields will be modified.
+                Edit values below. Non-empty fields will be applied to all selected files.
+                Clear a field to leave it unchanged.
               </p>
 
               <div className="bulk-field">
-                <label className="bulk-field-label">
-                  <input
-                    type="checkbox"
-                    checked={bulkEditForm.applyArtist}
-                    onChange={(e) => setBulkEditForm(f => ({ ...f, applyArtist: e.target.checked }))}
-                  />
-                  Artist
-                </label>
+                <label className="bulk-field-label">Artist</label>
                 <input
                   type="text"
                   className="bulk-field-input"
-                  placeholder="New artist name"
+                  placeholder="Type or select artist..."
+                  list="artist-suggestions"
                   value={bulkEditForm.artist}
                   onChange={(e) => setBulkEditForm(f => ({ ...f, artist: e.target.value }))}
-                  disabled={!bulkEditForm.applyArtist}
                 />
+                <datalist id="artist-suggestions">
+                  {bulkEditSuggestions.artist.map(s => (
+                    <option key={s.value} value={s.value}>
+                      {s.value} ({s.count} {s.count === 1 ? 'file' : 'files'})
+                    </option>
+                  ))}
+                </datalist>
+                {bulkEditSuggestions.artist.length > 0 && (
+                  <div className="bulk-suggestions">
+                    {bulkEditSuggestions.artist.slice(0, 3).map(s => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        className={`suggestion-chip ${bulkEditForm.artist === s.value ? 'active' : ''}`}
+                        onClick={() => setBulkEditForm(f => ({ ...f, artist: s.value }))}
+                      >
+                        {s.value} <span className="chip-count">({s.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="bulk-field">
-                <label className="bulk-field-label">
-                  <input
-                    type="checkbox"
-                    checked={bulkEditForm.applyAlbum}
-                    onChange={(e) => setBulkEditForm(f => ({ ...f, applyAlbum: e.target.checked }))}
-                  />
-                  Album
-                </label>
+                <label className="bulk-field-label">Album</label>
                 <input
                   type="text"
                   className="bulk-field-input"
-                  placeholder="New album name"
+                  placeholder="Type or select album..."
+                  list="album-suggestions"
                   value={bulkEditForm.album}
                   onChange={(e) => setBulkEditForm(f => ({ ...f, album: e.target.value }))}
-                  disabled={!bulkEditForm.applyAlbum}
                 />
+                <datalist id="album-suggestions">
+                  {bulkEditSuggestions.album.map(s => (
+                    <option key={s.value} value={s.value}>
+                      {s.value} ({s.count} {s.count === 1 ? 'file' : 'files'})
+                    </option>
+                  ))}
+                </datalist>
+                {bulkEditSuggestions.album.length > 0 && (
+                  <div className="bulk-suggestions">
+                    {bulkEditSuggestions.album.slice(0, 3).map(s => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        className={`suggestion-chip ${bulkEditForm.album === s.value ? 'active' : ''}`}
+                        onClick={() => setBulkEditForm(f => ({ ...f, album: s.value }))}
+                      >
+                        {s.value} <span className="chip-count">({s.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="bulk-field">
-                <label className="bulk-field-label">
-                  <input
-                    type="checkbox"
-                    checked={bulkEditForm.applyGenre}
-                    onChange={(e) => setBulkEditForm(f => ({ ...f, applyGenre: e.target.checked }))}
-                  />
-                  Genre
-                </label>
+                <label className="bulk-field-label">Genre</label>
                 <input
                   type="text"
                   className="bulk-field-input"
-                  placeholder="New genre"
+                  placeholder="Type or select genre..."
+                  list="genre-suggestions"
                   value={bulkEditForm.genre}
                   onChange={(e) => setBulkEditForm(f => ({ ...f, genre: e.target.value }))}
-                  disabled={!bulkEditForm.applyGenre}
                 />
+                <datalist id="genre-suggestions">
+                  {bulkEditSuggestions.genre.map(s => (
+                    <option key={s.value} value={s.value}>
+                      {s.value} ({s.count} {s.count === 1 ? 'file' : 'files'})
+                    </option>
+                  ))}
+                </datalist>
+                {bulkEditSuggestions.genre.length > 0 && (
+                  <div className="bulk-suggestions">
+                    {bulkEditSuggestions.genre.slice(0, 3).map(s => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        className={`suggestion-chip ${bulkEditForm.genre === s.value ? 'active' : ''}`}
+                        onClick={() => setBulkEditForm(f => ({ ...f, genre: s.value }))}
+                      >
+                        {s.value} <span className="chip-count">({s.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bulk-field">
+                <label className="bulk-field-label">Year</label>
+                <input
+                  type="text"
+                  className="bulk-field-input bulk-field-year"
+                  placeholder="Type or select year..."
+                  list="year-suggestions"
+                  value={bulkEditForm.year}
+                  onChange={(e) => setBulkEditForm(f => ({ ...f, year: e.target.value }))}
+                />
+                <datalist id="year-suggestions">
+                  {bulkEditSuggestions.year.map(s => (
+                    <option key={s.value} value={s.value}>
+                      {s.value} ({s.count} {s.count === 1 ? 'file' : 'files'})
+                    </option>
+                  ))}
+                </datalist>
+                {bulkEditSuggestions.year.length > 0 && (
+                  <div className="bulk-suggestions">
+                    {bulkEditSuggestions.year.slice(0, 5).map(s => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        className={`suggestion-chip ${bulkEditForm.year === s.value ? 'active' : ''}`}
+                        onClick={() => setBulkEditForm(f => ({ ...f, year: s.value }))}
+                      >
+                        {s.value} <span className="chip-count">({s.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
-              <button className="modal-btn cancel" onClick={closeBulkEdit}>
+              <button type="button" className="modal-btn cancel" onClick={closeBulkEdit}>
                 Cancel
               </button>
               <button
+                type="button"
                 className="modal-btn apply"
                 onClick={handleBulkUpdate}
                 disabled={bulkEditLoading}
@@ -530,55 +638,62 @@ export default function MetadataEditor() {
                         <td>
                           <input
                             type="text"
-                            value={editForm.title || ''}
+                            value={editForm.title ?? ''}
                             onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                             className="edit-input"
+                            placeholder="Title"
+                            autoFocus
                           />
                         </td>
                         <td>
                           <input
                             type="text"
-                            value={editForm.artist || ''}
+                            value={editForm.artist ?? ''}
                             onChange={(e) => setEditForm({ ...editForm, artist: e.target.value })}
                             className="edit-input"
+                            placeholder="Artist"
                           />
                         </td>
                         <td>
                           <input
                             type="text"
-                            value={editForm.album || ''}
+                            value={editForm.album ?? ''}
                             onChange={(e) => setEditForm({ ...editForm, album: e.target.value })}
                             className="edit-input"
+                            placeholder="Album"
                           />
                         </td>
                         <td>
                           <input
                             type="text"
-                            value={editForm.genre || ''}
+                            value={editForm.genre ?? ''}
                             onChange={(e) => setEditForm({ ...editForm, genre: e.target.value })}
                             className="edit-input"
+                            placeholder="Genre"
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            value={editForm.trackNumber || ''}
+                            value={editForm.trackNumber ?? ''}
                             onChange={(e) => setEditForm({ ...editForm, trackNumber: e.target.value ? parseInt(e.target.value) : null })}
                             className="edit-input edit-input-small"
+                            placeholder="#"
                           />
                         </td>
                         <td>
                           <input
                             type="number"
-                            value={editForm.year || ''}
+                            value={editForm.year ?? ''}
                             onChange={(e) => setEditForm({ ...editForm, year: e.target.value ? parseInt(e.target.value) : null })}
                             className="edit-input edit-input-small"
+                            placeholder="Year"
                           />
                         </td>
                         <td>{file.formattedDuration}</td>
                         <td className="action-cell">
-                          <button className="action-btn save" onClick={saveEdit}>✓</button>
-                          <button className="action-btn cancel" onClick={cancelEdit}>×</button>
+                          <button type="button" className="action-btn save" onClick={saveEdit}>✓</button>
+                          <button type="button" className="action-btn cancel" onClick={cancelEdit}>×</button>
                         </td>
                       </>
                     ) : (

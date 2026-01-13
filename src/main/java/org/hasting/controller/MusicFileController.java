@@ -144,7 +144,8 @@ public class MusicFileController {
                 request.ids(),
                 request.artist(),
                 request.album(),
-                request.genre()
+                request.genre(),
+                request.year()
         );
         return Map.of("updated", updated);
     }
@@ -202,7 +203,8 @@ public class MusicFileController {
             List<Long> ids,
             String artist,
             String album,
-            String genre
+            String genre,
+            Integer year
     ) {
     }
 }
