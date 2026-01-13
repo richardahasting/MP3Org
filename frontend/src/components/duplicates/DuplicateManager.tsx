@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DuplicateGroup, MusicFile, DuplicateScanStatus } from '../../types/music';
 import {
   fetchDuplicateGroups,
-  getDuplicateCount,
   keepFileDeleteOthers,
   startDuplicateScan,
   refreshDuplicates,
