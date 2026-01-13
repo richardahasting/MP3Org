@@ -166,9 +166,10 @@ public class MusicFileService {
      * @param artist New artist (null to keep existing)
      * @param album  New album (null to keep existing)
      * @param genre  New genre (null to keep existing)
+     * @param year   New year (null to keep existing)
      * @return Number of files updated
      */
-    public int bulkUpdate(List<Long> ids, String artist, String album, String genre) {
+    public int bulkUpdate(List<Long> ids, String artist, String album, String genre, Integer year) {
         int updated = 0;
         for (Long id : ids) {
             MusicFile existing = DatabaseManager.getMusicFileById(id);
@@ -184,6 +185,10 @@ public class MusicFileService {
                 }
                 if (genre != null) {
                     existing.setGenre(genre);
+                    changed = true;
+                }
+                if (year != null) {
+                    existing.setYear(year);
                     changed = true;
                 }
                 if (changed) {

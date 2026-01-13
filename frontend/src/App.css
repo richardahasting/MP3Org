@@ -237,7 +237,8 @@ body::before {
   margin: 0 auto;
   width: 100%;
   min-height: 0; /* Allow flex child to shrink */
-  overflow: hidden; /* Establish scroll context for children */
+  overflow-y: auto; /* Allow vertical scrolling */
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -1328,26 +1329,16 @@ body::before {
 }
 
 .bulk-field {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 
 .bulk-field-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+  display: block;
   font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: var(--space-xs);
-  cursor: pointer;
-}
-
-.bulk-field-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent-primary);
-  cursor: pointer;
 }
 
 .bulk-field-input {
@@ -1368,9 +1359,52 @@ body::before {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.bulk-field-input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.bulk-field-year {
+  max-width: 150px;
+}
+
+/* Suggestion chips for bulk edit */
+.bulk-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: rgba(0, 255, 255, 0.05);
+}
+
+.suggestion-chip.active {
+  border-color: var(--accent-primary);
+  background: var(--accent-glow);
+  color: var(--accent-primary);
+}
+
+.suggestion-chip .chip-count {
+  color: var(--text-muted);
+  font-size: 0.7rem;
 }
 
 .modal-footer {

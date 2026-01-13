@@ -7,6 +7,25 @@ plugins {
 group = "org.hasting"
 version = "2.0.0-SNAPSHOT"
 
+// Enforce Java 21 - fail fast with clear error message
+val javaVersion = JavaVersion.current()
+if (javaVersion != JavaVersion.VERSION_21) {
+    throw GradleException("""
+        |
+        |===========================================================
+        |  ERROR: Java 21 is required to build this project.
+        |
+        |  Current version: $javaVersion
+        |  Required version: 21
+        |
+        |  To fix this:
+        |    - SDKMAN:  sdk env
+        |    - jenv:    jenv local
+        |    - Manual:  export JAVA_HOME=/path/to/java-21
+        |===========================================================
+        |""".trimMargin())
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
@@ -28,18 +47,32 @@ dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("commons-fileupload:commons-fileupload:1.5")
 
-    // Include all JARs from the lib directory (excluding JavaFX - using Maven for JDK 21 compatible version)
+    // JAudioTagger for MP3 metadata extraction
+    implementation("net.jthink:jaudiotagger:3.0.1")
+
+    // MigLayout for Swing layouts (legacy UI code)
+    implementation("com.miglayout:miglayout-swing:11.3")
+
+    // Include any custom JARs from lib directory (log4Rich, etc.)
     implementation(fileTree(mapOf(
         "dir" to "lib",
         "include" to listOf("*.jar"),
-        "exclude" to listOf("javafx*.jar", "javafx-swt.jar")
+        "exclude" to listOf("javafx*.jar", "javafx-swt.jar", "jaudiotagger*.jar", "miglayout*.jar")
     )))
 
     // JavaFX 21 for compiling existing UI code (will be removed after migration)
-    compileOnly("org.openjfx:javafx-controls:21.0.2:mac-aarch64")
-    compileOnly("org.openjfx:javafx-fxml:21.0.2:mac-aarch64")
-    compileOnly("org.openjfx:javafx-graphics:21.0.2:mac-aarch64")
-    compileOnly("org.openjfx:javafx-base:21.0.2:mac-aarch64")
+    // Using classifier-based approach for cross-platform support
+    val javafxPlatform = when {
+        System.getProperty("os.name").lowercase().contains("mac") -> {
+            if (System.getProperty("os.arch") == "aarch64") "mac-aarch64" else "mac"
+        }
+        System.getProperty("os.name").lowercase().contains("win") -> "win"
+        else -> "linux"
+    }
+    compileOnly("org.openjfx:javafx-controls:21.0.2:$javafxPlatform")
+    compileOnly("org.openjfx:javafx-fxml:21.0.2:$javafxPlatform")
+    compileOnly("org.openjfx:javafx-graphics:21.0.2:$javafxPlatform")
+    compileOnly("org.openjfx:javafx-base:21.0.2:$javafxPlatform")
 
     // SQLite database (embedded) - replaces Derby for Issue #72
     implementation("org.xerial:sqlite-jdbc:3.45.1.0")

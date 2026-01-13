@@ -3,7 +3,127 @@
 ## Overview
 This developer log tracks the evolution of MP3Org from a basic music organization tool to a sophisticated application with advanced directory management, test infrastructure, and user experience enhancements. The log spans multiple major development sessions between July 2025 and covers critical architectural improvements, database enhancements, and UI/UX refinements.
 
-## Latest Session: Issue #69 - Web UI Migration Phase 1 (January 10, 2026)
+## Latest Session: Issue #92 - Directory-Based Duplicate Resolution & Bulk Edit Enhancement (January 13, 2026)
+**Duration**: ~3 hours | **Status**: ✅ COMPLETED | **Commit**: 74c8f89
+
+### Problem Statement
+1. Users needed to group duplicates by directory to resolve entire directory conflicts at once
+2. Metadata bulk edit lacked smart suggestions and year field support
+3. Metadata page had scrolling issues and edit form didn't show existing values
+
+### Implementation Summary
+
+#### Directory-Based Duplicate Grouping (Issue #92)
+**Backend Already Implemented**:
+- `DirectoryConflictDTO`, `DuplicatePairDTO`, `DirectoryResolutionRequest` DTOs
+- `DuplicateService.getDirectoryConflicts()` method
+- `DuplicateController` endpoints for `/by-directory`, `/resolve-directory/preview`, `/resolve-directory/execute`
+
+**Frontend UI Completed**:
+- View mode toggle (By Similarity / By Directory)
+- Directory conflicts list showing both directories and file counts
+- Conflict detail panel with directory selection
+- Preview/execute buttons for resolution
+
+**Files Modified**:
+- `frontend/src/components/duplicates/DuplicateManager.tsx`
+- `frontend/src/api/duplicatesApi.ts`
+- `frontend/src/types/music.ts`
+- `frontend/src/App.css`
+
+#### Config Help Update
+- Moved fingerprint settings to top of config help
+- Added OS-specific Chromaprint installation instructions:
+  - macOS: `brew install chromaprint`
+  - Windows: Download from acoustid.org
+  - Linux: Package manager commands for Ubuntu, Fedora, Arch
+
+#### Metadata Page Fixes
+**Scrolling Fix**:
+```css
+/* Before */
+.main-content { overflow: hidden; }
+
+/* After */
+.main-content { overflow-y: auto; }
+```
+
+**Edit Form Fix**:
+```typescript
+// Before - empty string treated as falsy
+value={editForm.title || ''}
+
+// After - only null/undefined replaced
+value={editForm.title ?? ''}
+```
+
+#### Bulk Edit Redesign
+**New Features**:
+- Combobox inputs using HTML5 `<datalist>` for autocomplete
+- Suggestion chips showing distinct values with frequency counts
+- Pre-selection of most common value when opening bulk edit
+- Year field added to bulk edit (backend + frontend)
+- Title and track# excluded from multi-file edit
+
+**Backend Changes**:
+```java
+// MusicFileService.java - Added year parameter
+public int bulkUpdate(List<Long> ids, String artist, String album, String genre, Integer year)
+
+// BulkUpdateRequest record - Added year field
+public record BulkUpdateRequest(List<Long> ids, String artist, String album, String genre, Integer year)
+```
+
+**Frontend Implementation**:
+```typescript
+// Compute suggestions from selected files
+const bulkEditSuggestions = useMemo(() => {
+  const selectedFiles = files.filter(f => selectedIds.has(f.id));
+
+  const countValues = (getter: (f: MusicFile) => string | number | null): ValueSuggestion[] => {
+    const counts = new Map<string, number>();
+    for (const file of selectedFiles) {
+      const val = getter(file);
+      if (val !== null && val !== undefined && val !== '') {
+        counts.set(String(val), (counts.get(String(val)) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  return {
+    artist: countValues(f => f.artist),
+    album: countValues(f => f.album),
+    genre: countValues(f => f.genre),
+    year: countValues(f => f.year),
+  };
+}, [files, selectedIds]);
+```
+
+### Technical Challenges Resolved
+**Java 25 Gradle Incompatibility**: Kotlin DSL doesn't support Java 25 yet. Used `gradle21` wrapper script to compile with Java 21.
+
+### Files Modified
+- `frontend/src/App.css` - scrolling fix, directory view styles, suggestion chip styles
+- `frontend/src/components/metadata/MetadataEditor.tsx` - edit form fixes, new bulk edit modal
+- `frontend/src/components/common/helpContent.tsx` - config help Chromaprint instructions
+- `frontend/src/components/duplicates/DuplicateManager.tsx` - directory view UI
+- `frontend/src/api/duplicatesApi.ts` - directory conflict API functions
+- `frontend/src/api/musicApi.ts` - year parameter in bulk update
+- `frontend/src/types/music.ts` - directory conflict types
+- `src/main/java/org/hasting/service/MusicFileService.java` - year in bulkUpdate
+- `src/main/java/org/hasting/controller/MusicFileController.java` - year in BulkUpdateRequest
+
+### Session Statistics
+- **Features Completed**: 4 (directory grouping UI, config help, metadata fixes, bulk edit)
+- **Files Modified**: 9
+- **Backend Restart**: Required for bulk update year parameter
+
+---
+
+## Previous Session: Issue #69 - Web UI Migration Phase 1 (January 10, 2026)
 **Duration**: ~4 hours | **Status**: ✅ PHASE 1 COMPLETED | **Priority**: High
 
 ### Problem Statement
