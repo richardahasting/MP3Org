@@ -3,9 +3,15 @@ package org.hasting.controller;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.dto.PageResponse;
 import org.hasting.service.MusicFileService;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 
@@ -141,6 +147,52 @@ public class MusicFileController {
                 request.genre()
         );
         return Map.of("updated", updated);
+    }
+
+    /**
+     * GET /api/v1/music/{id}/stream - Stream audio file for playback.
+     *
+     * @param id The database ID
+     * @return Audio file stream with appropriate content type
+     */
+    @GetMapping("/{id}/stream")
+    public ResponseEntity<Resource> streamAudioFile(@PathVariable Long id) {
+        return musicFileService.getAudioFile(id)
+                .map(file -> {
+                    Resource resource = new FileSystemResource(file);
+                    String contentType = getContentType(file.getName());
+
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.add(HttpHeaders.CONTENT_TYPE, contentType);
+                    headers.add(HttpHeaders.ACCEPT_RANGES, "bytes");
+                    headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(file.length()));
+
+                    return ResponseEntity.ok()
+                            .headers(headers)
+                            .body(resource);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Determines the content type based on file extension.
+     */
+    private String getContentType(String filename) {
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".mp3")) {
+            return "audio/mpeg";
+        } else if (lower.endsWith(".flac")) {
+            return "audio/flac";
+        } else if (lower.endsWith(".wav")) {
+            return "audio/wav";
+        } else if (lower.endsWith(".m4a") || lower.endsWith(".aac")) {
+            return "audio/mp4";
+        } else if (lower.endsWith(".ogg")) {
+            return "audio/ogg";
+        } else if (lower.endsWith(".wma")) {
+            return "audio/x-ms-wma";
+        }
+        return "application/octet-stream";
     }
 
     /**

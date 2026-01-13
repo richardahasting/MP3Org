@@ -36,13 +36,41 @@ public class DuplicateController {
     }
 
     /**
-     * Get all duplicate groups.
+     * Get duplicate groups with pagination.
+     * @param page Page number (0-indexed), default 0
+     * @param size Page size, default 25
      */
     @GetMapping
-    public ResponseEntity<List<DuplicateGroupDTO>> getDuplicateGroups() {
-        List<DuplicateGroupDTO> groups = duplicateService.getDuplicateGroups();
-        return ResponseEntity.ok(groups);
+    public ResponseEntity<DuplicateGroupsResponse> getDuplicateGroups(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        List<DuplicateGroupDTO> allGroups = duplicateService.getDuplicateGroups();
+        int totalGroups = allGroups.size();
+        int totalPages = (int) Math.ceil((double) totalGroups / size);
+
+        int start = page * size;
+        int end = Math.min(start + size, totalGroups);
+
+        List<DuplicateGroupDTO> pageGroups = start < totalGroups
+            ? allGroups.subList(start, end)
+            : List.of();
+
+        return ResponseEntity.ok(new DuplicateGroupsResponse(
+            pageGroups, page, size, totalGroups, totalPages, page < totalPages - 1
+        ));
     }
+
+    /**
+     * Response for paginated duplicate groups.
+     */
+    public record DuplicateGroupsResponse(
+        List<DuplicateGroupDTO> groups,
+        int page,
+        int size,
+        int totalGroups,
+        int totalPages,
+        boolean hasMore
+    ) {}
 
     /**
      * Get count of duplicate groups.

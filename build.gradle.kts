@@ -28,20 +28,20 @@ dependencies {
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("commons-fileupload:commons-fileupload:1.5")
 
-    // Include all JARs from the lib directory (excluding JavaFX - using Maven for JDK 21 compatible version)
+    // Include all JARs from the lib directory
     implementation(fileTree(mapOf(
         "dir" to "lib",
         "include" to listOf("*.jar"),
         "exclude" to listOf("javafx*.jar", "javafx-swt.jar")
     )))
 
-    // JavaFX 21 for compiling existing UI code (will be removed after migration)
+    // JavaFX 21 for compiling existing UI code
     compileOnly("org.openjfx:javafx-controls:21.0.2:mac-aarch64")
     compileOnly("org.openjfx:javafx-fxml:21.0.2:mac-aarch64")
     compileOnly("org.openjfx:javafx-graphics:21.0.2:mac-aarch64")
     compileOnly("org.openjfx:javafx-base:21.0.2:mac-aarch64")
 
-    // SQLite database (embedded) - replaces Derby for Issue #72
+    // SQLite database
     implementation("org.xerial:sqlite-jdbc:3.45.1.0")
 
     // Connection pooling
@@ -54,14 +54,18 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.7")
     implementation("ch.qos.logback:logback-classic:1.4.8")
 
-    // Apache Commons for file operations
+    // Apache Commons
     implementation("commons-io:commons-io:2.13.0")
     implementation("org.apache.commons:commons-text:1.13.1")
 
-    // JUnit for testing
+    // Audio tagging
+    implementation("net.jthink:jaudiotagger:3.0.1")
+
+    // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")  // ADDED
 }
 
 springBoot {
