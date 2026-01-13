@@ -90,6 +90,7 @@ public class DatabaseManager {
                 // deleteMusicFilesTable();
                 createMusicFilesTable();
                 createScanDirectoriesTable();
+                migrateFingerprintColumns();
                 
                 // Initialize file path cache for performance  issue#41
                 initFilePathCacheWithRetry();
@@ -239,7 +240,9 @@ public class DatabaseManager {
                 "sample_rate INTEGER, " +
                 "file_type TEXT, " +
                 "last_modified TEXT, " +
-                "date_added TEXT DEFAULT CURRENT_TIMESTAMP" +
+                "date_added TEXT DEFAULT CURRENT_TIMESTAMP, " +
+                "fingerprint TEXT, " +
+                "fingerprint_duration INTEGER" +
                 ")";
 
         try (Statement stmt = connection.createStatement()) {
@@ -296,6 +299,39 @@ public class DatabaseManager {
         } catch (SQLException e) {
             logger.error(String.format("Failed to create scan_directories table: {}", e.getMessage()), e);
             throw new RuntimeException("Failed to create scan_directories table", e);
+        }
+    }
+
+    /**
+     * Migrates existing database to add fingerprint columns if they don't exist.
+     * This allows existing databases to be upgraded without data loss.
+     */
+    private static synchronized void migrateFingerprintColumns() {
+        // Check if fingerprint column exists
+        try (Statement stmt = connection.createStatement()) {
+            ResultSet rs = stmt.executeQuery("SELECT fingerprint FROM music_files WHERE 1=0");
+            rs.close();
+            logger.debug("Fingerprint columns already exist");
+            return; // Columns exist
+        } catch (SQLException e) {
+            // Columns don't exist, add them
+            logger.info("Adding fingerprint columns to music_files table");
+        }
+
+        // Add fingerprint column
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE music_files ADD COLUMN fingerprint TEXT");
+            logger.info("Added fingerprint column");
+        } catch (SQLException e) {
+            logger.error("Failed to add fingerprint column: " + e.getMessage());
+        }
+
+        // Add fingerprint_duration column
+        try (Statement stmt = connection.createStatement()) {
+            stmt.executeUpdate("ALTER TABLE music_files ADD COLUMN fingerprint_duration INTEGER");
+            logger.info("Added fingerprint_duration column");
+        } catch (SQLException e) {
+            logger.error("Failed to add fingerprint_duration column: " + e.getMessage());
         }
     }
 
@@ -1579,7 +1615,58 @@ public class DatabaseManager {
             musicFile.setDateAdded(new Date(dateAddedMs));
         }
 
+        // Load fingerprint if available (may not exist in older databases)
+        try {
+            musicFile.setFingerprint(rs.getString("fingerprint"));
+            if (rs.getObject("fingerprint_duration") != null) {
+                musicFile.setFingerprintDuration(rs.getInt("fingerprint_duration"));
+            }
+        } catch (SQLException e) {
+            // Column doesn't exist yet - ignore
+        }
+
         return musicFile;
+    }
+
+    /**
+     * Updates the fingerprint for a music file.
+     *
+     * @param fileId the database ID of the music file
+     * @param fingerprint the Chromaprint fingerprint as comma-separated integers
+     * @param duration the duration in seconds used for fingerprinting
+     * @return true if update was successful, false otherwise
+     */
+    public static synchronized boolean updateFingerprint(long fileId, String fingerprint, int duration) {
+        String sql = "UPDATE music_files SET fingerprint = ?, fingerprint_duration = ? WHERE id = ?";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, fingerprint);
+            pstmt.setInt(2, duration);
+            pstmt.setLong(3, fileId);
+            int updated = pstmt.executeUpdate();
+            return updated > 0;
+        } catch (SQLException e) {
+            logger.error("Failed to update fingerprint for file ID " + fileId, e);
+            return false;
+        }
+    }
+
+    /**
+     * Gets all music files that don't have fingerprints yet.
+     *
+     * @return list of MusicFile objects without fingerprints
+     */
+    public static synchronized List<MusicFile> getFilesWithoutFingerprints() {
+        List<MusicFile> musicFiles = new ArrayList<>();
+        String sql = "SELECT * FROM music_files WHERE fingerprint IS NULL" + getFileTypeFilterClause();
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                musicFiles.add(extractMusicFileFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to get files without fingerprints", e);
+        }
+        return musicFiles;
     }
 
     public static synchronized List<MusicFile> searchMusicFilesByTitle(String title) {
