@@ -2753,7 +2753,9 @@ body::before {
 
 .file-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--space-lg);
   padding-top: var(--space-sm);
   border-top: 1px solid var(--border);
 }
@@ -4202,4 +4204,201 @@ body::before {
   font-size: 0.9rem;
   line-height: 1.5;
   margin-top: var(--space-sm);
+}
+
+/* ============================================
+   Help Modal Styles
+   ============================================ */
+
+.help-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 9, 8, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 200ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.help-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 700px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-soft), var(--shadow-glow);
+  animation: slideUp 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.help-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.help-modal-header h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.help-modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.help-modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.help-modal-content {
+  padding: var(--space-lg);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.help-section {
+  margin-bottom: var(--space-xl);
+}
+
+.help-section:last-child {
+  margin-bottom: 0;
+}
+
+.help-section h3 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--accent-primary);
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.help-section h3::before {
+  content: '◆';
+  font-size: 0.5rem;
+  color: var(--accent-secondary);
+}
+
+.help-section-content {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.help-section-content p {
+  margin-bottom: var(--space-md);
+}
+
+.help-section-content p:last-child {
+  margin-bottom: 0;
+}
+
+.help-section-content ul,
+.help-section-content ol {
+  margin: var(--space-md) 0;
+  padding-left: var(--space-lg);
+}
+
+.help-section-content li {
+  margin-bottom: var(--space-sm);
+}
+
+.help-section-content strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Help Button */
+.help-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.help-button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-glow);
+}
+
+/* Tab header with help button */
+.tab-header-with-help {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+}
+
+.tab-header-with-help h2 {
+  margin-bottom: 0;
+}
+
+/* Header top row with help button - used in Import, Organize, Config */
+.import-header-top,
+.organize-header-top,
+.config-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.import-header-top h2,
+.organize-header-top h2,
+.config-header-top h2 {
+  margin-bottom: 0;
 }

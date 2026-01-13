@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { startScan, cancelScan, browseDirectory, getScanDirectories } from '../../api/scanningApi';
 import type { DirectoryEntry, ScanProgress } from '../../types/music';
+import HelpModal, { HelpButton } from '../common/HelpModal';
+import { importHelp } from '../common/helpContent';
 
 /**
  * Import View - Phase 2 of Web UI Migration (Issue #69)
@@ -25,6 +27,9 @@ export default function ImportView() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanProgress | null>(null);
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false);
 
   // WebSocket hook for real-time progress
   const { progress, isConnected } = useWebSocket({
@@ -144,7 +149,10 @@ export default function ImportView() {
   return (
     <div className="import-view">
       <div className="import-header">
-        <h2 className="import-title">Import Music Files</h2>
+        <div className="import-header-top">
+          <h2 className="import-title">Import Music Files</h2>
+          <HelpButton onClick={() => setShowHelp(true)} />
+        </div>
         <p className="import-description">
           Browse directories and select folders to scan for music files
         </p>
@@ -339,6 +347,13 @@ export default function ImportView() {
           </div>
         </div>
       </div>
+
+      <HelpModal
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Import Help"
+        sections={importHelp}
+      />
     </div>
   );
 }

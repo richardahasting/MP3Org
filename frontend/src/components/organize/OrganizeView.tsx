@@ -10,6 +10,8 @@ import {
   getAvailableFields,
   getTextFormats,
 } from '../../api/organizationApi';
+import HelpModal, { HelpButton } from '../common/HelpModal';
+import { organizeHelp } from '../common/helpContent';
 
 export default function OrganizeView() {
   // Template configuration
@@ -41,6 +43,9 @@ export default function OrganizeView() {
     failed: number;
     errors: string[];
   } | null>(null);
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false);
 
   // Load available options on mount
   useEffect(() => {
@@ -175,7 +180,10 @@ export default function OrganizeView() {
   return (
     <div className="organize-view">
       <div className="organize-header">
-        <h2 className="organize-title">Organize Music Files</h2>
+        <div className="organize-header-top">
+          <h2 className="organize-title">Organize Music Files</h2>
+          <HelpButton onClick={() => setShowHelp(true)} />
+        </div>
         <p className="organize-subtitle">
           Preview and execute file organization based on metadata templates
         </p>
@@ -425,6 +433,13 @@ export default function OrganizeView() {
           )}
         </div>
       </div>
+
+      <HelpModal
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Organize Help"
+        sections={organizeHelp}
+      />
     </div>
   );
 }

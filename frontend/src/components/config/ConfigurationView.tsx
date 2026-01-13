@@ -22,6 +22,8 @@ import {
   startFingerprintGeneration,
   getFingerprintGenerationStatus,
 } from '../../api/configApi';
+import HelpModal, { HelpButton } from '../common/HelpModal';
+import { configHelp } from '../common/helpContent';
 
 type ConfigTab = 'matching' | 'filetypes' | 'profiles';
 
@@ -54,6 +56,9 @@ export default function ConfigurationView() {
   } | null>(null);
   const [fingerprintThreshold, setFingerprintThreshold] = useState(85);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -275,7 +280,10 @@ export default function ConfigurationView() {
   return (
     <div className="config-view">
       <div className="config-header">
-        <h2 className="config-title">Configuration</h2>
+        <div className="config-header-top">
+          <h2 className="config-title">Configuration</h2>
+          <HelpButton onClick={() => setShowHelp(true)} />
+        </div>
         <p className="config-subtitle">
           Manage application settings, fuzzy search parameters, and database profiles
         </p>
@@ -784,6 +792,13 @@ export default function ConfigurationView() {
         )}
 
       </div>
+
+      <HelpModal
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Configuration Help"
+        sections={configHelp}
+      />
     </div>
   );
 }
