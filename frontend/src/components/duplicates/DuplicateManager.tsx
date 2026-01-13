@@ -186,12 +186,24 @@ export default function DuplicateManager() {
     try {
       await deleteFile(fileId);
 
-      // If this was the last file in the group, clear selection
-      if (selectedGroup.fileCount <= 2) {
+      // Update the group locally - remove deleted file
+      const remainingFiles = selectedGroup.files.filter(f => f.file.id !== fileId);
+
+      if (remainingFiles.length <= 1) {
+        // Group is resolved - no longer a duplicate
         setSelectedGroup(null);
+        setSelectedFileId(null);
+        setComparison(null);
+      } else {
+        // Update the selected group with remaining files
+        setSelectedGroup({
+          ...selectedGroup,
+          files: remainingFiles,
+          fileCount: remainingFiles.length,
+        });
       }
-      setSelectedFileId(null);
-      setComparison(null);
+
+      // Refresh to get updated groups from server
       await loadDuplicates();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete file');

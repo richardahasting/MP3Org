@@ -30,6 +30,7 @@ import java.util.Set;
  * - POST /api/v1/duplicates/scan/{id}/cancel - Cancel scan
  * - POST /api/v1/duplicates/refresh      - Invalidate cache and refresh
  * - DELETE /api/v1/duplicates/{groupId}/keep/{fileId} - Keep one file, delete others
+ * - DELETE /api/v1/duplicates/file/{fileId} - Delete a single file
  */
 @RestController
 @RequestMapping("/api/v1/duplicates")
