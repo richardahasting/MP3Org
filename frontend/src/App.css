@@ -235,6 +235,10 @@ body::before {
   max-width: 1600px;
   margin: 0 auto;
   width: 100%;
+  min-height: 0; /* Allow flex child to shrink */
+  overflow: hidden; /* Establish scroll context for children */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Panel Container */
@@ -2156,6 +2160,7 @@ body::before {
   gap: var(--space-lg);
   flex: 1;
   min-height: 0;
+  overflow: hidden; /* Prevent grid from expanding beyond container */
 }
 
 /* Duplicate List Panel */
