@@ -1,5 +1,6 @@
 package org.hasting.service;
 
+import org.hasting.dto.DuplicateFileDTO;
 import org.hasting.dto.DuplicateGroupDTO;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.model.MusicFile;
@@ -78,11 +79,22 @@ public class DuplicateService {
         }
 
         AtomicInteger groupId = new AtomicInteger(1);
+        final boolean usingFingerprints = filesWithFingerprints > allFiles.size() / 2;
+
         cachedDuplicateGroups = groups.stream()
-            .map(group -> DuplicateGroupDTO.fromFiles(
-                groupId.getAndIncrement(),
-                group.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
-            ))
+            .map(group -> {
+                List<MusicFileDTO> fileDTOs = group.stream()
+                    .map(MusicFileDTO::fromEntity)
+                    .collect(Collectors.toList());
+
+                if (usingFingerprints) {
+                    // Compute similarity scores for fingerprint-based groups
+                    List<Double> similarities = FingerprintMatcher.computeGroupSimilarities(group);
+                    return DuplicateGroupDTO.fromFilesWithSimilarity(groupId.getAndIncrement(), fileDTOs, similarities);
+                } else {
+                    return DuplicateGroupDTO.fromFiles(groupId.getAndIncrement(), fileDTOs);
+                }
+            })
             .collect(Collectors.toList());
 
         cacheTimestamp = System.currentTimeMillis();
@@ -235,7 +247,8 @@ public class DuplicateService {
         DuplicateGroupDTO group = groupOpt.get();
         int deletedCount = 0;
 
-        for (MusicFileDTO file : group.files()) {
+        for (DuplicateFileDTO dupFile : group.files()) {
+            MusicFileDTO file = dupFile.file();
             if (file.id() != keepFileId) {
                 MusicFile musicFile = DatabaseManager.getMusicFileById(file.id());
                 if (musicFile != null && DatabaseManager.deleteMusicFile(musicFile)) {
@@ -280,13 +293,16 @@ public class DuplicateService {
                 duplicateGroups = FingerprintMatcher.groupDuplicates(allFiles);
                 session.setGroupsFound(duplicateGroups.size());
 
-                // Broadcast all groups at once for fingerprint matching
+                // Broadcast all groups at once for fingerprint matching, with similarity scores
                 AtomicInteger groupIdCounter = new AtomicInteger(1);
                 List<DuplicateGroupDTO> allGroupDTOs = duplicateGroups.stream()
-                    .map(g -> DuplicateGroupDTO.fromFiles(
-                        groupIdCounter.getAndIncrement(),
-                        g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
-                    ))
+                    .map(group -> {
+                        List<MusicFileDTO> fileDTOs = group.stream()
+                            .map(MusicFileDTO::fromEntity)
+                            .collect(Collectors.toList());
+                        List<Double> similarities = FingerprintMatcher.computeGroupSimilarities(group);
+                        return DuplicateGroupDTO.fromFilesWithSimilarity(groupIdCounter.getAndIncrement(), fileDTOs, similarities);
+                    })
                     .collect(Collectors.toList());
 
                 if (!allGroupDTOs.isEmpty()) {

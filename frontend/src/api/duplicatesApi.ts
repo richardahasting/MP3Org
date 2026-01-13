@@ -114,3 +114,14 @@ export async function keepFileDeleteOthers(
   if (!response.ok) throw new Error('Failed to process duplicate group');
   return response.json();
 }
+
+/**
+ * Deletes a single file from the collection.
+ */
+export async function deleteFile(fileId: number): Promise<{ deletedFileId: number; success: boolean }> {
+  const response = await fetch(`${API_BASE}/file/${fileId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete file');
+  return response.json();
+}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { DuplicateGroup, MusicFile, DuplicateScanStatus } from '../../types/music';
+import type { DuplicateGroup, DuplicateFile, MusicFile, DuplicateScanStatus } from '../../types/music';
 import {
   fetchDuplicateGroups,
-  keepFileDeleteOthers,
+  deleteFile,
   startDuplicateScan,
   refreshDuplicates,
   compareFiles,
@@ -136,15 +136,16 @@ export default function DuplicateManager() {
     setComparison(null);
   }, []);
 
-  const handleSelectFile = useCallback(async (file: MusicFile) => {
+  const handleSelectFile = useCallback(async (dupFile: DuplicateFile) => {
+    const file = dupFile.file;
     setSelectedFileId(file.id);
 
     // If there's already a selected group, compare with the first file
     if (selectedGroup && selectedGroup.files.length > 1) {
-      const otherFile = selectedGroup.files.find(f => f.id !== file.id);
-      if (otherFile) {
+      const otherDupFile = selectedGroup.files.find(f => f.file.id !== file.id);
+      if (otherDupFile) {
         try {
-          const result = await compareFiles(file.id, otherFile.id);
+          const result = await compareFiles(file.id, otherDupFile.file.id);
           setComparison({
             file1: result.file1,
             file2: result.file2,
@@ -158,22 +159,28 @@ export default function DuplicateManager() {
     }
   }, [selectedGroup]);
 
-  const handleKeepFile = useCallback(async (fileId: number) => {
+  const handleDeleteFile = useCallback(async (fileId: number) => {
     if (!selectedGroup) return;
 
-    if (!confirm(`Keep this file and delete the ${selectedGroup.fileCount - 1} other duplicate(s)?`)) {
+    const fileToDelete = selectedGroup.files.find(f => f.file.id === fileId);
+    const fileName = fileToDelete?.file.title || 'this file';
+
+    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) {
       return;
     }
 
     try {
-      const result = await keepFileDeleteOthers(selectedGroup.groupId, fileId);
-      alert(`Kept file and deleted ${result.deletedCount} duplicate(s)`);
-      setSelectedGroup(null);
+      await deleteFile(fileId);
+
+      // If this was the last file in the group, clear selection
+      if (selectedGroup.fileCount <= 2) {
+        setSelectedGroup(null);
+      }
       setSelectedFileId(null);
       setComparison(null);
       await loadDuplicates();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process duplicates');
+      setError(err instanceof Error ? err.message : 'Failed to delete file');
     }
   }, [selectedGroup, loadDuplicates]);
 
@@ -190,8 +197,9 @@ export default function DuplicateManager() {
   };
 
   // Audio playback handlers
-  const playFile = useCallback((file: MusicFile, e: React.MouseEvent) => {
+  const playFile = useCallback((dupFile: DuplicateFile, e: React.MouseEvent) => {
     e.stopPropagation();
+    const file = dupFile.file;
     if (playingFile?.id === file.id) {
       // Toggle play/pause for same file
       if (audioRef.current) {
@@ -317,48 +325,60 @@ export default function DuplicateManager() {
               <>
                 <div className="detail-header">
                   <h3>Files in Group</h3>
-                  <span className="detail-hint">Click a file to keep it, others will be deleted</span>
+                  <span className="detail-hint">Select a file to see details, delete duplicates you don't want</span>
                 </div>
                 <div className="file-list">
-                  {selectedGroup.files.map(file => (
-                    <div
-                      key={file.id}
-                      className={`file-item ${selectedFileId === file.id ? 'selected' : ''}`}
-                      onClick={() => handleSelectFile(file)}
-                    >
-                      <div className="file-main">
-                        <span className="file-title">{file.title || 'Unknown'}</span>
-                        <span className="file-artist">{file.artist || 'Unknown'}</span>
-                        <span className="file-album">{file.album || 'Unknown'}</span>
+                  {selectedGroup.files.map((dupFile, index) => {
+                    const file = dupFile.file;
+                    const isReference = index === 0;
+                    return (
+                      <div
+                        key={file.id}
+                        className={`file-item ${selectedFileId === file.id ? 'selected' : ''} ${isReference ? 'reference' : ''}`}
+                        onClick={() => handleSelectFile(dupFile)}
+                      >
+                        <div className="file-main">
+                          <div className="file-title-row">
+                            <span className="file-title">{file.title || 'Unknown'}</span>
+                            {dupFile.similarity !== null && (
+                              <span className={`similarity-badge ${dupFile.similarity >= 0.95 ? 'high' : dupFile.similarity >= 0.85 ? 'medium' : 'low'}`}>
+                                {(dupFile.similarity * 100).toFixed(0)}% match
+                              </span>
+                            )}
+                            {isReference && <span className="reference-badge">Reference</span>}
+                          </div>
+                          <span className="file-artist">{file.artist || 'Unknown'}</span>
+                          <span className="file-album">{file.album || 'Unknown'}</span>
+                        </div>
+                        <div className="file-meta">
+                          <span className="file-duration">{formatDuration(file.durationSeconds)}</span>
+                          <span className="file-bitrate">{file.bitRate} kbps</span>
+                          <span className="file-size">{formatFileSize(file.fileSizeBytes)}</span>
+                        </div>
+                        <div className="file-path" title={file.filePath}>
+                          {file.filePath.split('/').slice(-2).join('/')}
+                        </div>
+                        <div className="file-actions">
+                          <button
+                            className={`play-button ${playingFile?.id === file.id && isPlaying ? 'playing' : ''}`}
+                            onClick={(e) => playFile(dupFile, e)}
+                            title={playingFile?.id === file.id && isPlaying ? 'Pause' : 'Play'}
+                          >
+                            {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
+                          </button>
+                          <button
+                            className="delete-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteFile(file.id);
+                            }}
+                          >
+                            Delete This File
+                          </button>
+                        </div>
                       </div>
-                      <div className="file-meta">
-                        <span className="file-duration">{formatDuration(file.durationSeconds)}</span>
-                        <span className="file-bitrate">{file.bitRate} kbps</span>
-                        <span className="file-size">{formatFileSize(file.fileSizeBytes)}</span>
-                      </div>
-                      <div className="file-path" title={file.filePath}>
-                        {file.filePath.split('/').slice(-2).join('/')}
-                      </div>
-                      <div className="file-actions">
-                        <button
-                          className={`play-button ${playingFile?.id === file.id && isPlaying ? 'playing' : ''}`}
-                          onClick={(e) => playFile(file, e)}
-                          title={playingFile?.id === file.id && isPlaying ? 'Pause' : 'Play'}
-                        >
-                          {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
-                        </button>
-                        <button
-                          className="keep-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleKeepFile(file.id);
-                          }}
-                        >
-                          Keep This File
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {comparison && (

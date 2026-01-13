@@ -313,6 +313,40 @@ public class FingerprintMatcher {
     public record SimilarFile(MusicFile file, double similarity) {}
 
     /**
+     * Computes similarity scores for each file in a group relative to the first file.
+     * The first file gets similarity 1.0 (reference), others get their actual similarity.
+     *
+     * @param group list of music files in a duplicate group
+     * @return list of similarity scores (same order as input)
+     */
+    public static List<Double> computeGroupSimilarities(List<MusicFile> group) {
+        if (group == null || group.isEmpty()) {
+            return List.of();
+        }
+
+        List<Double> similarities = new ArrayList<>();
+        MusicFile reference = group.get(0);
+        int[] refFp = reference.hasFingerprint() ? parseFingerprint(reference.getFingerprint()) : null;
+
+        for (int i = 0; i < group.size(); i++) {
+            if (i == 0) {
+                similarities.add(1.0); // Reference file has 100% similarity to itself
+            } else {
+                MusicFile file = group.get(i);
+                if (refFp != null && file.hasFingerprint()) {
+                    int[] fileFp = parseFingerprint(file.getFingerprint());
+                    double similarity = calculateSimilarity(refFp, fileFp);
+                    similarities.add(similarity);
+                } else {
+                    similarities.add(null); // No fingerprint available
+                }
+            }
+        }
+
+        return similarities;
+    }
+
+    /**
      * Gets a detailed comparison breakdown between two fingerprints.
      *
      * @param fp1 first fingerprint

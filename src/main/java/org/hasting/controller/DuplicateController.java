@@ -170,6 +170,21 @@ public class DuplicateController {
     }
 
     /**
+     * Delete a single file from the collection.
+     */
+    @DeleteMapping("/file/{fileId}")
+    public ResponseEntity<Map<String, Object>> deleteFile(@PathVariable long fileId) {
+        boolean deleted = duplicateService.deleteFile(fileId);
+        if (!deleted) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(Map.of(
+            "deletedFileId", fileId,
+            "success", true
+        ));
+    }
+
+    /**
      * Request body for comparing two files.
      */
     public record CompareRequest(long fileId1, long fileId2) {}

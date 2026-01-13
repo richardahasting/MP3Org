@@ -58,10 +58,15 @@ export interface BrowseResponse {
 }
 
 // Duplicate detection types for Phase 3
+export interface DuplicateFile {
+  file: MusicFile;
+  similarity: number | null;  // Fingerprint similarity to reference file (0.0-1.0), null if not available
+}
+
 export interface DuplicateGroup {
   groupId: number;
   fileCount: number;
-  files: MusicFile[];
+  files: DuplicateFile[];
   representativeTitle: string;
   representativeArtist: string;
 }
