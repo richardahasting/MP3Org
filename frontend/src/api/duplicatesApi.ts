@@ -1,4 +1,4 @@
-import type { DuplicateGroup, DuplicateScanStatus, CompareResult, MusicFile } from '../types/music';
+import type { DuplicateGroup, DuplicateScanStatus, CompareResult, MusicFile, AutoResolutionResult, AutoResolutionPreview } from '../types/music';
 
 const API_BASE = '/api/v1/duplicates';
 
@@ -123,5 +123,53 @@ export async function deleteFile(fileId: number): Promise<{ deletedFileId: numbe
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Failed to delete file');
+  return response.json();
+}
+
+/**
+ * Automatically resolves duplicates based on bitrate, metadata, and path matching.
+ * Returns files that couldn't be auto-resolved (need manual review).
+ */
+export async function autoResolveDuplicates(): Promise<AutoResolutionResult> {
+  const response = await fetch(`${API_BASE}/auto-resolve`, {
+    method: 'POST',
+  });
+  if (!response.ok) throw new Error('Failed to auto-resolve duplicates');
+  return response.json();
+}
+
+/**
+ * Previews automatic duplicate resolution without deleting any files.
+ * Shows what files would be deleted and which would be kept.
+ */
+export async function previewAutoResolution(): Promise<AutoResolutionPreview> {
+  const response = await fetch(`${API_BASE}/auto-resolve/preview`);
+  if (!response.ok) throw new Error('Failed to preview auto-resolution');
+  return response.json();
+}
+
+/**
+ * Executes automatic duplicate resolution with optional file exclusions.
+ * Files in the exclude list will be kept even if they would normally be deleted.
+ */
+export async function executeAutoResolution(excludeFileIds?: number[]): Promise<AutoResolutionResult> {
+  const response = await fetch(`${API_BASE}/auto-resolve/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ excludeFileIds: excludeFileIds || [] }),
+  });
+  if (!response.ok) throw new Error('Failed to execute auto-resolution');
+  return response.json();
+}
+
+/**
+ * Opens the folder containing a file in the OS file manager (Finder, Explorer, etc.).
+ */
+export async function openFileFolder(filePath: string): Promise<{ success: boolean; folder?: string; error?: string }> {
+  const response = await fetch(`${API_BASE}/open-folder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filePath }),
+  });
   return response.json();
 }
