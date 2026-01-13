@@ -5,11 +5,11 @@ import {
   getDuplicateCount,
   keepFileDeleteOthers,
   startDuplicateScan,
-  getScanStatus,
   refreshDuplicates,
   compareFiles,
 } from '../../api/duplicatesApi';
 import { getAudioStreamUrl } from '../../api/musicApi';
+import { useDuplicateWebSocket } from '../../hooks/useDuplicateWebSocket';
 
 interface ComparisonDetail {
   file1: MusicFile;
@@ -25,7 +25,7 @@ export default function DuplicateManager() {
   const [selectedGroup, setSelectedGroup] = useState<DuplicateGroup | null>(null);
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [scanStatus, setScanStatus] = useState<DuplicateScanStatus | null>(null);
+  const [scanSessionId, setScanSessionId] = useState<string | null>(null);
   const [comparison, setComparison] = useState<ComparisonDetail | null>(null);
   const [duplicateCount, setDuplicateCount] = useState(0);
 
@@ -33,6 +33,29 @@ export default function DuplicateManager() {
   const [playingFile, setPlayingFile] = useState<MusicFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // WebSocket for progressive duplicate scanning
+  const { status: scanStatus } = useDuplicateWebSocket({
+    sessionId: scanSessionId,
+    onProgress: useCallback((status: DuplicateScanStatus) => {
+      if (status.isComplete || status.isCancelled || status.stage === 'error') {
+        setScanning(false);
+        setScanSessionId(null);
+        if (status.error) {
+          setError(status.error);
+        }
+      }
+    }, []),
+    onGroupsReceived: useCallback((newGroups: DuplicateGroup[], totalFound: number) => {
+      setGroups(prev => [...prev, ...newGroups]);
+      setDuplicateCount(totalFound);
+    }, []),
+    onError: useCallback((err: string) => {
+      setError(err);
+      setScanning(false);
+      setScanSessionId(null);
+    }, []),
+  });
 
   const loadDuplicates = useCallback(async () => {
     try {
@@ -70,37 +93,19 @@ export default function DuplicateManager() {
     try {
       setScanning(true);
       setError(null);
+      setGroups([]); // Clear existing groups for fresh scan
+      setDuplicateCount(0);
+      setSelectedGroup(null);
+      setSelectedFileId(null);
+      setComparison(null);
+
       const sessionId = await startDuplicateScan();
-
-      // Poll for status
-      const pollStatus = async () => {
-        try {
-          const status = await getScanStatus(sessionId);
-          setScanStatus(status);
-
-          if (status.isComplete || status.isCancelled || status.stage === 'error') {
-            setScanning(false);
-            if (status.isComplete) {
-              await loadDuplicates();
-            }
-            if (status.error) {
-              setError(status.error);
-            }
-          } else {
-            setTimeout(pollStatus, 500);
-          }
-        } catch (err) {
-          setScanning(false);
-          setError(err instanceof Error ? err.message : 'Scan failed');
-        }
-      };
-
-      pollStatus();
+      setScanSessionId(sessionId); // WebSocket will handle progress and groups
     } catch (err) {
       setScanning(false);
       setError(err instanceof Error ? err.message : 'Failed to start scan');
     }
-  }, [loadDuplicates]);
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     try {

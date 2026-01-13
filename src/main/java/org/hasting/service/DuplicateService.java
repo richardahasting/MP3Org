@@ -36,6 +36,7 @@ public class DuplicateService {
     private List<DuplicateGroupDTO> cachedDuplicateGroups = null;
     private long cacheTimestamp = 0;
     private static final long CACHE_TTL_MS = 60000; // 1 minute cache
+    private static final int GROUP_BATCH_SIZE = 25; // Send groups to frontend every 25 found
 
     public DuplicateService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
@@ -242,6 +243,8 @@ public class DuplicateService {
 
             List<List<MusicFile>> duplicateGroups = new ArrayList<>();
             Set<MusicFile> processed = new HashSet<>();
+            AtomicInteger groupIdCounter = new AtomicInteger(1);
+            int lastBroadcastedGroupCount = 0;
 
             for (int i = 0; i < allFiles.size() && !session.isCancelled(); i++) {
                 MusicFile file1 = allFiles.get(i);
@@ -266,6 +269,21 @@ public class DuplicateService {
                 if (group.size() > 1) {
                     duplicateGroups.add(group);
                     session.setGroupsFound(duplicateGroups.size());
+
+                    // Broadcast new groups in batches of GROUP_BATCH_SIZE
+                    if (duplicateGroups.size() - lastBroadcastedGroupCount >= GROUP_BATCH_SIZE) {
+                        List<DuplicateGroupDTO> newGroups = duplicateGroups
+                            .subList(lastBroadcastedGroupCount, duplicateGroups.size())
+                            .stream()
+                            .map(g -> DuplicateGroupDTO.fromFiles(
+                                groupIdCounter.getAndIncrement(),
+                                g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
+                            ))
+                            .collect(Collectors.toList());
+
+                        broadcastGroups(session, newGroups);
+                        lastBroadcastedGroupCount = duplicateGroups.size();
+                    }
                 }
 
                 session.setFilesProcessed(i + 1);
@@ -276,16 +294,30 @@ public class DuplicateService {
                 }
             }
 
+            // Broadcast any remaining groups that weren't in a full batch
+            if (duplicateGroups.size() > lastBroadcastedGroupCount) {
+                List<DuplicateGroupDTO> remainingGroups = duplicateGroups
+                    .subList(lastBroadcastedGroupCount, duplicateGroups.size())
+                    .stream()
+                    .map(g -> DuplicateGroupDTO.fromFiles(
+                        groupIdCounter.getAndIncrement(),
+                        g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
+                    ))
+                    .collect(Collectors.toList());
+
+                broadcastGroups(session, remainingGroups);
+            }
+
             if (session.isCancelled()) {
                 session.setStage("cancelled");
             } else {
                 session.setStage("completed");
 
                 // Update cache with results
-                AtomicInteger groupId = new AtomicInteger(1);
+                AtomicInteger cacheGroupId = new AtomicInteger(1);
                 cachedDuplicateGroups = duplicateGroups.stream()
                     .map(group -> DuplicateGroupDTO.fromFiles(
-                        groupId.getAndIncrement(),
+                        cacheGroupId.getAndIncrement(),
                         group.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
                     ))
                     .collect(Collectors.toList());
@@ -308,6 +340,22 @@ public class DuplicateService {
             session.getStatus()
         );
     }
+
+    private void broadcastGroups(DuplicateSession session, List<DuplicateGroupDTO> groups) {
+        messagingTemplate.convertAndSend(
+            "/topic/duplicates/" + session.getSessionId() + "/groups",
+            new DuplicateGroupBatch(groups, session.getStatus().groupsFound())
+        );
+        logger.info("Broadcasted {} new duplicate groups (total: {})", groups.size(), session.getStatus().groupsFound());
+    }
+
+    /**
+     * Batch of duplicate groups sent via WebSocket.
+     */
+    public record DuplicateGroupBatch(
+        List<DuplicateGroupDTO> groups,
+        int totalGroupsFound
+    ) {}
 
     /**
      * Inner class to track duplicate scan session state.
