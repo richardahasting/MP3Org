@@ -71,3 +71,11 @@ export async function bulkUpdateMusicFiles(
   if (!response.ok) throw new Error('Bulk update failed');
   return response.json();
 }
+
+/**
+ * Returns the URL for streaming an audio file.
+ * Can be used directly as the src for an HTML5 audio element.
+ */
+export function getAudioStreamUrl(id: number): string {
+  return `${API_BASE}/${id}/stream`;
+}

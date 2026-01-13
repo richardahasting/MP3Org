@@ -1,7 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useMusicFiles } from '../../hooks/useMusicFiles';
 import type { MusicFile } from '../../types/music';
-import { updateMusicFile, deleteMusicFile, bulkUpdateMusicFiles } from '../../api/musicApi';
+import { updateMusicFile, deleteMusicFile, bulkUpdateMusicFiles, getAudioStreamUrl } from '../../api/musicApi';
 
 type SearchField = 'all' | 'title' | 'artist' | 'album';
 
@@ -48,6 +48,11 @@ export default function MetadataEditor() {
     applyGenre: false,
   });
   const [bulkEditLoading, setBulkEditLoading] = useState(false);
+
+  // Audio player state
+  const [playingFile, setPlayingFile] = useState<MusicFile | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Computed values for selection
   const allSelected = useMemo(() =>
@@ -203,6 +208,40 @@ export default function MetadataEditor() {
       setBulkEditLoading(false);
     }
   }, [selectedIds, bulkEditForm, refresh]);
+
+  // Audio playback handlers
+  const playFile = useCallback((file: MusicFile) => {
+    if (playingFile?.id === file.id) {
+      // Toggle play/pause for same file
+      if (audioRef.current) {
+        if (isPlaying) {
+          audioRef.current.pause();
+        } else {
+          audioRef.current.play();
+        }
+      }
+    } else {
+      // Play new file
+      setPlayingFile(file);
+      setIsPlaying(true);
+      // Audio will auto-play via onLoadedData
+    }
+  }, [playingFile, isPlaying]);
+
+  const stopPlayback = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlayingFile(null);
+    setIsPlaying(false);
+  }, []);
+
+  const handleAudioPlay = useCallback(() => setIsPlaying(true), []);
+  const handleAudioPause = useCallback(() => setIsPlaying(false), []);
+  const handleAudioEnded = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
 
   const renderPagination = () => {
     if (totalPages <= 1) return null;
@@ -546,6 +585,13 @@ export default function MetadataEditor() {
                         <td className="cell-year">{file.year || '—'}</td>
                         <td className="cell-duration">{file.formattedDuration}</td>
                         <td className="action-cell">
+                          <button
+                            className={`action-btn play ${playingFile?.id === file.id && isPlaying ? 'playing' : ''}`}
+                            onClick={() => playFile(file)}
+                            title={playingFile?.id === file.id && isPlaying ? 'Pause' : 'Play'}
+                          >
+                            {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
+                          </button>
                           <button className="action-btn edit" onClick={() => startEdit(file)}>✎</button>
                           <button className="action-btn delete" onClick={() => handleDelete(file.id)}>✕</button>
                         </td>
@@ -559,6 +605,29 @@ export default function MetadataEditor() {
 
           {renderPagination()}
         </>
+      )}
+
+      {/* Audio Player */}
+      {playingFile && (
+        <div className="audio-player-bar">
+          <div className="audio-player-info">
+            <span className="audio-player-title">{playingFile.title || 'Unknown'}</span>
+            <span className="audio-player-artist">{playingFile.artist || 'Unknown Artist'}</span>
+          </div>
+          <audio
+            ref={audioRef}
+            src={getAudioStreamUrl(playingFile.id)}
+            autoPlay
+            onPlay={handleAudioPlay}
+            onPause={handleAudioPause}
+            onEnded={handleAudioEnded}
+            controls
+            className="audio-player-controls"
+          />
+          <button className="audio-player-close" onClick={stopPlayback} title="Stop">
+            ✕
+          </button>
+        </div>
       )}
     </div>
   );
