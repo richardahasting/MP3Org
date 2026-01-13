@@ -23,10 +23,10 @@ import {
   getFingerprintGenerationStatus,
 } from '../../api/configApi';
 
-type ConfigTab = 'fuzzy' | 'filetypes' | 'profiles' | 'fingerprints';
+type ConfigTab = 'matching' | 'filetypes' | 'profiles';
 
 export default function ConfigurationView() {
-  const [activeTab, setActiveTab] = useState<ConfigTab>('fuzzy');
+  const [activeTab, setActiveTab] = useState<ConfigTab>('matching');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -298,10 +298,10 @@ export default function ConfigurationView() {
 
       <div className="config-tabs">
         <button
-          className={`config-tab ${activeTab === 'fuzzy' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fuzzy')}
+          className={`config-tab ${activeTab === 'matching' ? 'active' : ''}`}
+          onClick={() => setActiveTab('matching')}
         >
-          Fuzzy Search
+          Fuzzy Matching
         </button>
         <button
           className={`config-tab ${activeTab === 'filetypes' ? 'active' : ''}`}
@@ -315,19 +315,134 @@ export default function ConfigurationView() {
         >
           Profiles
         </button>
-        <button
-          className={`config-tab ${activeTab === 'fingerprints' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fingerprints')}
-        >
-          Fingerprints
-        </button>
       </div>
 
       <div className="config-content">
-        {activeTab === 'fuzzy' && fuzzyConfig && (
-          <div className="config-panel fuzzy-panel">
+        {activeTab === 'matching' && fuzzyConfig && (
+          <div className="config-panel matching-panel">
+            {/* Audio Fingerprinting Section */}
             <div className="panel-header">
-              <h3 className="panel-title">Fuzzy Search Settings</h3>
+              <h3 className="panel-title">Audio Fingerprinting</h3>
+              <p className="panel-description">
+                Uses Chromaprint to identify duplicates based on audio content, not just metadata.
+              </p>
+            </div>
+
+            <div className="config-section">
+              <h4 className="section-title">System Status</h4>
+              {fingerprintStatus && (
+                <div className="fingerprint-status">
+                  <div className={`status-indicator ${fingerprintStatus.fpcalcAvailable ? 'available' : 'unavailable'}`}>
+                    <span className="status-icon">{fingerprintStatus.fpcalcAvailable ? '✓' : '✗'}</span>
+                    <span className="status-text">
+                      {fingerprintStatus.fpcalcAvailable ? 'fpcalc Available' : 'fpcalc Not Found'}
+                    </span>
+                  </div>
+                  {!fingerprintStatus.fpcalcAvailable && (
+                    <div className="install-hint">
+                      <p>Install Chromaprint to enable audio fingerprinting:</p>
+                      <code>brew install chromaprint</code>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {fingerprintStatus?.fpcalcAvailable && (
+              <>
+                <div className="config-section">
+                  <h4 className="section-title">Fingerprint Coverage</h4>
+                  <div className="fingerprint-stats">
+                    <div className="stat-item">
+                      <span className="stat-value">{fingerprintStatus.filesWithFingerprints.toLocaleString()}</span>
+                      <span className="stat-label">With fingerprints</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-value">{fingerprintStatus.filesWithoutFingerprints.toLocaleString()}</span>
+                      <span className="stat-label">Without fingerprints</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-value">
+                        {fingerprintStatus.filesWithFingerprints + fingerprintStatus.filesWithoutFingerprints > 0
+                          ? Math.round(
+                              (fingerprintStatus.filesWithFingerprints /
+                                (fingerprintStatus.filesWithFingerprints + fingerprintStatus.filesWithoutFingerprints)) *
+                                100
+                            )
+                          : 0}%
+                      </span>
+                      <span className="stat-label">Coverage</span>
+                    </div>
+                  </div>
+
+                  {fingerprintStatus.filesWithoutFingerprints > 0 && (
+                    <div className="fingerprint-actions">
+                      <button
+                        className="generate-btn"
+                        onClick={handleStartFingerprintGeneration}
+                        disabled={fingerprintGenerating}
+                      >
+                        {fingerprintGenerating ? 'Generating...' : 'Generate Missing Fingerprints'}
+                      </button>
+                      <button className="refresh-btn" onClick={refreshFingerprintStatus} disabled={fingerprintGenerating}>
+                        Refresh
+                      </button>
+                    </div>
+                  )}
+
+                  {fingerprintProgress && (
+                    <div className="fingerprint-progress">
+                      <div className={`progress-bar ${fingerprintProgress.status === 'error' ? 'error' : ''}`}>
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${fingerprintProgress.total > 0 ? (fingerprintProgress.completed / fingerprintProgress.total) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="progress-text">
+                        {fingerprintProgress.completed.toLocaleString()} / {fingerprintProgress.total.toLocaleString()} files
+                        {fingerprintProgress.status === 'completed' && ' — Complete!'}
+                        {fingerprintProgress.status === 'error' && ' — Error'}
+                      </div>
+                      {fingerprintProgress.status === 'error' && fingerprintProgress.error && (
+                        <div className="progress-error">
+                          {fingerprintProgress.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="config-section">
+                  <h4 className="section-title">Fingerprint Similarity Threshold</h4>
+                  <div className="config-field">
+                    <div className="slider-group">
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={fingerprintThreshold}
+                        onChange={(e) => setFingerprintThreshold(Number(e.target.value))}
+                      />
+                      <span className="slider-value">{fingerprintThreshold}%</span>
+                    </div>
+                    <div className="threshold-hints">
+                      <span className="hint-item">70% = Lenient</span>
+                      <span className="hint-item">85% = Recommended</span>
+                      <span className="hint-item">95% = Strict</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Divider */}
+            <div className="section-divider" />
+
+            {/* Fuzzy Search Settings Section */}
+            <div className="panel-header">
+              <h3 className="panel-title">Metadata Fuzzy Matching</h3>
               <div className="panel-actions">
                 <button className="preset-btn" onClick={() => handlePresetApply('strict')}>Strict</button>
                 <button className="preset-btn" onClick={() => handlePresetApply('balanced')}>Balanced</button>
@@ -668,147 +783,6 @@ export default function ConfigurationView() {
           </div>
         )}
 
-        {activeTab === 'fingerprints' && (
-          <div className="config-panel fingerprints-panel">
-            <div className="panel-header">
-              <h3 className="panel-title">Audio Fingerprinting</h3>
-              <p className="panel-description">
-                Audio fingerprinting uses Chromaprint to identify duplicate songs based on their actual audio content,
-                rather than metadata alone. This provides much more accurate duplicate detection.
-              </p>
-            </div>
-
-            <div className="config-section">
-              <h4 className="section-title">System Status</h4>
-              {fingerprintStatus && (
-                <div className="fingerprint-status">
-                  <div className={`status-indicator ${fingerprintStatus.fpcalcAvailable ? 'available' : 'unavailable'}`}>
-                    <span className="status-icon">{fingerprintStatus.fpcalcAvailable ? '✓' : '✗'}</span>
-                    <span className="status-text">
-                      {fingerprintStatus.fpcalcAvailable ? 'fpcalc Available' : 'fpcalc Not Found'}
-                    </span>
-                  </div>
-                  {!fingerprintStatus.fpcalcAvailable && (
-                    <div className="install-hint">
-                      <p>Install Chromaprint to enable audio fingerprinting:</p>
-                      <code>brew install chromaprint</code>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {fingerprintStatus?.fpcalcAvailable && (
-              <>
-                <div className="config-section">
-                  <h4 className="section-title">Fingerprint Coverage</h4>
-                  <div className="fingerprint-stats">
-                    <div className="stat-item">
-                      <span className="stat-value">{fingerprintStatus.filesWithFingerprints.toLocaleString()}</span>
-                      <span className="stat-label">Files with fingerprints</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-value">{fingerprintStatus.filesWithoutFingerprints.toLocaleString()}</span>
-                      <span className="stat-label">Files without fingerprints</span>
-                    </div>
-                    <div className="stat-item">
-                      <span className="stat-value">
-                        {fingerprintStatus.filesWithFingerprints + fingerprintStatus.filesWithoutFingerprints > 0
-                          ? Math.round(
-                              (fingerprintStatus.filesWithFingerprints /
-                                (fingerprintStatus.filesWithFingerprints + fingerprintStatus.filesWithoutFingerprints)) *
-                                100
-                            )
-                          : 0}%
-                      </span>
-                      <span className="stat-label">Coverage</span>
-                    </div>
-                  </div>
-
-                  {fingerprintStatus.filesWithoutFingerprints > 0 && (
-                    <div className="fingerprint-actions">
-                      <button
-                        className="generate-btn"
-                        onClick={handleStartFingerprintGeneration}
-                        disabled={fingerprintGenerating}
-                      >
-                        {fingerprintGenerating ? 'Generating...' : 'Generate Missing Fingerprints'}
-                      </button>
-                      <button className="refresh-btn" onClick={refreshFingerprintStatus} disabled={fingerprintGenerating}>
-                        Refresh Status
-                      </button>
-                    </div>
-                  )}
-
-                  {fingerprintProgress && (
-                    <div className="fingerprint-progress">
-                      <div className={`progress-bar ${fingerprintProgress.status === 'error' ? 'error' : ''}`}>
-                        <div
-                          className="progress-fill"
-                          style={{
-                            width: `${fingerprintProgress.total > 0 ? (fingerprintProgress.completed / fingerprintProgress.total) * 100 : 0}%`,
-                          }}
-                        />
-                      </div>
-                      <div className="progress-text">
-                        {fingerprintProgress.completed.toLocaleString()} / {fingerprintProgress.total.toLocaleString()} files
-                        {fingerprintProgress.status === 'completed' && ' — Complete!'}
-                        {fingerprintProgress.status === 'error' && ' — Error'}
-                      </div>
-                      {fingerprintProgress.status === 'error' && fingerprintProgress.error && (
-                        <div className="progress-error">
-                          {fingerprintProgress.error}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="config-section">
-                  <h4 className="section-title">Similarity Threshold</h4>
-                  <p className="section-description">
-                    Two audio files are considered duplicates if their fingerprint similarity exceeds this threshold.
-                    Higher values are stricter (fewer false positives), lower values catch more duplicates but may include false positives.
-                  </p>
-                  <div className="config-field">
-                    <label>Fingerprint Similarity Threshold</label>
-                    <div className="slider-group">
-                      <input
-                        type="range"
-                        min="50"
-                        max="100"
-                        value={fingerprintThreshold}
-                        onChange={(e) => setFingerprintThreshold(Number(e.target.value))}
-                      />
-                      <span className="slider-value">{fingerprintThreshold}%</span>
-                    </div>
-                    <div className="threshold-hints">
-                      <span className="hint-item">70% = Lenient</span>
-                      <span className="hint-item">85% = Recommended</span>
-                      <span className="hint-item">95% = Strict</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="config-section">
-                  <h4 className="section-title">How It Works</h4>
-                  <div className="info-box">
-                    <ol className="info-list">
-                      <li>Chromaprint analyzes the first 30 seconds of each audio file</li>
-                      <li>It generates a unique acoustic "fingerprint" based on the audio content</li>
-                      <li>Fingerprints are compared using bit-level similarity analysis</li>
-                      <li>Files with similarity above the threshold are grouped as duplicates</li>
-                    </ol>
-                    <p className="info-note">
-                      Unlike metadata matching, fingerprinting correctly identifies the same song even when
-                      titles, artists, or albums are labeled differently.
-                    </p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -3726,3 +3726,32 @@ body::before {
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* Section Divider for Combined Panels */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-subtle) 20%,
+    var(--border-subtle) 80%,
+    transparent
+  );
+  margin: var(--space-xl) 0;
+}
+
+/* Matching Panel (combined Fingerprints + Fuzzy) */
+.matching-panel .panel-header {
+  margin-bottom: var(--space-lg);
+}
+
+.matching-panel .panel-header:not(:first-child) {
+  margin-top: var(--space-md);
+}
+
+.matching-panel .panel-description {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-top: var(--space-sm);
+}
