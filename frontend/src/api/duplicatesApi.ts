@@ -2,11 +2,23 @@ import type { DuplicateGroup, DuplicateScanStatus, CompareResult, MusicFile } fr
 
 const API_BASE = '/api/v1/duplicates';
 
+export interface DuplicateGroupsResponse {
+  groups: DuplicateGroup[];
+  page: number;
+  size: number;
+  totalGroups: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
 /**
- * Fetches all duplicate groups.
+ * Fetches duplicate groups with pagination.
  */
-export async function fetchDuplicateGroups(): Promise<DuplicateGroup[]> {
-  const response = await fetch(API_BASE);
+export async function fetchDuplicateGroups(
+  page: number = 0,
+  size: number = 25
+): Promise<DuplicateGroupsResponse> {
+  const response = await fetch(`${API_BASE}?page=${page}&size=${size}`);
   if (!response.ok) throw new Error('Failed to fetch duplicate groups');
   return response.json();
 }
