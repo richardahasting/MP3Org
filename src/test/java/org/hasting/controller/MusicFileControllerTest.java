@@ -1,5 +1,6 @@
 package org.hasting.controller;
 
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.dto.PageResponse;
@@ -10,21 +11,18 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;  // CHANGED
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -46,7 +44,7 @@ class MusicFileControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private MusicFileService musicFileService;
 
     private MusicFileDTO sampleMusicFile;
@@ -185,7 +183,8 @@ class MusicFileControllerTest {
         @DisplayName("Should update music file and return updated data")
         void updateMusicFile_ValidRequest_ReturnsUpdatedFile() throws Exception {
             MusicFileDTO updatedFile = createSampleMusicFile(1L, "Updated Title", "Updated Artist", "Updated Album");
-            when(musicFileService.updateMusicFile(eq(1L), any(MusicFileDTO.class)))
+            when(musicFileService.updateMusicFile(eq(1L), any()))
+
                     .thenReturn(Optional.of(updatedFile));
 
             mockMvc.perform(put("/api/v1/music/1")
@@ -196,13 +195,13 @@ class MusicFileControllerTest {
                     .andExpect(jsonPath("$.artist", is("Updated Artist")))
                     .andExpect(jsonPath("$.album", is("Updated Album")));
 
-            verify(musicFileService).updateMusicFile(eq(1L), any(MusicFileDTO.class));
+            verify(musicFileService).updateMusicFile(eq(1L), any());
         }
 
         @Test
         @DisplayName("Should return 404 when updating non-existent file")
         void updateMusicFile_NotFound_Returns404() throws Exception {
-            when(musicFileService.updateMusicFile(eq(999L), any(MusicFileDTO.class)))
+            when(musicFileService.updateMusicFile(eq(999L), any()))
                     .thenReturn(Optional.empty());
 
             mockMvc.perform(put("/api/v1/music/999")
@@ -210,7 +209,7 @@ class MusicFileControllerTest {
                             .content(objectMapper.writeValueAsString(sampleMusicFile)))
                     .andExpect(status().isNotFound());
 
-            verify(musicFileService).updateMusicFile(eq(999L), any(MusicFileDTO.class));
+            verify(musicFileService).updateMusicFile(eq(999L), any());
         }
 
         @Test
@@ -221,7 +220,8 @@ class MusicFileControllerTest {
                     null, null, null, null, null, null, null, null, null
             );
             MusicFileDTO result = createSampleMusicFile(1L, "New Title", "Test Artist", "Test Album");
-            when(musicFileService.updateMusicFile(eq(1L), any(MusicFileDTO.class)))
+            when(musicFileService.updateMusicFile(eq(1L), any()))
+
                     .thenReturn(Optional.of(result));
 
             mockMvc.perform(put("/api/v1/music/1")
@@ -484,6 +484,205 @@ class MusicFileControllerTest {
                             .content(requestBody))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.updated", is(0)));
+        }
+    }
+    // ========================================
+    // GET /api/v1/music/{id}/stream - Stream Audio
+    // ========================================
+    @Nested
+    @DisplayName("GET /api/v1/music/{id}/stream - Stream Audio File")
+    class StreamAudioFileTests {
+
+        @Test
+        @DisplayName("Should stream MP3 file with correct content type")
+        void streamAudioFile_Mp3File_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.mp3");
+            when(mockFile.length()).thenReturn(5000000L);
+            when(mockFile.exists()).thenReturn(true);
+            when(mockFile.canRead()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/mpeg"))  // FIXED
+                    .andExpect(header().string("Accept-Ranges", "bytes"))      // FIXED
+                    .andExpect(header().exists("Content-Length"));              // FIXED
+
+            verify(musicFileService).getAudioFile(1L);
+        }
+
+        @Test
+        @DisplayName("Should stream FLAC file with correct content type")
+        void streamAudioFile_FlacFile_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.flac");
+            when(mockFile.length()).thenReturn(30000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/flac"));  // FIXED
+
+            verify(musicFileService).getAudioFile(1L);
+        }
+
+        @Test
+        @DisplayName("Should stream WAV file with correct content type")
+        void streamAudioFile_WavFile_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.wav");
+            when(mockFile.length()).thenReturn(40000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/wav"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should stream M4A file with correct content type")
+        void streamAudioFile_M4aFile_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.m4a");
+            when(mockFile.length()).thenReturn(6000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/mp4"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should stream AAC file with correct content type")
+        void streamAudioFile_AacFile_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.aac");
+            when(mockFile.length()).thenReturn(4000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/mp4"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should stream OGG file with correct content type")
+        void streamAudioFile_OggFile_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.ogg");
+            when(mockFile.length()).thenReturn(4500000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/ogg"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should stream WMA file with correct content type")
+        void streamAudioFile_WmaFile_ReturnsCorrectContentType() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.wma");
+            when(mockFile.length()).thenReturn(3500000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/x-ms-wma"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should use octet-stream for unknown file types")
+        void streamAudioFile_UnknownType_ReturnsOctetStream() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.xyz");
+            when(mockFile.length()).thenReturn(1000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "application/octet-stream"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should handle case-insensitive file extensions")
+        void streamAudioFile_MixedCase_HandlesCorrectly() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("Song.MP3");
+            when(mockFile.length()).thenReturn(5000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Type", "audio/mpeg"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should return 404 when audio file not found")
+        void streamAudioFile_FileNotFound_Returns404() throws Exception {
+            when(musicFileService.getAudioFile(999L)).thenReturn(Optional.empty());
+
+            mockMvc.perform(get("/api/v1/music/999/stream"))
+                    .andExpect(status().isNotFound());
+
+            verify(musicFileService).getAudioFile(999L);
+        }
+
+        @Test
+        @DisplayName("Should return 404 when music file ID does not exist")
+        void streamAudioFile_InvalidId_Returns404() throws Exception {
+            when(musicFileService.getAudioFile(123L)).thenReturn(Optional.empty());
+
+            mockMvc.perform(get("/api/v1/music/123/stream"))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Should include Content-Length header")
+        void streamAudioFile_IncludesContentLength() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.mp3");
+            when(mockFile.length()).thenReturn(12345678L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Content-Length", "12345678"));  // FIXED
+        }
+
+        @Test
+        @DisplayName("Should include Accept-Ranges header for seeking support")
+        void streamAudioFile_IncludesAcceptRanges() throws Exception {
+            File mockFile = mock(File.class);
+            when(mockFile.getName()).thenReturn("song.mp3");
+            when(mockFile.length()).thenReturn(5000000L);
+            when(mockFile.exists()).thenReturn(true);
+            
+            when(musicFileService.getAudioFile(1L)).thenReturn(Optional.of(mockFile));
+
+            mockMvc.perform(get("/api/v1/music/1/stream"))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Accept-Ranges", "bytes"));  // FIXED
         }
     }
 }
