@@ -4,6 +4,7 @@ import org.hasting.dto.DuplicateGroupDTO;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
+import org.hasting.util.FingerprintMatcher;
 import org.hasting.util.FuzzyMatcher;
 import org.hasting.util.FuzzySearchConfig;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -44,7 +45,8 @@ public class DuplicateService {
 
     /**
      * Gets all duplicate groups from the database.
-     * Uses caching to avoid repeated expensive computations.
+     * Uses fingerprint-based matching for accurate duplicate detection.
+     * Falls back to metadata matching if fingerprints are not available.
      */
     public List<DuplicateGroupDTO> getDuplicateGroups() {
         // Check cache validity
@@ -57,9 +59,23 @@ public class DuplicateService {
         logger.info("Computing duplicate groups...");
 
         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-        FuzzySearchConfig config = new FuzzySearchConfig();
 
-        List<List<MusicFile>> groups = FuzzyMatcher.groupDuplicates(allFiles, config);
+        // Count files with fingerprints
+        long filesWithFingerprints = allFiles.stream().filter(MusicFile::hasFingerprint).count();
+        logger.info("Files with fingerprints: {}/{}", filesWithFingerprints, allFiles.size());
+
+        List<List<MusicFile>> groups;
+
+        if (filesWithFingerprints > allFiles.size() / 2) {
+            // Use fingerprint matching if majority of files have fingerprints
+            logger.info("Using fingerprint-based duplicate detection");
+            groups = FingerprintMatcher.groupDuplicates(allFiles);
+        } else {
+            // Fall back to metadata matching
+            logger.info("Using metadata-based duplicate detection (fingerprints not available for most files)");
+            FuzzySearchConfig config = new FuzzySearchConfig();
+            groups = FuzzyMatcher.groupDuplicates(allFiles, config);
+        }
 
         AtomicInteger groupId = new AtomicInteger(1);
         cachedDuplicateGroups = groups.stream()
@@ -93,6 +109,7 @@ public class DuplicateService {
 
     /**
      * Finds files similar to a specific file.
+     * Uses fingerprint matching when available, falls back to metadata matching.
      */
     public List<MusicFileDTO> findSimilarFiles(long fileId) {
         MusicFile target = DatabaseManager.getMusicFileById(fileId);
@@ -101,8 +118,17 @@ public class DuplicateService {
         }
 
         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-        FuzzySearchConfig config = new FuzzySearchConfig();
 
+        // Use fingerprint matching if target has fingerprint
+        if (target.hasFingerprint()) {
+            return FingerprintMatcher.findSimilarFiles(target, allFiles, FingerprintMatcher.DEFAULT_SIMILARITY_THRESHOLD)
+                .stream()
+                .map(sf -> MusicFileDTO.fromEntity(sf.file()))
+                .collect(Collectors.toList());
+        }
+
+        // Fall back to metadata matching
+        FuzzySearchConfig config = new FuzzySearchConfig();
         return allFiles.stream()
             .filter(f -> f.getId() != fileId)
             .filter(f -> FuzzyMatcher.areDuplicates(target, f, config))

@@ -13,7 +13,9 @@ CREATE TABLE IF NOT EXISTS music_files (
     sample_rate INT,
     file_type VARCHAR(10),
     last_modified TIMESTAMP,
-    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fingerprint CLOB,
+    fingerprint_duration INT
 );
 
 -- Create indexes for common search operations
