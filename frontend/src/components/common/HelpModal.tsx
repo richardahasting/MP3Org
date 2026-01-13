@@ -68,7 +68,7 @@ interface HelpButtonProps {
 
 export function HelpButton({ onClick }: HelpButtonProps) {
   return (
-    <button className="help-button" onClick={onClick} title="Help &amp; Information">
+    <button type="button" className="help-button" onClick={onClick} title="Help & Information">
       ?
     </button>
   );
