@@ -50,6 +50,7 @@ export default function ConfigurationView() {
     completed: number;
     total: number;
     status: string;
+    error?: string;
   } | null>(null);
   const [fingerprintThreshold, setFingerprintThreshold] = useState(85);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -221,6 +222,7 @@ export default function ConfigurationView() {
               completed: status.completed,
               total: status.totalFiles,
               status: status.status,
+              error: status.error || undefined,
             });
 
             if (status.status === 'completed' || status.status === 'error') {
@@ -229,6 +231,11 @@ export default function ConfigurationView() {
                 pollIntervalRef.current = null;
               }
               setFingerprintGenerating(false);
+
+              // Show error if there was one
+              if (status.status === 'error' && status.error) {
+                setError(`Fingerprint generation failed: ${status.error}`);
+              }
 
               // Refresh fingerprint status
               const fpStatus = await getFingerprintStatus();
@@ -735,7 +742,7 @@ export default function ConfigurationView() {
 
                   {fingerprintProgress && (
                     <div className="fingerprint-progress">
-                      <div className="progress-bar">
+                      <div className={`progress-bar ${fingerprintProgress.status === 'error' ? 'error' : ''}`}>
                         <div
                           className="progress-fill"
                           style={{
@@ -746,8 +753,13 @@ export default function ConfigurationView() {
                       <div className="progress-text">
                         {fingerprintProgress.completed.toLocaleString()} / {fingerprintProgress.total.toLocaleString()} files
                         {fingerprintProgress.status === 'completed' && ' — Complete!'}
-                        {fingerprintProgress.status === 'error' && ' — Error occurred'}
+                        {fingerprintProgress.status === 'error' && ' — Error'}
                       </div>
+                      {fingerprintProgress.status === 'error' && fingerprintProgress.error && (
+                        <div className="progress-error">
+                          {fingerprintProgress.error}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
