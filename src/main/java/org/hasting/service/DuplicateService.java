@@ -262,76 +262,106 @@ public class DuplicateService {
             List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
             FuzzySearchConfig config = new FuzzySearchConfig();
 
+            // Determine if we should use fingerprint matching
+            long filesWithFingerprints = allFiles.stream().filter(MusicFile::hasFingerprint).count();
+            boolean useFingerprints = filesWithFingerprints > allFiles.size() / 2;
+
+            logger.info("Duplicate scan: {} files, {} with fingerprints, using {} matching",
+                allFiles.size(), filesWithFingerprints, useFingerprints ? "fingerprint" : "metadata");
+
             session.setTotalFiles(allFiles.size());
-            session.setTotalComparisons((allFiles.size() * (allFiles.size() - 1)) / 2);
             session.setStage("scanning");
             broadcastProgress(session);
 
-            List<List<MusicFile>> duplicateGroups = new ArrayList<>();
-            Set<MusicFile> processed = new HashSet<>();
-            AtomicInteger groupIdCounter = new AtomicInteger(1);
-            int lastBroadcastedGroupCount = 0;
+            List<List<MusicFile>> duplicateGroups;
 
-            for (int i = 0; i < allFiles.size() && !session.isCancelled(); i++) {
-                MusicFile file1 = allFiles.get(i);
-                if (processed.contains(file1)) continue;
+            if (useFingerprints) {
+                // Use fingerprint-based matching (parallel, efficient)
+                duplicateGroups = FingerprintMatcher.groupDuplicates(allFiles);
+                session.setGroupsFound(duplicateGroups.size());
 
-                List<MusicFile> group = new ArrayList<>();
-                group.add(file1);
-                processed.add(file1);
-
-                for (int j = i + 1; j < allFiles.size() && !session.isCancelled(); j++) {
-                    MusicFile file2 = allFiles.get(j);
-                    if (processed.contains(file2)) continue;
-
-                    if (FuzzyMatcher.areDuplicates(file1, file2, config)) {
-                        group.add(file2);
-                        processed.add(file2);
-                    }
-
-                    session.incrementComparisons();
-                }
-
-                if (group.size() > 1) {
-                    duplicateGroups.add(group);
-                    session.setGroupsFound(duplicateGroups.size());
-
-                    // Broadcast new groups in batches of GROUP_BATCH_SIZE
-                    if (duplicateGroups.size() - lastBroadcastedGroupCount >= GROUP_BATCH_SIZE) {
-                        List<DuplicateGroupDTO> newGroups = duplicateGroups
-                            .subList(lastBroadcastedGroupCount, duplicateGroups.size())
-                            .stream()
-                            .map(g -> DuplicateGroupDTO.fromFiles(
-                                groupIdCounter.getAndIncrement(),
-                                g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
-                            ))
-                            .collect(Collectors.toList());
-
-                        broadcastGroups(session, newGroups);
-                        lastBroadcastedGroupCount = duplicateGroups.size();
-                    }
-                }
-
-                session.setFilesProcessed(i + 1);
-
-                // Broadcast progress every 100 files
-                if (i % 100 == 0) {
-                    broadcastProgress(session);
-                }
-            }
-
-            // Broadcast any remaining groups that weren't in a full batch
-            if (duplicateGroups.size() > lastBroadcastedGroupCount) {
-                List<DuplicateGroupDTO> remainingGroups = duplicateGroups
-                    .subList(lastBroadcastedGroupCount, duplicateGroups.size())
-                    .stream()
+                // Broadcast all groups at once for fingerprint matching
+                AtomicInteger groupIdCounter = new AtomicInteger(1);
+                List<DuplicateGroupDTO> allGroupDTOs = duplicateGroups.stream()
                     .map(g -> DuplicateGroupDTO.fromFiles(
                         groupIdCounter.getAndIncrement(),
                         g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
                     ))
                     .collect(Collectors.toList());
 
-                broadcastGroups(session, remainingGroups);
+                if (!allGroupDTOs.isEmpty()) {
+                    broadcastGroups(session, allGroupDTOs);
+                }
+            } else {
+                // Fall back to metadata-based fuzzy matching
+                duplicateGroups = new ArrayList<>();
+                Set<MusicFile> processed = new HashSet<>();
+                AtomicInteger groupIdCounter = new AtomicInteger(1);
+                int lastBroadcastedGroupCount = 0;
+
+                session.setTotalComparisons((allFiles.size() * (allFiles.size() - 1)) / 2);
+
+                for (int i = 0; i < allFiles.size() && !session.isCancelled(); i++) {
+                    MusicFile file1 = allFiles.get(i);
+                    if (processed.contains(file1)) continue;
+
+                    List<MusicFile> group = new ArrayList<>();
+                    group.add(file1);
+                    processed.add(file1);
+
+                    for (int j = i + 1; j < allFiles.size() && !session.isCancelled(); j++) {
+                        MusicFile file2 = allFiles.get(j);
+                        if (processed.contains(file2)) continue;
+
+                        if (FuzzyMatcher.areDuplicates(file1, file2, config)) {
+                            group.add(file2);
+                            processed.add(file2);
+                        }
+
+                        session.incrementComparisons();
+                    }
+
+                    if (group.size() > 1) {
+                        duplicateGroups.add(group);
+                        session.setGroupsFound(duplicateGroups.size());
+
+                        // Broadcast new groups in batches of GROUP_BATCH_SIZE
+                        if (duplicateGroups.size() - lastBroadcastedGroupCount >= GROUP_BATCH_SIZE) {
+                            List<DuplicateGroupDTO> newGroups = duplicateGroups
+                                .subList(lastBroadcastedGroupCount, duplicateGroups.size())
+                                .stream()
+                                .map(g -> DuplicateGroupDTO.fromFiles(
+                                    groupIdCounter.getAndIncrement(),
+                                    g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
+                                ))
+                                .collect(Collectors.toList());
+
+                            broadcastGroups(session, newGroups);
+                            lastBroadcastedGroupCount = duplicateGroups.size();
+                        }
+                    }
+
+                    session.setFilesProcessed(i + 1);
+
+                    // Broadcast progress every 100 files
+                    if (i % 100 == 0) {
+                        broadcastProgress(session);
+                    }
+                }
+
+                // Broadcast any remaining groups that weren't in a full batch
+                if (duplicateGroups.size() > lastBroadcastedGroupCount) {
+                    List<DuplicateGroupDTO> remainingGroups = duplicateGroups
+                        .subList(lastBroadcastedGroupCount, duplicateGroups.size())
+                        .stream()
+                        .map(g -> DuplicateGroupDTO.fromFiles(
+                            groupIdCounter.getAndIncrement(),
+                            g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
+                        ))
+                        .collect(Collectors.toList());
+
+                    broadcastGroups(session, remainingGroups);
+                }
             }
 
             if (session.isCancelled()) {
