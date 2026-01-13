@@ -1,262 +1,371 @@
 # MP3Org Installation Guide
 
-## Quick Installation
-
-### Option 1: Download Pre-built JAR (Recommended)
-
-1. **Download the latest release** from [GitHub Releases](https://github.com/richardahasting/MP3Org/releases)
-2. **Download `mp3org-1.0.0.zip`** (contains JAR + documentation + run scripts)
-3. **Extract the ZIP** to your desired location
-4. **Run the application**:
-   - **Windows**: Double-click `scripts/run-mp3org.bat`
-   - **macOS/Linux**: Run `scripts/run-mp3org.sh` from terminal
-   - **Any OS**: `java -jar mp3org-1.0.0.jar`
-
-### Option 2: Direct JAR Download
-
-1. **Download `mp3org-1.0.0.jar`** from the releases page
-2. **Run with Java**:
-   ```bash
-   java --enable-native-access=ALL-UNNAMED \
-        --add-opens javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \
-        -jar mp3org-1.0.0.jar
-   ```
-
-## Requirements
-
-### System Requirements
-- **Operating System**: Windows 10+, macOS 10.14+, or Linux with X11/Wayland
-- **Memory**: 2GB RAM minimum, 4GB recommended for large collections
-- **Storage**: 50MB for application + space for your music collection
-- **Java**: Version 11 or higher (see below)
-
-### Java Installation
-
-MP3Org requires Java 11 or higher with JavaFX support.
-
-#### Install Java (Choose One):
-
-**Option A: OpenJDK (Recommended)**
-- Download from [OpenJDK.org](https://openjdk.org/)
-- Most recent versions include JavaFX
-
-**Option B: Oracle JDK**
-- Download from [Oracle.com](https://www.oracle.com/java/)
-- Includes JavaFX support
-
-**Option C: Package Managers**
-```bash
-# macOS with Homebrew
-brew install openjdk
-
-# Ubuntu/Debian
-sudo apt install openjdk-17-jdk openjfx
-
-# Fedora/RHEL
-sudo dnf install java-17-openjdk javafx-runtime
-
-# Windows with Chocolatey
-choco install openjdk
-```
-
-#### Verify Java Installation:
-```bash
-java --version
-# Should show version 11 or higher
-```
-
-## Detailed Installation Steps
-
-### Windows Installation
-
-1. **Install Java**:
-   - Download OpenJDK from [OpenJDK.org](https://openjdk.org/)
-   - Run the installer
-   - Verify: Open Command Prompt and run `java --version`
-
-2. **Download MP3Org**:
-   - Download `mp3org-1.0.0.zip` from [Releases](https://github.com/richardahasting/MP3Org/releases)
-   - Extract to `C:\Program Files\MP3Org\` (or your preferred location)
-
-3. **Run MP3Org**:
-   - Double-click `scripts\run-mp3org.bat`
-   - Or create a desktop shortcut to the batch file
-
-4. **Optional: Add to Start Menu**:
-   - Create a shortcut to `run-mp3org.bat`
-   - Move to `C:\Users\[username]\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\`
-
-### macOS Installation
-
-1. **Install Java**:
-   ```bash
-   # Using Homebrew (recommended)
-   brew install openjdk
-   
-   # Or download from OpenJDK.org
-   ```
-
-2. **Download MP3Org**:
-   ```bash
-   # Download and extract
-   cd ~/Downloads
-   curl -L -O https://github.com/richardahasting/MP3Org/releases/download/v1.0.0/mp3org-1.0.0.zip
-   unzip mp3org-1.0.0.zip
-   mv mp3org-1.0.0 /Applications/MP3Org
-   ```
-
-3. **Run MP3Org**:
-   ```bash
-   cd /Applications/MP3Org
-   ./scripts/run-mp3org.sh
-   ```
-
-4. **Optional: Create Application Bundle**:
-   - Use Automator to create a `.app` bundle that runs the shell script
-
-### Linux Installation
-
-1. **Install Java**:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt update
-   sudo apt install openjdk-17-jdk openjfx
-   
-   # Fedora/RHEL
-   sudo dnf install java-17-openjdk javafx-runtime
-   
-   # Arch Linux
-   sudo pacman -S jdk-openjdk java-openjfx
-   ```
-
-2. **Download MP3Org**:
-   ```bash
-   cd ~/Downloads
-   wget https://github.com/richardahasting/MP3Org/releases/download/v1.0.0/mp3org-1.0.0.zip
-   unzip mp3org-1.0.0.zip
-   sudo mv mp3org-1.0.0 /opt/mp3org
-   ```
-
-3. **Run MP3Org**:
-   ```bash
-   cd /opt/mp3org
-   ./scripts/run-mp3org.sh
-   ```
-
-4. **Optional: Create Desktop Entry**:
-   ```bash
-   # Create desktop entry
-   cat > ~/.local/share/applications/mp3org.desktop << EOF
-   [Desktop Entry]
-   Name=MP3Org
-   Comment=Music Collection Manager
-   Exec=/opt/mp3org/scripts/run-mp3org.sh
-   Icon=/opt/mp3org/icon.png
-   Terminal=false
-   Type=Application
-   Categories=AudioVideo;Music;
-   EOF
-   ```
-
-## Building from Source
-
-If you prefer to build MP3Org yourself:
+## Quick Start
 
 ### Prerequisites
-- **Git**: For cloning the repository
-- **Java 11+**: For building and running
-- **Gradle**: Included with the project (gradlew)
+- **Java 21** (LTS) - Required
+- **Node.js 18+** - Required for frontend
+- **Chromaprint** - Optional, for audio fingerprinting
 
-### Build Steps
+### Clone and Run
+
 ```bash
 # Clone the repository
 git clone https://github.com/richardahasting/MP3Org.git
 cd MP3Org
 
-# Build the application
-./gradlew build
+# Start backend (Terminal 1)
+./gradle21 bootRun              # macOS/Linux
+gradle21.cmd bootRun            # Windows
 
-# Run directly
-./gradlew run
-
-# Or build the distribution JAR
-./gradlew shadowJar
-java -jar build/distributions/mp3org-1.0.0.jar
+# Start frontend (Terminal 2)
+cd frontend
+npm install
+npm run dev
 ```
 
-### Build Commands
-```bash
-# Clean build
-./gradlew clean build
-
-# Create fat JAR
-./gradlew shadowJar
-
-# Create distribution ZIP
-./gradlew distributionZip
-
-# Run tests
-./gradlew test
-
-# Run from JAR
-./gradlew runShadowJar
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**"Java not found" Error**:
-- Install Java 11 or higher
-- Ensure Java is in your system PATH
-- Try running: `java --version`
-
-**"JavaFX not found" Error**:
-- Install OpenJDK with JavaFX support
-- Or add JavaFX manually: `--module-path /path/to/javafx/lib --add-modules javafx.controls,javafx.fxml`
-
-**Application won't start**:
-- Check Java version: `java --version`
-- Try running with: `java --enable-native-access=ALL-UNNAMED -jar mp3org-1.0.0.jar`
-- Check console output for specific error messages
-
-**Performance Issues**:
-- Increase memory: `-Xmx4g` (for 4GB)
-- Close other applications
-- Use SSD storage for better performance
-
-**File Permission Issues (Linux/macOS)**:
-```bash
-# Make run script executable
-chmod +x scripts/run-mp3org.sh
-
-# Fix JAR permissions
-chmod 644 mp3org-1.0.0.jar
-```
-
-### Getting Help
-
-- **Built-in Help**: Press F1 in the application
-- **User Guide**: See `MP3Org_User_Guide.md`
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/richardahasting/MP3Org/issues)
-- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/richardahasting/MP3Org/discussions)
-
-## File Locations
-
-### Default Database Location
-- **Windows**: `%USERPROFILE%\mp3org\`
-- **macOS**: `~/mp3org/`
-- **Linux**: `~/mp3org/`
-
-### Configuration Files
-- **Database**: `mp3org/` directory
-- **Profiles**: `mp3org-profiles.properties`
-- **Settings**: `mp3org.properties`
-
-### Log Files
-- **Application logs**: Console output
-- **Database logs**: `derby.log`
+Open http://localhost:5173 in your browser.
 
 ---
 
-**Need help?** Check the [User Guide](MP3Org_User_Guide.md) or open an issue on GitHub!
+## Java 21 Installation
+
+MP3Org requires Java 21 LTS. The `gradle21` scripts automatically locate Java 21 on your system.
+
+### macOS
+
+**Option A: Homebrew (Recommended)**
+```bash
+brew install openjdk@21
+```
+
+**Option B: SDKMAN**
+```bash
+curl -s "https://get.sdkman.io" | bash
+sdk install java 21-tem
+```
+
+**Option C: Direct Download**
+- [Adoptium Temurin](https://adoptium.net/)
+- [Oracle JDK](https://www.oracle.com/java/technologies/downloads/)
+
+### Linux
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install openjdk-21-jdk
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install java-21-openjdk-devel
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S jdk21-openjdk
+```
+
+**SDKMAN (Any distro):**
+```bash
+curl -s "https://get.sdkman.io" | bash
+sdk install java 21-tem
+```
+
+### Windows
+
+**Option A: winget (Recommended)**
+```cmd
+winget install EclipseAdoptium.Temurin.21.JDK
+```
+
+**Option B: Chocolatey**
+```cmd
+choco install temurin21
+```
+
+**Option C: Direct Download**
+- [Adoptium Temurin](https://adoptium.net/)
+- [Microsoft OpenJDK](https://docs.microsoft.com/en-us/java/openjdk/download)
+- [Amazon Corretto](https://aws.amazon.com/corretto/)
+
+### Verify Installation
+
+```bash
+java --version
+# Should show: openjdk 21.x.x or similar
+```
+
+---
+
+## Node.js Installation
+
+The React frontend requires Node.js 18 or higher.
+
+### macOS
+
+```bash
+# Homebrew
+brew install node
+
+# Or use nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+```
+
+### Linux
+
+```bash
+# Ubuntu/Debian (using NodeSource)
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Or use nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+```
+
+### Windows
+
+```cmd
+# winget
+winget install OpenJS.NodeJS.LTS
+
+# Or download from https://nodejs.org/
+```
+
+### Verify Installation
+
+```bash
+node --version    # Should show v18.x.x or higher
+npm --version     # Should show 9.x.x or higher
+```
+
+---
+
+## Chromaprint Installation (Optional)
+
+Audio fingerprinting requires Chromaprint for acoustic duplicate detection.
+
+### macOS
+
+```bash
+brew install chromaprint
+```
+
+### Linux
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install libchromaprint-tools
+```
+
+**Fedora/RHEL:**
+```bash
+sudo dnf install chromaprint-tools
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S chromaprint
+```
+
+### Windows
+
+1. Download from https://acoustid.org/chromaprint
+2. Extract the ZIP file
+3. Add the folder containing `fpcalc.exe` to your PATH
+
+### Verify Installation
+
+```bash
+fpcalc -version
+# Should show: fpcalc version 1.x.x
+```
+
+---
+
+## How gradle21 Works
+
+The `gradle21` scripts automatically find Java 21 on your system:
+
+| Platform | Locations Checked |
+|----------|-------------------|
+| **macOS** | `/usr/libexec/java_home -v 21` |
+| **Linux** | SDKMAN, `/usr/lib/jvm/java-21-*`, `/opt/`, Homebrew |
+| **Windows** | Program Files (Adoptium, Oracle, Microsoft, Amazon, Zulu, BellSoft) |
+
+If Java 21 is already your default, you can use `./gradlew` directly.
+
+---
+
+## Building from Source
+
+### Development Mode
+
+```bash
+# Backend with hot reload
+./gradle21 bootRun
+
+# Frontend with hot reload
+cd frontend
+npm run dev
+```
+
+### Production Build
+
+```bash
+# Build backend JAR
+./gradle21 build
+
+# Build frontend
+cd frontend
+npm run build
+```
+
+The backend JAR is created at `build/libs/MP3Org-2.0.0-SNAPSHOT.jar`.
+
+### Running the Production Build
+
+```bash
+# Start backend
+java -jar build/libs/MP3Org-2.0.0-SNAPSHOT.jar
+
+# Serve frontend (use any static server)
+cd frontend
+npm run preview
+```
+
+---
+
+## Directory Structure
+
+After installation, MP3Org creates:
+
+```
+~/.mp3org/                  # Application data (Linux/macOS)
+%USERPROFILE%\.mp3org\      # Application data (Windows)
+├── mp3org.db               # SQLite database
+└── config.properties       # Settings (if customized)
+```
+
+---
+
+## Troubleshooting
+
+### "Java 21 not found"
+
+The `gradle21` script shows installation instructions if Java 21 isn't found:
+
+```
+ERROR: Java 21 not found on this system.
+Please install Java 21 (LTS) from one of these sources:
+  - Adoptium Temurin: https://adoptium.net/
+  ...
+```
+
+Follow the provided instructions for your platform.
+
+### "JAVA_HOME points to wrong version"
+
+The `gradle21` scripts override JAVA_HOME, so this shouldn't be an issue. If using `./gradlew` directly, ensure JAVA_HOME points to Java 21:
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)  # macOS
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk     # Linux
+```
+
+### "Port already in use"
+
+**Backend (9090):**
+```bash
+# Find and kill process on port 9090
+lsof -i :9090           # macOS/Linux
+netstat -ano | findstr :9090  # Windows
+```
+
+**Frontend (5173):**
+```bash
+# Kill process or use different port
+npm run dev -- --port 3000
+```
+
+### "npm install fails"
+
+```bash
+# Clear npm cache and retry
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### "WebSocket connection failed"
+
+- Ensure backend is running on port 9090
+- Check browser console for CORS errors
+- Try refreshing the page
+
+---
+
+## Version Managers
+
+### SDKMAN (Java)
+
+```bash
+# Install SDKMAN
+curl -s "https://get.sdkman.io" | bash
+
+# Install and use Java 21
+sdk install java 21-tem
+sdk use java 21-tem
+
+# Auto-switch when entering project
+sdk env
+```
+
+The project includes `.sdkmanrc` for automatic version switching.
+
+### nvm (Node.js)
+
+```bash
+# Install nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# Install and use Node 18
+nvm install 18
+nvm use 18
+```
+
+---
+
+## Platform-Specific Notes
+
+### macOS
+
+- Gatekeeper may block unsigned JARs - right-click and select "Open"
+- Use Homebrew for easiest installation of all dependencies
+
+### Linux
+
+- Some distros require manual PATH configuration for Java
+- Wayland users may need XWayland for some Java features
+
+### Windows
+
+- Run Command Prompt or PowerShell as Administrator if needed
+- Use `gradle21.cmd` (not `./gradle21`)
+- Path separators use backslash (`\`)
+
+---
+
+## Getting Help
+
+- **User Guide**: See [MP3Org_User_Guide.md](MP3Org_User_Guide.md)
+- **README**: See [README.md](README.md) for technical details
+- **Issues**: [GitHub Issues](https://github.com/richardahasting/MP3Org/issues)
+
+---
+
+*Last updated: January 2026*
+*Version: MP3Org 2.0*

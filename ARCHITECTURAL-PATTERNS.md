@@ -2,364 +2,388 @@
 
 ## Overview
 
-This document captures the architectural patterns, design principles, and decision rationale established during the major refactoring work. These patterns serve as guidelines for future development and maintain consistency across the MP3Org codebase.
+This document captures the architectural patterns, design principles, and decision rationale for the MP3Org application. The project uses a modern full-stack architecture with Spring Boot backend and React frontend.
 
-## Design Principles Applied
+## Current Architecture (v2.0)
+
+### Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | React 18, TypeScript, Vite | Modern web UI |
+| **Backend** | Spring Boot 3.4, Java 21 | REST API & business logic |
+| **Database** | SQLite | Embedded database |
+| **Real-time** | WebSocket (STOMP) | Scan progress updates |
+| **Audio** | JAudioTagger, Chromaprint | Metadata & fingerprinting |
+
+### High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     React Frontend                          │
+│  ┌─────────┐ ┌──────────┐ ┌────────┐ ┌──────────┐ ┌───────┐│
+│  │Duplicate│ │ Metadata │ │ Import │ │ Organize │ │Config ││
+│  │ Manager │ │  Editor  │ │  View  │ │   View   │ │ View  ││
+│  └────┬────┘ └────┬─────┘ └───┬────┘ └────┬─────┘ └───┬───┘│
+└───────┼──────────┼─────────────┼───────────┼──────────┼─────┘
+        │          │             │           │          │
+        └──────────┴─────────────┴───────────┴──────────┘
+                              │ HTTP/WebSocket
+        ┌─────────────────────┴─────────────────────────┐
+        │              Spring Boot REST API              │
+        │  ┌─────────────────────────────────────────┐  │
+        │  │             Service Layer               │  │
+        │  │  MusicFileService, ScanningService,     │  │
+        │  │  DuplicateService, ConfigService        │  │
+        │  └────────────────────┬────────────────────┘  │
+        └───────────────────────┼───────────────────────┘
+                                │
+                        ┌───────┴───────┐
+                        │ SQLite Database│
+                        └───────────────┘
+```
+
+---
+
+## Design Principles
 
 ### 1. SOLID Principles
 
 #### **Single Responsibility Principle (SRP)**
 Each class has one reason to change and one primary responsibility.
 
-**Examples:**
-- `MusicFileComparator`: Only handles file comparison logic
-- `MetadataExtractor`: Only extracts audio metadata
-- `SearchPanel`: Only manages search functionality
-- `FileOrganizer`: Only handles file organization operations
+**Backend Examples:**
+- `MusicFileService`: CRUD operations for music files
+- `DuplicateService`: Duplicate detection and resolution
+- `ScanningService`: Directory scanning and progress tracking
+- `FingerprintService`: Audio fingerprint generation
 
-**Benefits:**
-- Easier maintenance and debugging
-- Reduced coupling between components
-- Clear testing boundaries
-- Improved code readability
+**Frontend Examples:**
+- `DuplicateManager.tsx`: Duplicate management UI
+- `MetadataEditor.tsx`: Metadata editing UI
+- `duplicatesApi.ts`: API client for duplicates endpoints
 
 #### **Open/Closed Principle (OCP)**
 Classes are open for extension but closed for modification.
 
 **Implementation:**
-- Interface-based design for extensibility
-- Strategy pattern for configurable algorithms
-- Plugin architecture for new file format support
-- Template methods for customizable workflows
+- Strategy pattern for duplicate detection algorithms
+- Configurable thresholds without code changes
+- Plugin architecture for audio format support
 
 #### **Dependency Inversion Principle (DIP)**
-High-level modules don't depend on low-level modules; both depend on abstractions.
+High-level modules depend on abstractions, not concrete implementations.
 
 **Application:**
-- Configuration interfaces abstract implementation details
-- Database access through manager abstractions
-- UI components depend on service interfaces
-- Utility classes expose abstract contracts
+- Service interfaces in Spring Boot
+- React hooks abstract API interactions
+- Configuration interfaces decouple business logic
 
 ### 2. Design Patterns
 
-#### **Observer Pattern**
-Enables loose coupling between UI components through event-driven communication.
+#### **Repository Pattern**
+Data access abstraction for database operations.
 
-**Implementation:**
 ```java
-// Callback-based communication between panels
-profileManagementPanel.setOnProfileChanged(() -> {
-    refreshAllPanels();
-});
-
-fuzzySearchConfigPanel.setOnConfigChanged(() -> {
-    statusLabel.setText("Configuration updated");
-});
+@Repository
+public interface MusicFileRepository {
+    List<MusicFile> findByArtistContaining(String artist);
+    Optional<MusicFile> findByFilePath(String path);
+}
 ```
 
-**Benefits:**
-- Decoupled UI components
-- Reactive user interface
-- Easy event handling
-- Maintainable component interactions
+#### **Service Pattern**
+Business logic encapsulation in service classes.
 
-#### **Utility Pattern**
-Stateless service classes providing focused functionality.
+```java
+@Service
+public class DuplicateService {
+    public List<DuplicateGroupDTO> getDuplicateGroups() { ... }
+    public AutoResolutionResultDTO autoResolveDuplicates() { ... }
+}
+```
 
-**Examples:**
-- `MusicFileComparator`: Comparison operations
-- `ArtistStatisticsManager`: Statistical analysis
-- `FileOrganizer`: File system operations
-- `MetadataExtractor`: Metadata processing
+#### **DTO Pattern**
+Data transfer objects for API communication.
 
-**Characteristics:**
-- Static methods for pure functions
-- No instance state
-- Thread-safe operations
-- Easy unit testing
+```java
+public record MusicFileDTO(
+    Long id,
+    String filePath,
+    String title,
+    String artist,
+    // ... other fields
+) {}
+```
 
-#### **Facade Pattern**
-Simplified interfaces for complex subsystems.
+#### **Custom Hooks Pattern (Frontend)**
+Reusable React hooks for state management.
 
-**Implementation:**
-- `ConfigurationView`: Orchestrates multiple configuration panels
-- `MetadataEditorView`: Coordinates editing workflows
-- `DatabaseManager`: Abstracts database complexity
-- `PathTemplate`: Simplifies file path generation
+```typescript
+function useDuplicates() {
+    const [groups, setGroups] = useState<DuplicateGroup[]>([]);
+    const [loading, setLoading] = useState(false);
+    // ... fetch logic
+    return { groups, loading, refresh };
+}
+```
 
-**Benefits:**
-- Reduced complexity for clients
-- Clear API boundaries
-- Easier subsystem evolution
-- Improved testability
-
-#### **Strategy Pattern**
-Configurable algorithms for different scenarios.
-
-**Applications:**
-- Text formatting in `PathTemplate`
-- Fuzzy matching algorithms in `FuzzyMatcher`
-- File organization strategies
-- Duplicate detection approaches
+---
 
 ## Architectural Layers
 
-### 1. Model Layer
-**Purpose**: Data representation and business logic
+### 1. Presentation Layer (Frontend)
 
-**Components:**
-- `MusicFile`: Core entity with metadata
-- `PathTemplate`: File organization templates
-- `DatabaseProfile`: Configuration profiles
-- `FuzzySearchConfig`: Algorithm parameters
-
-**Principles:**
-- Rich domain models with behavior
-- Immutable value objects where appropriate
-- Clear data validation rules
-- Business logic encapsulation
-
-### 2. Service Layer
-**Purpose**: Business operations and algorithms
-
-**Components:**
-- `DatabaseManager`: Data persistence operations
-- `MusicFileScanner`: File system scanning
-- `FuzzyMatcher`: Similarity algorithms
-- `MetadataExtractor`: Audio processing
-
-**Principles:**
-- Stateless service operations
-- Transaction management
-- Error handling and recovery
-- Performance optimization
-
-### 3. UI Layer
 **Purpose**: User interface and interaction
 
 **Components:**
-- Main application views (Configuration, Import, etc.)
-- Specialized panels (Search, Edit, Bulk operations)
-- Dialog components
-- Custom controls
+- React functional components with TypeScript
+- Custom hooks for data fetching
+- API client modules for backend communication
+- CSS modules for styling
 
 **Principles:**
-- Model-View separation
-- Event-driven architecture
-- Responsive user experience
+- Component composition over inheritance
+- Hooks for state management
+- Memoization for performance
 - Accessibility considerations
 
-### 4. Utility Layer
-**Purpose**: Cross-cutting concerns and helpers
+### 2. API Layer (Controllers)
+
+**Purpose**: HTTP request handling and routing
 
 **Components:**
-- String manipulation utilities
-- File system helpers
-- Configuration management
-- Logging and monitoring
+- `MusicFileController`: Music file CRUD endpoints
+- `DuplicateController`: Duplicate detection endpoints
+- `ScanningController`: Directory scanning endpoints
+- `ConfigController`: Application settings endpoints
 
 **Principles:**
-- Pure functions where possible
-- Thread-safe implementations
-- Minimal dependencies
-- Comprehensive error handling
+- RESTful endpoint design
+- Request validation
+- Response DTOs (not entities)
+- Exception handling
 
-## Component Communication Patterns
+### 3. Service Layer
 
-### 1. Callback-Based Communication
-**Used for**: UI component coordination
+**Purpose**: Business logic and orchestration
 
-**Pattern:**
-```java
-// Panel registers callback with parent
-panel.setOnChangeCallback(() -> {
-    // Handle change in parent component
-    updateRelatedComponents();
-});
+**Components:**
+- `MusicFileService`: File management operations
+- `DuplicateService`: Duplicate detection algorithms
+- `ScanningService`: Directory traversal and metadata extraction
+- `FingerprintService`: Audio fingerprint processing
+
+**Principles:**
+- Transaction management
+- Business rule enforcement
+- Service composition
+- Caching strategies
+
+### 4. Data Layer
+
+**Purpose**: Data persistence and retrieval
+
+**Components:**
+- `DatabaseManager`: JDBC operations with SQLite
+- Entity models (`MusicFile`)
+- DTOs for API responses
+
+**Principles:**
+- Connection pooling
+- Prepared statements
+- Index optimization
+- Data integrity constraints
+
+---
+
+## API Design
+
+### REST Conventions
+
+| HTTP Method | Purpose | Example |
+|-------------|---------|---------|
+| GET | Retrieve resource(s) | `GET /api/v1/music/{id}` |
+| POST | Create resource or action | `POST /api/v1/scanning/start` |
+| PUT | Update resource | `PUT /api/v1/music/{id}` |
+| DELETE | Delete resource | `DELETE /api/v1/duplicates/file/{id}` |
+
+### Response Format
+
+```json
+{
+  "groups": [...],
+  "page": 0,
+  "size": 25,
+  "totalGroups": 150,
+  "totalPages": 6,
+  "hasMore": true
+}
 ```
 
-**Benefits:**
-- Loose coupling between components
-- Clear event flow
-- Easy testing with mock callbacks
-- Flexible communication patterns
+### Error Handling
 
-### 2. Manager-Based Coordination
-**Used for**: Cross-component data management
+```json
+{
+  "error": "File not found",
+  "status": 404,
+  "timestamp": "2026-01-13T12:00:00Z"
+}
+```
 
-**Pattern:**
-- `DatabaseManager` coordinates data operations
-- `ProfileManager` handles configuration switching
-- `ArtistStatisticsManager` provides statistical services
+---
 
-**Benefits:**
-- Centralized coordination logic
-- Consistent data management
-- Transaction boundaries
-- Caching and optimization opportunities
+## Real-Time Communication
 
-### 3. Configuration-Driven Behavior
-**Used for**: Customizable application behavior
+### WebSocket Architecture
 
-**Implementation:**
-- `FuzzySearchConfig` for algorithm parameters
-- `DatabaseConfig` for data source configuration
-- `PathTemplate` for file organization rules
+```
+Browser                     Server
+   │                          │
+   │─── CONNECT /ws ─────────>│
+   │                          │
+   │─── SUBSCRIBE ───────────>│
+   │    /topic/scanning/{id}  │
+   │                          │
+   │<─── MESSAGE ─────────────│
+   │    {progress: 45%, ...}  │
+   │                          │
+```
 
-**Benefits:**
-- User customization support
-- A/B testing capabilities
-- Environment-specific behavior
-- Runtime reconfiguration
+### STOMP Protocol Usage
 
-## Error Handling Strategy
+- `/app/scanning/start`: Initiate scan
+- `/topic/scanning/{sessionId}`: Progress updates
+- Automatic reconnection on disconnect
 
-### 1. Defensive Programming
-**Approach**: Validate inputs and handle edge cases gracefully
-
-**Implementation:**
-- Null checks in all public methods
-- Parameter validation with clear error messages
-- Graceful degradation for missing data
-- User-friendly error reporting
-
-### 2. Exception Hierarchy
-**Structure**: Clear exception types for different error categories
-
-**Categories:**
-- `ConfigurationException`: Configuration-related errors
-- `DatabaseException`: Data persistence failures
-- `MetadataException`: Audio processing issues
-- `ValidationException`: Input validation failures
-
-### 3. Recovery Strategies
-**Approach**: Attempt recovery before failing
-
-**Techniques:**
-- Retry logic for transient failures
-- Fallback values for missing configuration
-- Alternative algorithms for edge cases
-- User notification with recovery options
-
-## Testing Architecture
-
-### 1. Unit Testing Strategy
-**Focus**: Individual component validation
-
-**Approach:**
-- Test each utility class independently
-- Mock external dependencies
-- Validate edge cases and error conditions
-- Performance benchmarking for critical paths
-
-### 2. Integration Testing
-**Focus**: Component interaction validation
-
-**Scope:**
-- Database and service layer integration
-- UI component coordination
-- Configuration and behavior validation
-- End-to-end workflow testing
-
-### 3. Test Data Management
-**Strategy**: Consistent, reproducible test scenarios
-
-**Implementation:**
-- Sample music file collections
-- Predefined test configurations
-- Database fixtures and cleanup
-- Performance baseline data
+---
 
 ## Performance Considerations
 
-### 1. Memory Management
-**Strategy**: Minimize memory footprint and prevent leaks
+### Backend Optimization
 
-**Techniques:**
-- Object pooling for frequently created instances
-- Lazy loading for expensive operations
-- Proper resource cleanup and disposal
-- Memory profiling and optimization
+- **Connection Pooling**: HikariCP for SQLite connections
+- **Caching**: In-memory caching for duplicate groups
+- **Batch Operations**: Bulk metadata extraction
+- **Lazy Loading**: Stream large result sets
 
-### 2. I/O Optimization
-**Strategy**: Minimize file system and database operations
+### Frontend Optimization
 
-**Approaches:**
-- Batch operations where possible
-- Caching frequently accessed data
-- Asynchronous processing for long operations
-- Progress feedback for user experience
+- **Code Splitting**: Vite automatic chunk splitting
+- **Memoization**: `useMemo`, `useCallback` for expensive operations
+- **Virtual Scrolling**: For large file lists
+- **Debouncing**: Search input optimization
 
-### 3. Algorithm Efficiency
-**Strategy**: Optimize critical path algorithms
+### Database Optimization
 
-**Focus Areas:**
-- Fuzzy string matching optimization
-- Database query performance
-- File scanning efficiency
-- Duplicate detection algorithms
+- **Indexes**: On filePath, artist, album, title
+- **Query Optimization**: Avoid N+1 queries
+- **Connection Reuse**: Single connection per request
+
+---
 
 ## Security Considerations
 
-### 1. Data Protection
-**Strategy**: Protect user data and configuration
+### Input Validation
 
-**Measures:**
-- Input validation and sanitization
-- SQL injection prevention
-- File path validation
-- Configuration encryption where appropriate
-
-### 2. File System Safety
-**Strategy**: Safe file operations and validation
-
-**Approaches:**
 - Path traversal prevention
-- File permission validation
-- Atomic operations where possible
-- Backup and recovery capabilities
+- SQL injection prevention (prepared statements)
+- XSS prevention (React automatic escaping)
 
-## Future Evolution Guidelines
+### File System Safety
 
-### 1. Extensibility Points
-**Areas prepared for future enhancement:**
-- Plugin architecture for new file formats
-- Custom fuzzy matching algorithms
-- Additional metadata sources
-- UI theme and customization support
+- Restricted to allowed directories
+- Path normalization
+- Permission validation
 
-### 2. Migration Strategies
-**Approaches for future architectural changes:**
-- Backward compatibility maintenance
-- Gradual migration patterns
-- Configuration versioning
-- Data migration utilities
+### API Security
 
-### 3. Monitoring and Maintenance
-**Ongoing architectural health:**
-- Code complexity metrics
-- Performance monitoring
-- Error rate tracking
-- User experience analytics
+- CORS configuration
+- Request size limits
+- Rate limiting (future)
+
+---
+
+## Testing Architecture
+
+### Backend Testing
+
+```
+src/test/java/
+├── controller/          # Controller integration tests
+├── service/             # Service unit tests
+├── util/                # Utility class tests
+└── integration/         # End-to-end tests
+```
+
+### Frontend Testing
+
+```
+frontend/tests/
+├── e2e/                 # Puppeteer E2E tests
+└── components/          # Component unit tests (future)
+```
+
+### Test Categories
+
+| Category | Tool | Purpose |
+|----------|------|---------|
+| Unit | JUnit 5 | Service/utility testing |
+| Integration | Spring Boot Test | Controller testing |
+| E2E | Puppeteer | Full workflow testing |
+
+---
+
+## Migration History
+
+### v1.0 → v2.0 Changes
+
+| Aspect | v1.0 (Desktop) | v2.0 (Web) |
+|--------|----------------|------------|
+| UI | JavaFX/Swing | React + TypeScript |
+| Backend | Monolithic | Spring Boot REST API |
+| Database | Apache Derby | SQLite |
+| Java | 11 | 21 |
+| Real-time | Event listeners | WebSocket |
+
+### Key Migration Decisions
+
+1. **SQLite over PostgreSQL**: Simpler deployment, no external database server
+2. **React over Vue/Angular**: Better ecosystem, team familiarity
+3. **Spring Boot over Quarkus**: Mature ecosystem, better documentation
+4. **WebSocket over SSE**: Bidirectional communication for future features
+
+---
+
+## Future Evolution
+
+### Planned Improvements
+
+- **Plugin System**: Custom duplicate detection algorithms
+- **Multi-user Support**: Authentication and authorization
+- **Cloud Sync**: Optional cloud backup
+- **Mobile App**: React Native or PWA
+
+### Extension Points
+
+- `DuplicateDetector` interface for custom algorithms
+- `MetadataProvider` interface for external metadata sources
+- `StorageProvider` interface for cloud storage
 
 ---
 
 ## Conclusion
 
-The architectural patterns established during the major refactoring provide a solid foundation for continued development of the MP3Org application. The emphasis on SOLID principles, clear separation of concerns, and comprehensive testing ensures that the codebase remains maintainable, extensible, and performant as it evolves.
+The MP3Org architecture balances simplicity with scalability. The clear separation between frontend and backend enables independent development and deployment. The use of standard patterns (Repository, Service, DTO) makes the codebase accessible to developers familiar with Spring Boot.
 
-**Key Principles to Maintain:**
-1. **Single Responsibility**: Each class has one clear purpose
-2. **Loose Coupling**: Components interact through well-defined interfaces
-3. **High Cohesion**: Related functionality is grouped together
-4. **Defensive Programming**: Handle errors gracefully and validate inputs
-5. **Comprehensive Testing**: Validate all changes through automated tests
-
-These patterns serve as the architectural blueprint for future development, ensuring consistency and quality across all components of the MP3Org application.
+**Key Principles:**
+1. **Separation of Concerns**: Clear boundaries between layers
+2. **Single Responsibility**: Each component has one job
+3. **API-First Design**: Frontend and backend are decoupled
+4. **Performance by Default**: Optimization built into architecture
+5. **Security in Depth**: Multiple layers of protection
 
 ---
 
-**Document Created**: 2025-06-29  
-**Based on Refactoring Work**: 2024-12-29  
-**Purpose**: Architectural guidance and pattern documentation
+*Document Updated: January 2026*
+*Architecture Version: 2.0*

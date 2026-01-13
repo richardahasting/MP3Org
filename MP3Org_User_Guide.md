@@ -1,15 +1,15 @@
-# MP3Org - Complete User Guide
+# MP3Org User Guide
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Getting Started](#getting-started)
-3. [Configuration](#configuration)
-4. [Database Profiles](#database-profiles)
-5. [Importing Music](#importing-music)
-6. [Finding and Managing Duplicates](#finding-and-managing-duplicates)
-7. [Editing Metadata](#editing-metadata)
-8. [Organizing Your Collection](#organizing-your-collection)
-9. [Advanced Features](#advanced-features)
+3. [The Interface](#the-interface)
+4. [Importing Music](#importing-music)
+5. [Finding and Managing Duplicates](#finding-and-managing-duplicates)
+6. [Editing Metadata](#editing-metadata)
+7. [Organizing Your Collection](#organizing-your-collection)
+8. [Configuration](#configuration)
+9. [Audio Fingerprinting](#audio-fingerprinting)
 10. [Troubleshooting](#troubleshooting)
 11. [Tips and Best Practices](#tips-and-best-practices)
 
@@ -17,406 +17,345 @@
 
 ## Introduction
 
-MP3Org is a powerful music collection management tool designed to help you organize large music libraries by finding and removing duplicate files, organizing music into structured folders, and editing metadata for better collection management.
+MP3Org is a powerful web-based music collection management tool that helps you organize large music libraries. It runs as a local web application with a Spring Boot backend and React frontend.
 
 ### Key Features
-- **Smart Duplicate Detection**: Advanced fuzzy matching algorithms find duplicates even when metadata differs slightly
-- **File Organization**: Automatically organize music into Artist/Album/Track structure
-- **Metadata Editing**: Search and edit song information for better organization
-- **Multiple Database Support**: Maintain separate music collections with profiles
-- **Format Support**: Works with MP3, FLAC, M4A, WAV, OGG, WMA, AIFF, APE, and OPUS files
+- **Smart Duplicate Detection**: Advanced fuzzy matching finds duplicates even with inconsistent metadata
+- **Audio Fingerprinting**: Optional Chromaprint integration detects acoustic duplicates
+- **Directory-Based Resolution**: Resolve entire folder conflicts at once
+- **Metadata Editing**: Search and bulk-edit song information
+- **File Organization**: Automatically organize into Artist/Album/Track structure
+- **Real-time Progress**: WebSocket-based scanning with live updates
+- **Modern Web UI**: Clean, responsive interface accessible via browser
+
+### Supported Formats
+- **Lossless**: FLAC, AIFF, APE, WAV
+- **Compressed**: MP3, M4A (AAC), OGG Vorbis, OPUS, WMA
 
 ---
 
 ## Getting Started
 
-### First Launch
+### Prerequisites
+- **Java 21** (LTS) - Required for the backend
+- **Node.js 18+** - Required for the frontend
+- **Chromaprint** - Optional, for audio fingerprinting
 
-When you first start MP3Org, the application will:
-1. Create a default database in the `mp3org` folder in your current directory
-2. Initialize with default settings that work well for most users
-3. Show an empty collection ready for your music files
+### Starting the Application
 
-### Quick Start Guide
+**Terminal 1 - Backend (port 9090):**
+```bash
+cd MP3Org
+./gradle21 bootRun          # macOS/Linux
+gradle21.cmd bootRun        # Windows
+```
 
-**Step 1: Configure Settings (Optional)**
-- Go to the **Config** tab
-- Choose which audio formats to include (all are enabled by default)
-- Adjust duplicate detection settings if needed (defaults are recommended for beginners)
+**Terminal 2 - Frontend (port 5173):**
+```bash
+cd MP3Org/frontend
+npm install                 # First time only
+npm run dev
+```
 
-**Step 2: Import Your Music**
-- Go to the **Import & Organize** tab
-- Click **"Add Directories to Scan"**
-- Select folders containing your music files
-- Wait for the scan to complete
+**Access the Application:**
+Open http://localhost:5173 in your web browser.
 
-**Step 3: Find Duplicates**
-- Go to the **Duplicate Manager** tab
-- Click **"Refresh Duplicates"**
-- Review potential duplicates and remove unwanted files
+### Quick Start Workflow
 
-**Step 4: Organize (Optional)**
-- Return to **Import & Organize** tab
-- Choose a destination folder
-- Click **"Organize Music Files"** to create a clean folder structure
-
----
-
-## Configuration
-
-The **Config** tab contains all application settings and is divided into several sections:
-
-### Database Location
-
-**Current Database Location**: Shows where your music database is stored. This location can be changed by:
-- **System Property**: `java -Dmp3org.database.path=/path/to/database -jar mp3org.jar`
-- **Environment Variable**: `MP3ORG_DATABASE_PATH=/path/to/database`
-- **Configuration File**: Create `mp3org.properties` with `database.path=/path/to/database`
-- **GUI**: Use the "Change Database Location" button
-
-### File Type Filters
-
-Control which audio formats are included in scans and searches:
-
-| Format | Description |
-|--------|-------------|
-| MP3 | Most common audio format |
-| FLAC | Lossless audio format |
-| M4A | Apple's AAC format |
-| WAV | Uncompressed audio |
-| OGG | Open source audio format |
-| WMA | Windows Media Audio |
-| AIFF | Apple's uncompressed format |
-| APE | Monkey's Audio lossless format |
-| OPUS | Modern open audio codec |
-
-**Tips:**
-- Enable all formats unless you have specific reasons to exclude some
-- Use "Select All" to quickly enable everything
-- Changes take effect immediately after clicking "Apply File Type Filters"
-
-### Duplicate Detection Settings
-
-This is the most important configuration section, controlling how MP3Org identifies potential duplicates.
-
-#### Presets
-
-| Preset | Description | Best For |
-|--------|-------------|----------|
-| **Strict** | High similarity thresholds, fewer matches | High-quality collections with consistent metadata |
-| **Balanced** | ⭐ Recommended for most users | General music collections |
-| **Lenient** | Lower thresholds, more matches | Collections with inconsistent metadata |
-| **Custom** | Manually configured settings | Advanced users with specific needs |
-
-#### Similarity Thresholds
-
-- **Title Similarity (85%)**: How closely song titles must match
-- **Artist Similarity (90%)**: How closely artist names must match  
-- **Album Similarity (85%)**: How closely album names must match
-
-Higher percentages = stricter matching = fewer false positives but might miss some duplicates.
-
-#### Duration Matching
-
-- **Tolerance (Seconds)**: Maximum time difference allowed (default: 10 seconds)
-- **Tolerance (Percent)**: Alternative percentage-based tolerance (default: 5%)
-
-The system uses whichever tolerance is more permissive.
-
-#### Text Normalization Options
-
-| Option | Effect | Example |
-|--------|--------|---------|
-| **Ignore Case** | Treats different cases as identical | "Artist" = "artist" |
-| **Ignore Punctuation** | Ignores punctuation differences | "Rock 'n' Roll" = "Rock n Roll" |
-| **Ignore Artist Prefixes** | Ignores "The", "A", "An" | "Beatles" = "The Beatles" |
-| **Ignore Featuring** | Ignores featuring artist info | "Song" = "Song (feat. Artist)" |
-| **Ignore Album Editions** | Ignores edition information | "Album" = "Album - Deluxe Edition" |
-
-#### Matching Requirements
-
-- **Track Numbers Must Match**: Whether track numbers must be identical for duplicates
-- **Minimum Fields Match**: How many fields (title, artist, album, duration) must meet thresholds
+1. **Import Music** - Scan directories to add files to the database
+2. **Find Duplicates** - Detect and review potential duplicates
+3. **Clean Up** - Delete unwanted duplicates or resolve by directory
+4. **Edit Metadata** - Fix inconsistent tags
+5. **Organize** - Create a clean folder structure (optional)
 
 ---
 
-## Database Profiles
+## The Interface
 
-Profiles allow you to maintain multiple separate music databases, each with its own settings.
+MP3Org has five main tabs:
 
-### Why Use Profiles?
+### Duplicate Manager
+Find and manage duplicate files in your collection. Features:
+- Similarity-based duplicate groups
+- Directory conflict view for folder-level resolution
+- Auto-resolve with preview capability
+- File comparison with quality indicators
 
-- **Separate Collections**: Personal music vs. work music vs. classical collection
-- **Different Detection Settings**: Strict settings for high-quality collection, lenient for downloaded music
-- **Different Locations**: Keep databases in different folders or drives
-- **Multiple Users**: Each family member can have their own music profile
+### Metadata Editor
+Search and edit music file information:
+- Full-text search across all fields
+- Individual file editing
+- Bulk edit for multiple files (artist, album, genre, year)
+- Smart combobox suggestions based on selected files
 
-### Managing Profiles
+### Import
+Add music files to your database:
+- Browse and select directories
+- Real-time scan progress via WebSocket
+- Support for all major audio formats
+- Automatic metadata extraction
 
-**Creating a New Profile:**
-1. Click **"New Profile"** in the Config tab
-2. Enter a descriptive name
-3. Choose the database location
-4. Configure settings as needed
+### Organize
+Create an organized copy of your music:
+- Artist/Album/Track folder structure
+- Preserves original files
+- Handles filename conflicts
 
-**Duplicating a Profile:**
-1. Select the profile to copy
-2. Click **"Duplicate"**
-3. The new profile inherits all settings from the original
-
-**Switching Profiles:**
-1. Use the dropdown menu to select a different profile
-2. The application switches databases and loads that profile's settings
-3. All your music and settings are now from the selected profile
-
-**Profile Settings:**
-Each profile remembers:
-- Database location and files
-- File type preferences
-- Duplicate detection configuration
-- Last used date
+### Config
+Application settings and help:
+- Duplicate detection thresholds
+- File type filters
+- Audio fingerprinting toggle
+- Built-in help documentation
 
 ---
 
 ## Importing Music
 
-The **Import & Organize** tab handles adding music files to your database.
+### Scanning Directories
 
-### Adding Music to Database
+1. Go to the **Import** tab
+2. Click **Browse** to navigate server directories
+3. Select the folder containing your music
+4. Click **Start Scan**
 
-**Step 1: Select Directories**
-- Click **"Add Directories to Scan"**
-- Choose one or more folders containing music
-- Subdirectories are automatically included
+### During the Scan
+- Progress updates in real-time via WebSocket
+- Shows files found, processed, and any errors
+- Can be cancelled if needed
 
-**Step 2: Monitor Progress**
-- Watch the progress bar during scanning
-- Large collections may take several minutes
-- The process can be interrupted and resumed later
+### What Gets Imported
+- All audio files matching enabled formats
+- Metadata is extracted automatically from file tags
+- Files are stored in a local SQLite database
 
-**Step 3: Review Results**
-- Check the status messages for any errors
-- Only files matching your enabled formats are imported
-- Metadata is automatically extracted from file tags
-
-### Supported Metadata
-
-MP3Org extracts the following information from your music files:
-- **Title**: Song name
-- **Artist**: Performing artist or band
-- **Album**: Album or collection name
-- **Genre**: Musical style
-- **Track Number**: Position on the album
-- **Year**: Release year
-- **Duration**: Song length in seconds
-- **Bitrate**: Audio quality (kbps)
-- **File Size**: Size in bytes
-- **File Path**: Location on disk
-
-### Import Tips
-
-- **Start Small**: Test with a small folder first to understand the process
-- **Check Metadata**: Ensure your files have good metadata before importing
-- **Backup First**: Always backup your music collection before making changes
-- **Clean Folders**: Remove non-music files from directories before scanning
+### Metadata Extracted
+| Field | Description |
+|-------|-------------|
+| Title | Song name |
+| Artist | Performing artist |
+| Album | Album name |
+| Genre | Musical style |
+| Track Number | Position on album |
+| Year | Release year |
+| Duration | Length in seconds |
+| Bitrate | Audio quality (kbps) |
+| Sample Rate | Audio sample rate |
+| File Size | Size in bytes |
+| File Path | Location on disk |
 
 ---
 
 ## Finding and Managing Duplicates
 
-The **Duplicate Manager** tab is where you identify and remove duplicate files.
+### View Modes
 
-### Finding Duplicates
+The Duplicate Manager offers two ways to view duplicates:
 
-**Step 1: Scan for Duplicates**
-- Click **"Refresh Duplicates"** to analyze your collection
-- The process uses your configured similarity settings
-- Results appear in the "Potential Duplicates" table
+#### By Similarity (Default)
+Groups files that match based on metadata similarity:
+- Title, artist, album fuzzy matching
+- Duration tolerance checking
+- Optional audio fingerprint matching
 
-**Step 2: Review Results**
-- Select a file from the left table to see similar matches on the right
-- Compare the files using the displayed information
-- Look for actual duplicates vs. different versions/qualities
+#### By Directory
+Groups duplicates that exist in different folders:
+- See folder conflicts at a glance
+- Resolve entire directories at once
+- Ideal for cleaning up album copies
 
-### Comparison Factors
+### Reviewing Duplicates
 
-When deciding which file to keep, consider:
+1. Select a duplicate group from the left panel
+2. Review all files in the group on the right
+3. Compare quality indicators:
+   - **Bitrate**: Higher is generally better
+   - **File Size**: Larger often means better quality
+   - **Format**: FLAC > MP3 for quality
+   - **Metadata**: More complete tags are valuable
 
-| Factor | Higher is Better | Notes |
-|--------|------------------|-------|
-| **Bitrate** | ✓ | Generally indicates better audio quality |
-| **File Size** | ± | Larger often means better quality, but not always |
-| **File Format** | ± | FLAC > MP3 > other formats for quality |
-| **Metadata Quality** | ✓ | Complete, accurate tags are valuable |
-| **File Location** | ± | Consider your preferred folder structure |
+### Resolving Duplicates
 
-### Removal Actions
+**Delete Individual Files:**
+- Click **Delete** on unwanted files
+- Confirms before deletion
+- Group auto-resolves when only 1 file remains
 
-**Delete Selected**
-- Manually select and delete specific files
-- Use this for careful, file-by-file review
-- Confirms deletion before proceeding
+**Auto-Resolve:**
+1. Click **Preview Auto-Resolution**
+2. Review what would be deleted vs. kept
+3. Exclude files you want to keep
+4. Click **Execute** to perform deletion
 
-**Keep Better Quality**
-- Automatically compares bitrates between two selected files
-- Deletes the lower quality version
-- Useful for obvious quality differences
+**Directory Resolution:**
+1. Switch to **By Directory** view
+2. Select a directory conflict
+3. Choose which directory to keep
+4. Preview and execute resolution
 
 ### Safety Tips
 
-⚠️ **Important**: File deletion is permanent!
-
-- **Backup Everything**: Always backup your collection before removing duplicates
-- **Review Carefully**: The system may occasionally suggest non-duplicates
-- **Start Conservative**: Use strict settings initially, then relax if needed
-- **Check Results**: Listen to files if you're unsure about deletion
+- **Backup first**: File deletion is permanent
+- **Preview always**: Use preview before auto-resolve
+- **Check quality**: Higher bitrate isn't always better (re-encodes)
+- **Open folder**: Use the folder icon to verify files before deletion
 
 ---
 
 ## Editing Metadata
 
-The **Metadata Editor** tab allows you to search for and edit song information.
+### Searching
 
-### Searching for Music
+Use the search bar to find files:
+- Searches title, artist, album, and genre
+- Case-insensitive, partial matching
+- Results appear in the table below
 
-**Search Options:**
-- **All Fields**: Searches title, artist, album, and genre
-- **Title**: Searches only song titles
-- **Artist**: Searches only artist names
-- **Album**: Searches only album names
+### Individual Editing
 
-**Search Tips:**
-- Use partial words (e.g., "beat" finds "Beatles")
-- Search is case-insensitive
-- Use specific terms for better results
+1. Click a file in the search results
+2. Edit fields in the form panel:
+   - Title, Artist, Album, Genre
+   - Track Number, Year
+3. Click **Save** to apply changes
 
-### Editing Information
+### Bulk Editing
 
-**Available Fields:**
-- **Title**: Song name as it should appear
-- **Artist**: Primary performing artist or band
-- **Album**: Album or collection name
-- **Genre**: Musical style (Rock, Pop, Jazz, etc.)
-- **Track Number**: Position on album (numbers only)
-- **Year**: Release year (4 digits)
+Edit multiple files at once:
 
-**Read-Only Information:**
-- **File Path**: Location on disk
-- **File Size**: Size in megabytes
-- **Bitrate**: Audio quality in kbps
-- **Duration**: Song length
+1. Select files using checkboxes in the table
+2. Click **Bulk Edit**
+3. Choose fields to update:
+   - **Artist**: Combobox shows values from selected files
+   - **Album**: With frequency counts
+   - **Genre**: Most common value pre-selected
+   - **Year**: Numeric input
+4. Click **Apply** to update all selected files
 
-### Metadata Best Practices
+### Smart Suggestions
 
-**Consistency is Key:**
-- Use consistent artist names ("The Beatles" vs "Beatles")
-- Use standard genre names
-- Include track numbers for proper album organization
-- Use full album names
-
-**Accuracy Helps Duplicates:**
-- Correct metadata improves duplicate detection
-- Fix typos and inconsistencies
-- Standardize featuring artist formats
-
-**Save Regularly:**
-- Changes are saved to the database when you click "Save Changes"
-- Use "Revert" to undo unsaved changes
-- Large batches can be time-consuming
+The bulk edit comboboxes show:
+- All distinct values from selected files
+- Frequency count for each value
+- Most common value pre-selected
+- Type to filter or enter new values
 
 ---
 
 ## Organizing Your Collection
 
-The **Import & Organize** tab also handles creating an organized copy of your music collection.
-
 ### Organization Structure
 
 MP3Org creates a hierarchical folder structure:
 ```
-Destination Folder/
+Destination/
 ├── Artist Name/
 │   ├── Album Name/
 │   │   ├── 01-Song Title.mp3
 │   │   ├── 02-Another Song.mp3
 │   │   └── ...
 │   └── Another Album/
-│       └── ...
 └── Another Artist/
-    └── ...
 ```
 
 ### Organization Process
 
-**Step 1: Choose Destination**
-- Select an empty folder for your organized collection
-- Ensure adequate free space (copies are created, originals remain)
-- Choose a location that's easy to access
+1. Go to the **Organize** tab
+2. Select source (your imported files)
+3. Choose destination folder
+4. Click **Organize**
+5. Monitor progress
 
-**Step 2: Start Organization**
-- Click **"Organize Music Files"**
-- Monitor progress through the progress bar
-- Large collections may take considerable time
+### Features
 
-**Step 3: Verify Results**
-- Check the destination folder for proper organization
-- Verify that files play correctly
-- Compare file counts to ensure completeness
-
-### Organization Features
-
-**File Naming:**
-- Format: `[Track Number]-[Song Title].[Extension]`
-- Track numbers are zero-padded (01, 02, etc.)
-- Invalid filename characters are replaced
-
-**Folder Naming:**
-- Artist and album names are used as folder names
-- Invalid folder characters are replaced
-- Empty or missing names use placeholders
-
-**File Handling:**
-- Original files remain unchanged
-- Copies maintain original quality and metadata
-- Duplicate files in the same album are numbered
+- **Non-destructive**: Creates copies, originals remain
+- **Smart naming**: Track numbers zero-padded (01, 02...)
+- **Conflict handling**: Duplicate names numbered automatically
+- **Invalid characters**: Replaced in file/folder names
 
 ---
 
-## Advanced Features
+## Configuration
 
-### Database Management
+### Duplicate Detection Settings
 
-**Multiple Databases:**
-- Each profile maintains its own database
-- Switch between profiles to access different collections
-- Profiles can share the same music files but have different organization
+Access via **Config** tab:
 
-**Database Maintenance:**
-- Use "Reload Configuration" to refresh settings
-- Database files are stored in Apache Derby format
-- Backup the entire database folder to preserve your work
+#### Similarity Thresholds
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Title Similarity | 85% | How closely titles must match |
+| Artist Similarity | 90% | How closely artists must match |
+| Album Similarity | 85% | How closely albums must match |
+| Duration Tolerance | 10 sec | Max time difference allowed |
 
-### Performance Optimization
+#### Presets
+| Preset | Best For |
+|--------|----------|
+| **Strict** | High-quality collections with consistent metadata |
+| **Balanced** | General music collections (recommended) |
+| **Lenient** | Collections with inconsistent metadata |
+| **Custom** | Advanced users with specific needs |
 
-**Large Collections:**
-- Import music in smaller batches for better responsiveness
-- Use optimized duplicate detection for faster processing
-- Consider profile organization for different collection types
+#### Text Normalization
+- **Ignore Case**: "Artist" = "artist"
+- **Ignore Punctuation**: "Rock 'n' Roll" = "Rock n Roll"
+- **Ignore Artist Prefixes**: "Beatles" = "The Beatles"
+- **Ignore Featuring**: "Song" = "Song (feat. Artist)"
+- **Ignore Album Editions**: "Album" = "Album - Deluxe Edition"
 
-**Memory Usage:**
-- Close other applications when working with very large collections
-- Restart MP3Org if performance degrades over long sessions
+### File Type Filters
 
-### Customization Options
+Enable/disable which formats to include:
+- Changes affect scanning and duplicate detection
+- Use **Select All** for comprehensive scanning
 
-**File Type Configuration:**
-- Disable formats you don't use for faster scanning
-- Re-enable formats as needed for specific imports
+---
 
-**Detection Tuning:**
-- Start with "Balanced" preset and adjust based on results
-- Use "Custom" settings for specific collection types
-- Save different configurations in different profiles
+## Audio Fingerprinting
+
+### What is Audio Fingerprinting?
+
+Audio fingerprinting uses Chromaprint to create acoustic "fingerprints" of your music. This allows detection of duplicates even when:
+- Metadata is completely different
+- Files are different encodings of the same recording
+- Tags have been modified or corrupted
+
+### Installing Chromaprint
+
+**macOS (Homebrew):**
+```bash
+brew install chromaprint
+```
+
+**Windows:**
+1. Download from https://acoustid.org/chromaprint
+2. Extract and add `fpcalc.exe` to your PATH
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt install libchromaprint-tools
+```
+
+**Linux (Fedora/RHEL):**
+```bash
+sudo dnf install chromaprint-tools
+```
+
+**Linux (Arch):**
+```bash
+sudo pacman -S chromaprint
+```
+
+### Enabling Fingerprinting
+
+1. Go to **Config** tab
+2. Toggle **Enable Audio Fingerprinting**
+3. Click **Save Settings**
+
+### Performance Note
+
+Initial fingerprint generation takes time for large collections. Fingerprints are cached in the database for subsequent scans.
 
 ---
 
@@ -424,54 +363,41 @@ Destination Folder/
 
 ### Common Issues
 
-**No Music Found During Import**
-- Check that selected folders contain supported file types
-- Verify file type filters include your music formats
-- Ensure files have proper file extensions
+**Backend won't start:**
+- Verify Java 21 is installed: `java --version`
+- Use `./gradle21 bootRun` instead of `./gradlew bootRun`
+- Check port 9090 isn't in use
 
-**Duplicate Detection Not Working**
-- Verify that files have metadata (title, artist, album)
+**Frontend won't start:**
+- Verify Node.js 18+: `node --version`
+- Run `npm install` in the frontend directory
+- Check port 5173 isn't in use
+
+**No duplicates found:**
+- Verify files have metadata (title, artist)
 - Try more lenient similarity settings
-- Check that files are actually duplicates (not different versions)
+- Check file type filters include your formats
 
-**Organization Creates Empty Folders**
-- Files may be missing essential metadata
-- Edit metadata before organizing
-- Check for invalid characters in artist/album names
+**Fingerprinting not working:**
+- Verify Chromaprint is installed: `fpcalc -version`
+- Ensure `fpcalc` is in your system PATH
+- Check Config tab for fingerprinting errors
 
-**Performance Issues**
-- Close other memory-intensive applications
-- Work with smaller collections at a time
-- Restart the application if it becomes unresponsive
-
-### Error Messages
-
-**"Database Connection Failed"**
-- Check that the database location is accessible
-- Verify folder permissions
-- Try changing the database location
-
-**"File Already Exists"**
-- During organization, files with identical names exist
-- The system automatically handles this with numbering
-- Check destination folder for the resulting files
-
-**"Access Denied"**
-- File or folder permissions prevent access
-- Run as administrator if necessary (Windows)
-- Check file system permissions (Linux/Mac)
+**Scan not progressing:**
+- Check browser console for WebSocket errors
+- Verify backend is running on port 9090
+- Try refreshing the page
 
 ### Getting Help
 
 **Built-in Help:**
-- Use the "?" buttons throughout the interface
-- Press F1 for general help
-- Each tab has context-specific help available
+- Click the **?** help button on any tab
+- Context-specific documentation
 
-**Logs and Debugging:**
-- Check console output for detailed error messages
-- Note the exact steps that caused problems
-- Record file paths and error messages for support
+**External Resources:**
+- GitHub Issues: Report bugs and request features
+- README.md: Technical documentation
+- INSTALLATION.md: Detailed setup instructions
 
 ---
 
@@ -479,85 +405,86 @@ Destination Folder/
 
 ### Before You Start
 
-1. **Backup Your Music**: Always backup your entire music collection before using any organization tool
-2. **Start Small**: Test with a small subset of your collection first
-3. **Clean Your Files**: Remove non-music files from folders before importing
-4. **Check Metadata**: Ensure your music files have good metadata tags
+1. **Backup your music**: Always backup before bulk operations
+2. **Start small**: Test with a subset first
+3. **Check metadata**: Better tags = better duplicate detection
+4. **Plan organization**: Decide on folder structure before organizing
 
-### Workflow Recommendations
-
-**Initial Setup:**
-1. Configure file types for your collection
-2. Create profiles if you have different music types
-3. Set up duplicate detection (start with "Balanced")
-4. Test with a small folder first
-
-**Regular Maintenance:**
-1. Import new music regularly
-2. Run duplicate detection periodically
-3. Clean up metadata as you notice issues
-4. Organize into clean folder structure when ready
-
-**Advanced Usage:**
-1. Use multiple profiles for different music types
-2. Adjust detection settings based on your collection quality
-3. Combine with other tools for complete music management
-
-### Duplicate Detection Strategies
+### Duplicate Detection Strategy
 
 **For High-Quality Collections:**
 - Use "Strict" preset
 - Enable track number matching
-- Use higher similarity thresholds
+- Higher similarity thresholds
 
 **For Mixed Collections:**
-- Use "Balanced" or "Lenient" presets
-- Enable text normalization options
+- Use "Balanced" preset
+- Enable text normalization
 - Review results carefully
 
 **For Downloaded Music:**
-- Use "Lenient" preset with normalization
-- Focus on artist and title matching
-- Be prepared for more false positives
+- Use "Lenient" preset
+- Enable all normalization options
+- Consider audio fingerprinting
 
-### Metadata Management
+### Workflow Recommendations
 
-**Consistency Rules:**
-- Decide on artist name formats ("The Beatles" vs "Beatles")
-- Use standard genre classifications
-- Be consistent with featuring artist formats
-- Include complete album information
+**Initial Setup:**
+1. Configure detection settings (start with Balanced)
+2. Enable audio fingerprinting if available
+3. Import a small test folder
+4. Verify duplicate detection works as expected
+
+**Regular Maintenance:**
+1. Import new music periodically
+2. Run duplicate detection after imports
+3. Use directory view for album conflicts
+4. Clean up metadata as issues are found
+
+**Large Collections:**
+- Import in batches for responsiveness
+- Use directory-based resolution for speed
+- Preview auto-resolve before executing
+
+### Metadata Best Practices
+
+**Consistency Matters:**
+- Decide on artist name format ("The Beatles" vs "Beatles")
+- Use standard genre names
+- Include track numbers for proper organization
 
 **Quality Indicators:**
 - Complete metadata improves duplicate detection
-- Accurate track numbers enable proper organization
 - Consistent spelling reduces false negatives
-
-### Organization Planning
-
-**Before Organizing:**
-- Plan your destination folder structure
-- Ensure adequate disk space (at least 2x your collection size)
-- Clean up metadata first for better folder names
-- Consider if you want copies or to move originals
-
-**After Organizing:**
-- Verify the organization worked correctly
-- Update your media player libraries
-- Consider cleaning up the original folders
-- Backup the organized collection
+- Track numbers enable proper organization
 
 ---
 
-## Conclusion
+## Keyboard Shortcuts
 
-MP3Org provides powerful tools for managing large music collections, from duplicate detection to organization and metadata editing. By following this guide and starting with small test collections, you can effectively organize and clean up even the largest music libraries.
-
-Remember that music collection management is an iterative process - start with conservative settings, learn how your collection responds, and gradually refine your approach for the best results.
-
-For additional help, use the built-in help system throughout the application, and don't hesitate to experiment with different settings on backup copies of your music.
+| Shortcut | Action |
+|----------|--------|
+| `Enter` | Execute search |
+| `Escape` | Close dialogs |
+| `Ctrl/Cmd + A` | Select all (in tables) |
 
 ---
 
-*Last updated: [Current Date]*
-*Version: MP3Org 1.0*
+## API Reference
+
+MP3Org exposes a REST API on port 9090:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/music` | List music files (paginated) |
+| `GET /api/v1/duplicates` | Get duplicate groups |
+| `GET /api/v1/duplicates/by-directory` | Get directory conflicts |
+| `POST /api/v1/scanning/start` | Start a scan |
+| `WS /ws` | WebSocket for real-time updates |
+
+See README.md for complete API documentation.
+
+---
+
+*Last updated: January 2026*
+*Version: MP3Org 2.0*

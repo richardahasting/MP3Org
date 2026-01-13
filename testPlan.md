@@ -1,260 +1,310 @@
-# MP3Org Application Test Plan - Config Tab StackOverflowError Fix Verification
+# MP3Org Test Plan
 
-## 🎯 **Test Objectives**
-- [ ] Verify Issue #26 (config tab StackOverflowError) is completely resolved
-- [ ] Ensure all profile management functionality works correctly
-- [ ] Validate no regressions were introduced by the fix
-- [ ] Test edge cases and error conditions
+## Overview
+
+This test plan covers the MP3Org web application (v2.0) with Spring Boot backend and React frontend.
 
 ---
 
-## 🏗️ **Test Environment Setup**
+## Test Environment Setup
 
-### **Prerequisites:**
-- [ ] Latest code from main branch (commit 827ed41)
-- [ ] Clean build: `./gradlew clean build`
-- [ ] Multiple database profiles available for testing
-- [ ] Some music files in at least one database for realistic testing
+### Prerequisites
 
-### **Application Startup:**
-- [ ] Run: `./gradlew run`
-- [ ] **Expected:** Application starts without errors, no StackOverflowError during initialization
+- Java 21 installed
+- Node.js 18+ installed
+- Chromaprint installed (for fingerprinting tests)
+- Test music files available
 
----
+### Starting the Application
 
-## 📋 **Core Test Scenarios**
+```bash
+# Terminal 1: Backend
+./gradle21 bootRun
 
-### **Test 1: Basic Config Tab Access** ⭐ **CRITICAL**
-**Objective:** Verify the primary issue is fixed
-
-- [ ] Launch application
-- [ ] Click on "Config" tab
-- [ ] Observe config tab loads properly
-- [ ] Switch between other tabs (Duplicate Manager, Metadata Editor, Import & Organize)
-- [ ] Return to Config tab multiple times
-
-**Expected Results:**
-- [ ] ✅ Config tab opens without StackOverflowError
-- [ ] ✅ No infinite loop or application freeze
-- [ ] ✅ Tab switching is smooth and responsive
-- [ ] ✅ No error messages in console/logs
-
----
-
-### **Test 2: Profile Switching Functionality** ⭐ **CRITICAL**
-**Objective:** Verify profile switching works correctly after the fix
-
-- [ ] Go to Config tab → Database Profiles section
-- [ ] Note current active profile in dropdown
-- [ ] Select a different profile from dropdown
-- [ ] Confirm the switch in the dialog that appears
-- [ ] Verify profile information updates (name, path, music file count)
-- [ ] Switch back to original profile
-- [ ] Test switching between 3+ different profiles rapidly
-
-**Expected Results:**
-- [ ] ✅ Profile switching completes successfully
-- [ ] ✅ Profile information updates correctly
-- [ ] ✅ Music file counts display properly
-- [ ] ✅ No recursive calling or infinite loops
-- [ ] ✅ Status messages show "Switched to profile: [name]"
-
----
-
-### **Test 3: Profile Management Operations**
-**Objective:** Ensure all profile operations work correctly
-
-#### **3a. Create New Profile**
-- [ ] Click "New Profile" button
-- [ ] Enter profile name: "Test Profile [timestamp]"
-- [ ] Select database directory
-- [ ] Verify new profile appears in dropdown
-- [ ] Verify new profile becomes active
-
-#### **3b. Duplicate Profile**
-- [ ] Select an existing profile
-- [ ] Click "Duplicate Profile" button
-- [ ] Accept default name or modify
-- [ ] Verify duplicated profile appears
-- [ ] Switch to duplicated profile
-
-#### **3c. Rename Profile**
-- [ ] Select a test profile
-- [ ] Click "Rename Profile" button
-- [ ] Enter new name: "Renamed Test Profile"
-- [ ] Verify name updates in dropdown and info panel
-
-#### **3d. Delete Profile**
-- [ ] Ensure you have multiple profiles
-- [ ] Select a test profile (not your main data)
-- [ ] Click "Delete Profile" button
-- [ ] Confirm deletion in dialog
-- [ ] Verify profile removed from dropdown
-- [ ] Verify application automatically switches to another profile
-
-**Expected Results for All 3a-3d:**
-- [ ] ✅ All operations complete without errors
-- [ ] ✅ UI updates reflect changes immediately
-- [ ] ✅ No StackOverflowError during any operation
-- [ ] ✅ Profile dropdown stays consistent
-
----
-
-### **Test 4: Rapid Tab Switching** ⭐ **STRESS TEST**
-**Objective:** Test for any remaining circular dependency issues
-
-- [ ] Rapidly switch between tabs: Config → Duplicate Manager → Config → Metadata Editor → Config
-- [ ] Repeat this pattern 10 times quickly
-- [ ] While in Config tab, rapidly switch between internal config tabs (if any)
-- [ ] Switch profiles while rapidly switching main tabs
-
-**Expected Results:**
-- [ ] ✅ No application freezing or slowdown
-- [ ] ✅ No StackOverflowError
-- [ ] ✅ All tabs load correctly each time
-- [ ] ✅ Performance remains responsive
-
----
-
-### **Test 5: Profile Switching Edge Cases**
-**Objective:** Test edge conditions that might trigger the old bug
-
-#### **5a. Same Profile Selection**
-- [ ] Note current active profile
-- [ ] Select the same profile from dropdown again
-- [ ] Verify no unnecessary processing occurs
-
-#### **5b. Profile Switch During Tab Change**
-- [ ] Start switching to Config tab
-- [ ] Immediately switch profiles before tab fully loads
-- [ ] Switch back to another tab while profile switch is in progress
-
-#### **5c. Multiple Profile Switches**
-- [ ] Switch to Profile A
-- [ ] Immediately switch to Profile B (before first switch completes)
-- [ ] Immediately switch to Profile C
-- [ ] Verify final state is consistent
-
-**Expected Results for All 5a-5c:**
-- [ ] ✅ No errors or exceptions
-- [ ] ✅ Application reaches consistent state
-- [ ] ✅ Final active profile matches last selection
-- [ ] ✅ No recursive calls or infinite loops
-
----
-
-### **Test 6: Error Condition Testing**
-**Objective:** Ensure error handling remains robust
-
-#### **6a. Invalid Profile Operations**
-- [ ] Try to delete the last remaining profile
-- [ ] Try to create profile with empty name
-- [ ] Try to create profile with duplicate name
-- [ ] Try to rename profile to existing name
-
-#### **6b. Database Connection Issues**
-- [ ] Switch to a profile with corrupted/missing database
-- [ ] Try to access Config tab during database errors
-- [ ] Verify error messages are appropriate
-
-**Expected Results:**
-- [ ] ✅ Appropriate error dialogs shown
-- [ ] ✅ Application remains stable
-- [ ] ✅ No StackOverflowError even during error conditions
-- [ ] ✅ User can recover from error states
-
----
-
-### **Test 7: Music File Count Display**
-**Objective:** Verify the count display that was part of the error chain
-
-- [ ] Switch to a profile with music files
-- [ ] Verify music file count displays correctly in profile info
-- [ ] Switch to empty profile, verify "0 files" or appropriate message
-- [ ] Switch back to profile with files
-- [ ] Verify count updates correctly
-
-**Expected Results:**
-- [ ] ✅ Music file counts are accurate
-- [ ] ✅ Counts update properly when switching profiles
-- [ ] ✅ No errors during count retrieval
-- [ ] ✅ Formatted display is user-friendly (e.g., "1,234 files")
-
----
-
-### **Test 8: Application Lifecycle**
-**Objective:** Test startup and shutdown behavior
-
-- [ ] Close and restart application multiple times
-- [ ] Verify last active profile is remembered
-- [ ] Test startup with different profiles as default
-- [ ] Ensure clean shutdown with no hanging processes
-
-**Expected Results:**
-- [ ] ✅ Consistent startup behavior
-- [ ] ✅ Profile state preserved between sessions
-- [ ] ✅ No memory leaks or hanging processes
-- [ ] ✅ Clean application termination
-
----
-
-## 🚨 **Red Flag Indicators**
-
-**Immediately stop testing and report if you see:**
-- [ ] ❌ StackOverflowError in console
-- [ ] ❌ Application freezing or becoming unresponsive
-- [ ] ❌ Infinite dialog boxes or repeated error messages
-- [ ] ❌ Rapid, repeated log entries indicating loops
-- [ ] ❌ Profile information not updating after switches
-- [ ] ❌ ComboBox selection jumping or behaving erratically
-
----
-
-## ✅ **Success Criteria**
-
-**Test passes if:**
-- [ ] All 8 test scenarios complete without StackOverflowError
-- [ ] Profile switching works smoothly and correctly
-- [ ] Config tab is accessible and functional
-- [ ] No performance degradation noticed
-- [ ] All existing functionality preserved
-- [ ] Error handling remains appropriate
-
----
-
-## 📊 **Test Results Summary**
-
-### **Test Execution Results - [Date/Time]**
-
-#### **Core Tests:**
-- [ ] Test 1 - Basic Config Tab Access: ✅ PASS / ❌ FAIL
-- [ ] Test 2 - Profile Switching: ✅ PASS / ❌ FAIL  
-- [ ] Test 3 - Profile Management: ✅ PASS / ❌ FAIL
-- [ ] Test 4 - Rapid Tab Switching: ✅ PASS / ❌ FAIL
-- [ ] Test 5 - Edge Cases: ✅ PASS / ❌ FAIL
-- [ ] Test 6 - Error Conditions: ✅ PASS / ❌ FAIL
-- [ ] Test 7 - Music File Count: ✅ PASS / ❌ FAIL
-- [ ] Test 8 - Application Lifecycle: ✅ PASS / ❌ FAIL
-
-#### **Overall Assessment:**
-- [ ] **Overall Result:** ✅ PASS / ❌ FAIL
-- [ ] **Issues Found:** [List any issues discovered]
-- [ ] **Notes:** [Additional observations]
-- [ ] **Estimated Testing Time:** 15-20 minutes for complete test suite
-
----
-
-## 📝 **Test Notes Section**
-
-**Use this space to record observations, issues, or additional notes during testing:**
-
+# Terminal 2: Frontend
+cd frontend && npm run dev
 ```
-[Your testing notes here]
+
+### Test Data Setup
+
+Create a test directory with sample music files:
+- Various formats (MP3, FLAC, M4A)
+- Known duplicates with different metadata
+- Files with complete and incomplete metadata
+
+---
+
+## Backend Tests
+
+### Running Backend Tests
+
+```bash
+./gradle21 test
+```
+
+### Test Categories
+
+#### Unit Tests
+
+| Test Class | Purpose |
+|------------|---------|
+| `StringUtilsTest` | Fuzzy string matching algorithms |
+| `MusicFileTest` | Music file entity operations |
+| `FuzzyMatcherTest` | Similarity calculation |
+
+#### Service Tests
+
+| Test Class | Purpose |
+|------------|---------|
+| `MusicFileServiceTest` | CRUD operations |
+| `DuplicateServiceTest` | Duplicate detection logic |
+| `ScanningServiceTest` | Directory scanning |
+
+#### Integration Tests
+
+| Test Class | Purpose |
+|------------|---------|
+| `MusicFileControllerTest` | REST API endpoints |
+| `DuplicateControllerTest` | Duplicate API endpoints |
+| `ScanningControllerTest` | Scanning API endpoints |
+
+---
+
+## Frontend Tests
+
+### Running E2E Tests
+
+```bash
+cd frontend
+npm run build
+npm run preview &
+npm test
+```
+
+### E2E Test Scenarios
+
+#### Import Tab Tests
+
+- [ ] Browse directories on server
+- [ ] Start a scan
+- [ ] View real-time progress via WebSocket
+- [ ] Cancel running scan
+- [ ] View scan results
+
+#### Duplicate Manager Tests
+
+- [ ] Load duplicate groups
+- [ ] Select a duplicate group
+- [ ] View file details and comparison
+- [ ] Delete individual file
+- [ ] Preview auto-resolution
+- [ ] Execute auto-resolution
+- [ ] Switch to directory view
+- [ ] Select directory conflict
+- [ ] Preview directory resolution
+- [ ] Execute directory resolution
+
+#### Metadata Editor Tests
+
+- [ ] Search for files
+- [ ] View search results
+- [ ] Select file for editing
+- [ ] Edit individual fields
+- [ ] Save changes
+- [ ] Select multiple files
+- [ ] Open bulk edit dialog
+- [ ] Apply bulk edits
+
+#### Config Tab Tests
+
+- [ ] View current settings
+- [ ] Modify duplicate detection thresholds
+- [ ] Enable/disable audio fingerprinting
+- [ ] Save configuration
+- [ ] View help documentation
+
+---
+
+## API Tests
+
+### Music Files API
+
+```bash
+# List files
+curl http://localhost:9090/api/v1/music?page=0&size=10
+
+# Get single file
+curl http://localhost:9090/api/v1/music/1
+
+# Search
+curl "http://localhost:9090/api/v1/music/search?q=beatles"
+
+# Update
+curl -X PUT http://localhost:9090/api/v1/music/1 \
+  -H "Content-Type: application/json" \
+  -d '{"title":"New Title","artist":"Artist"}'
+```
+
+### Duplicates API
+
+```bash
+# Get duplicate groups
+curl http://localhost:9090/api/v1/duplicates?page=0&size=25
+
+# Get directory conflicts
+curl http://localhost:9090/api/v1/duplicates/by-directory
+
+# Preview auto-resolution
+curl http://localhost:9090/api/v1/duplicates/auto-resolve/preview
+
+# Delete file
+curl -X DELETE http://localhost:9090/api/v1/duplicates/file/123
+```
+
+### Scanning API
+
+```bash
+# Browse directories
+curl "http://localhost:9090/api/v1/scanning/browse?path=/Users"
+
+# Start scan
+curl -X POST http://localhost:9090/api/v1/scanning/start \
+  -H "Content-Type: application/json" \
+  -d '{"directory":"/path/to/music"}'
+
+# Get scan status
+curl http://localhost:9090/api/v1/scanning/status/{sessionId}
+
+# Cancel scan
+curl -X POST http://localhost:9090/api/v1/scanning/cancel/{sessionId}
 ```
 
 ---
 
-**Test Plan Version:** 1.0  
-**Created:** 2025-07-04  
-**Target Fix:** Issue #26 - Config Tab StackOverflowError  
-**Related Commits:** 827ed41, c62a64c, 9862455
+## Manual Test Scenarios
+
+### Scenario 1: Complete Import Workflow
+
+1. Start application (backend + frontend)
+2. Navigate to Import tab
+3. Browse to test music directory
+4. Start scan
+5. Verify progress updates in real-time
+6. Wait for completion
+7. Verify file count matches expected
+
+**Expected**: All files imported with correct metadata
+
+### Scenario 2: Duplicate Detection and Resolution
+
+1. Import test directory with known duplicates
+2. Navigate to Duplicate Manager
+3. Verify duplicate groups are detected
+4. Select a duplicate group
+5. Compare file quality (bitrate, size)
+6. Delete lower quality file
+7. Verify group updates
+
+**Expected**: Lower quality duplicate removed, group resolved
+
+### Scenario 3: Directory-Based Resolution
+
+1. Import two directories with overlapping files
+2. Navigate to Duplicate Manager
+3. Switch to "By Directory" view
+4. Select a directory conflict
+5. Preview resolution
+6. Execute resolution (keep preferred directory)
+7. Verify files deleted from non-preferred directory
+
+**Expected**: All duplicates from one directory removed
+
+### Scenario 4: Bulk Metadata Edit
+
+1. Search for files by artist
+2. Select multiple files
+3. Open bulk edit
+4. Verify combobox shows distinct values with counts
+5. Select new artist name
+6. Apply changes
+7. Verify all files updated
+
+**Expected**: All selected files have new artist name
+
+### Scenario 5: Audio Fingerprinting
+
+1. Enable fingerprinting in Config
+2. Import files with different metadata but same audio
+3. Run duplicate detection
+4. Verify duplicates detected by fingerprint
+
+**Expected**: Acoustically identical files grouped as duplicates
+
+---
+
+## Performance Tests
+
+### Large Collection Test
+
+- Import 10,000+ files
+- Verify scan completes without errors
+- Check memory usage stays reasonable
+- Verify duplicate detection performance
+
+### Stress Test
+
+- Rapid tab switching
+- Multiple concurrent API requests
+- Large bulk edit operations
+
+---
+
+## Regression Tests
+
+### Critical Paths
+
+| Feature | Test |
+|---------|------|
+| Application startup | Backend starts on 9090, frontend on 5173 |
+| Database initialization | SQLite database created on first run |
+| WebSocket connection | Progress updates received during scan |
+| File deletion | Files removed from disk and database |
+| Metadata persistence | Changes saved and survive restart |
+
+### Known Edge Cases
+
+- Empty metadata fields
+- Very long file paths
+- Unicode characters in metadata
+- Files without audio tags
+- Corrupted audio files
+
+---
+
+## Test Results Template
+
+### Test Execution: [Date]
+
+| Category | Pass | Fail | Skip |
+|----------|------|------|------|
+| Backend Unit | | | |
+| Backend Integration | | | |
+| Frontend E2E | | | |
+| Manual Scenarios | | | |
+
+### Issues Found
+
+| Issue | Severity | Description |
+|-------|----------|-------------|
+| | | |
+
+### Notes
+
+```
+[Testing observations and notes]
+```
+
+---
+
+*Test Plan Version: 2.0*
+*Last Updated: January 2026*
