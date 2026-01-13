@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DuplicateGroup, MusicFile, DuplicateScanStatus } from '../../types/music';
 import {
   fetchDuplicateGroups,
@@ -9,6 +9,7 @@ import {
   refreshDuplicates,
   compareFiles,
 } from '../../api/duplicatesApi';
+import { getAudioStreamUrl } from '../../api/musicApi';
 
 interface ComparisonDetail {
   file1: MusicFile;
@@ -27,6 +28,11 @@ export default function DuplicateManager() {
   const [scanStatus, setScanStatus] = useState<DuplicateScanStatus | null>(null);
   const [comparison, setComparison] = useState<ComparisonDetail | null>(null);
   const [duplicateCount, setDuplicateCount] = useState(0);
+
+  // Audio player state
+  const [playingFile, setPlayingFile] = useState<MusicFile | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const loadDuplicates = useCallback(async () => {
     try {
@@ -164,6 +170,38 @@ export default function DuplicateManager() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  // Audio playback handlers
+  const playFile = useCallback((file: MusicFile, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playingFile?.id === file.id) {
+      // Toggle play/pause for same file
+      if (audioRef.current) {
+        if (isPlaying) {
+          audioRef.current.pause();
+        } else {
+          audioRef.current.play();
+        }
+      }
+    } else {
+      // Play new file
+      setPlayingFile(file);
+      setIsPlaying(true);
+    }
+  }, [playingFile, isPlaying]);
+
+  const stopPlayback = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlayingFile(null);
+    setIsPlaying(false);
+  }, []);
+
+  const handleAudioPlay = useCallback(() => setIsPlaying(true), []);
+  const handleAudioPause = useCallback(() => setIsPlaying(false), []);
+  const handleAudioEnded = useCallback(() => setIsPlaying(false), []);
+
   return (
     <div className="duplicate-manager">
       <div className="duplicate-header">
@@ -284,6 +322,13 @@ export default function DuplicateManager() {
                       </div>
                       <div className="file-actions">
                         <button
+                          className={`play-button ${playingFile?.id === file.id && isPlaying ? 'playing' : ''}`}
+                          onClick={(e) => playFile(file, e)}
+                          title={playingFile?.id === file.id && isPlaying ? 'Pause' : 'Play'}
+                        >
+                          {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
+                        </button>
+                        <button
                           className="keep-button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -315,6 +360,29 @@ export default function DuplicateManager() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Audio Player */}
+      {playingFile && (
+        <div className="audio-player-bar">
+          <div className="audio-player-info">
+            <span className="audio-player-title">{playingFile.title || 'Unknown'}</span>
+            <span className="audio-player-artist">{playingFile.artist || 'Unknown Artist'}</span>
+          </div>
+          <audio
+            ref={audioRef}
+            src={getAudioStreamUrl(playingFile.id)}
+            autoPlay
+            onPlay={handleAudioPlay}
+            onPause={handleAudioPause}
+            onEnded={handleAudioEnded}
+            controls
+            className="audio-player-controls"
+          />
+          <button className="audio-player-close" onClick={stopPlayback} title="Stop">
+            ✕
+          </button>
         </div>
       )}
     </div>

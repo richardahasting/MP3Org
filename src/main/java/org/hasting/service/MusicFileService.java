@@ -6,6 +6,7 @@ import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -192,5 +193,37 @@ public class MusicFileService {
             }
         }
         return updated;
+    }
+
+    /**
+     * Gets the audio file for streaming.
+     *
+     * @param id The database ID
+     * @return Optional containing the File if found and exists
+     */
+    public Optional<File> getAudioFile(Long id) {
+        MusicFile entity = DatabaseManager.getMusicFileById(id);
+        if (entity == null) {
+            return Optional.empty();
+        }
+        File file = new File(entity.getFilePath());
+        if (!file.exists() || !file.canRead()) {
+            return Optional.empty();
+        }
+        return Optional.of(file);
+    }
+
+    /**
+     * Gets the file type (extension) for a music file.
+     *
+     * @param id The database ID
+     * @return Optional containing the file type if found
+     */
+    public Optional<String> getFileType(Long id) {
+        MusicFile entity = DatabaseManager.getMusicFileById(id);
+        if (entity == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(entity.getFileType());
     }
 }
