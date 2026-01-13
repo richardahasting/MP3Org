@@ -2,6 +2,8 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { useMusicFiles } from '../../hooks/useMusicFiles';
 import type { MusicFile } from '../../types/music';
 import { updateMusicFile, deleteMusicFile, bulkUpdateMusicFiles, getAudioStreamUrl } from '../../api/musicApi';
+import HelpModal, { HelpButton } from '../common/HelpModal';
+import { metadataHelp } from '../common/helpContent';
 
 type SearchField = 'all' | 'title' | 'artist' | 'album';
 
@@ -53,6 +55,9 @@ export default function MetadataEditor() {
   const [playingFile, setPlayingFile] = useState<MusicFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false);
 
   // Computed values for selection
   const allSelected = useMemo(() =>
@@ -356,6 +361,7 @@ export default function MetadataEditor() {
           <button type="submit" className="search-btn">
             Search
           </button>
+          <HelpButton onClick={() => setShowHelp(true)} />
         </form>
       </div>
 
@@ -629,6 +635,13 @@ export default function MetadataEditor() {
           </button>
         </div>
       )}
+
+      <HelpModal
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Metadata Editor Help"
+        sections={metadataHelp}
+      />
     </div>
   );
 }

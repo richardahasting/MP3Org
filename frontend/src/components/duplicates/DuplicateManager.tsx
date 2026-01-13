@@ -12,6 +12,8 @@ import {
 } from '../../api/duplicatesApi';
 import { getAudioStreamUrl } from '../../api/musicApi';
 import { useDuplicateWebSocket } from '../../hooks/useDuplicateWebSocket';
+import HelpModal, { HelpButton } from '../common/HelpModal';
+import { duplicatesHelp } from '../common/helpContent';
 
 interface ComparisonDetail {
   file1: MusicFile;
@@ -46,6 +48,9 @@ export default function DuplicateManager() {
   const [playingFile, setPlayingFile] = useState<MusicFile | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Help modal state
+  const [showHelp, setShowHelp] = useState(false);
 
   // WebSocket for progressive duplicate scanning
   const { status: scanStatus } = useDuplicateWebSocket({
@@ -442,6 +447,7 @@ export default function DuplicateManager() {
           >
             Refresh
           </button>
+          <HelpButton onClick={() => setShowHelp(true)} />
         </div>
       </div>
 
@@ -722,8 +728,8 @@ export default function DuplicateManager() {
                           <span className="file-bitrate">{file.bitRate} kbps</span>
                           <span className="file-size">{formatFileSize(file.fileSizeBytes)}</span>
                         </div>
-                        <div className="file-path" title={file.filePath}>
-                          {file.filePath.split('/').slice(-2).join('/')}
+                        <div className="file-path">
+                          {file.filePath}
                         </div>
                         <div className="file-actions">
                           <button
@@ -791,6 +797,13 @@ export default function DuplicateManager() {
           </button>
         </div>
       )}
+
+      <HelpModal
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        title="Duplicate Manager Help"
+        sections={duplicatesHelp}
+      />
     </div>
   );
 }
