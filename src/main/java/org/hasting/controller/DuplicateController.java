@@ -24,6 +24,7 @@ import java.util.Map;
  * - POST /api/v1/duplicates/scan/{id}/cancel - Cancel scan
  * - POST /api/v1/duplicates/refresh      - Invalidate cache and refresh
  * - DELETE /api/v1/duplicates/{groupId}/keep/{fileId} - Keep one file, delete others
+ * - DELETE /api/v1/duplicates/file/{fileId} - Delete a single file
  */
 @RestController
 @RequestMapping("/api/v1/duplicates")
@@ -166,6 +167,21 @@ public class DuplicateController {
         return ResponseEntity.ok(Map.of(
             "keptFileId", fileId,
             "deletedCount", deletedCount
+        ));
+    }
+
+    /**
+     * Delete a single file from the duplicates.
+     */
+    @DeleteMapping("/file/{fileId}")
+    public ResponseEntity<Map<String, Object>> deleteFile(@PathVariable long fileId) {
+        boolean deleted = duplicateService.deleteFile(fileId);
+        if (!deleted) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(Map.of(
+            "deleted", true,
+            "fileId", fileId
         ));
     }
 

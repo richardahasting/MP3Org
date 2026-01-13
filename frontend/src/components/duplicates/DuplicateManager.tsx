@@ -3,7 +3,7 @@ import type { DuplicateGroup, MusicFile, DuplicateScanStatus } from '../../types
 import {
   fetchDuplicateGroups,
   getDuplicateCount,
-  keepFileDeleteOthers,
+  deleteDuplicateFile,
   startDuplicateScan,
   refreshDuplicates,
   compareFiles,
@@ -159,22 +159,37 @@ export default function DuplicateManager() {
     }
   }, [selectedGroup]);
 
-  const handleKeepFile = useCallback(async (fileId: number) => {
+  const handleDeleteFile = useCallback(async (fileId: number, fileName: string) => {
     if (!selectedGroup) return;
 
-    if (!confirm(`Keep this file and delete the ${selectedGroup.fileCount - 1} other duplicate(s)?`)) {
+    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) {
       return;
     }
 
     try {
-      const result = await keepFileDeleteOthers(selectedGroup.groupId, fileId);
-      alert(`Kept file and deleted ${result.deletedCount} duplicate(s)`);
-      setSelectedGroup(null);
-      setSelectedFileId(null);
-      setComparison(null);
+      await deleteDuplicateFile(fileId);
+
+      // Update the group locally - remove deleted file
+      const remainingFiles = selectedGroup.files.filter(f => f.id !== fileId);
+
+      if (remainingFiles.length <= 1) {
+        // Group is resolved - no longer a duplicate
+        setSelectedGroup(null);
+        setSelectedFileId(null);
+        setComparison(null);
+      } else {
+        // Update the selected group with remaining files
+        setSelectedGroup({
+          ...selectedGroup,
+          files: remainingFiles,
+          fileCount: remainingFiles.length,
+        });
+      }
+
+      // Refresh to get updated groups from server
       await loadDuplicates();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to process duplicates');
+      setError(err instanceof Error ? err.message : 'Failed to delete file');
     }
   }, [selectedGroup, loadDuplicates]);
 
@@ -318,7 +333,7 @@ export default function DuplicateManager() {
               <>
                 <div className="detail-header">
                   <h3>Files in Group</h3>
-                  <span className="detail-hint">Click a file to keep it, others will be deleted</span>
+                  <span className="detail-hint">Delete duplicates you don't want to keep</span>
                 </div>
                 <div className="file-list">
                   {selectedGroup.files.map(file => (
@@ -349,13 +364,13 @@ export default function DuplicateManager() {
                           {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
                         </button>
                         <button
-                          className="keep-button"
+                          className="delete-button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleKeepFile(file.id);
+                            handleDeleteFile(file.id, file.title || file.filePath);
                           }}
                         >
-                          Keep This File
+                          Delete this file
                         </button>
                       </div>
                     </div>

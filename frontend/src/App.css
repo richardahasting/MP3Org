@@ -2393,9 +2393,9 @@ body::before {
   animation: pulse-glow 1.5s ease-in-out infinite;
 }
 
-.keep-button {
+.delete-button {
   padding: var(--space-sm) var(--space-md);
-  background: var(--success);
+  background: var(--error);
   border: none;
   border-radius: 6px;
   color: var(--bg-deep);
@@ -2405,9 +2405,9 @@ body::before {
   transition: var(--transition-fast);
 }
 
-.keep-button:hover {
-  background: #8ec99e;
-  box-shadow: 0 2px 8px rgba(126, 184, 142, 0.3);
+.delete-button:hover {
+  background: #d88888;
+  box-shadow: 0 2px 8px rgba(199, 106, 106, 0.4);
 }
 
 /* Comparison Panel */
