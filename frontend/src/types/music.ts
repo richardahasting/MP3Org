@@ -116,3 +116,34 @@ export interface AutoResolutionPreview {
   totalFilesToKeep: number;
   totalGroupsNeedingReview: number;
 }
+
+// Directory-based duplicate grouping types (Issue #92)
+export interface DuplicatePair {
+  fileA: MusicFile;
+  fileB: MusicFile;
+  similarity: number | null;
+}
+
+export interface DirectoryConflict {
+  directoryA: string;
+  directoryB: string;
+  filesInA: number;
+  filesInB: number;
+  totalDuplicatePairs: number;
+  pairs: DuplicatePair[];
+}
+
+export interface DirectoryResolutionPreview {
+  directoryToKeep: string;
+  directoryToDelete: string;
+  filesToDelete: MusicFile[];
+  filesToKeep: MusicFile[];
+  totalFilesToDelete: number;
+}
+
+export interface DirectoryResolutionResult {
+  filesDeleted: number;
+  filesAttempted: number;
+  directoryKept: string;
+  directoryCleared: string;
+}

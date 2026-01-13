@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { DuplicateGroup, DuplicateFile, MusicFile, DuplicateScanStatus, AutoResolutionResult, AutoResolutionPreview } from '../../types/music';
+import type { DuplicateGroup, DuplicateFile, MusicFile, DuplicateScanStatus, AutoResolutionResult, AutoResolutionPreview, DirectoryConflict, DirectoryResolutionPreview } from '../../types/music';
 import {
   fetchDuplicateGroups,
   deleteFile,
@@ -9,11 +9,16 @@ import {
   previewAutoResolution,
   executeAutoResolution,
   openFileFolder,
+  getDirectoryConflicts,
+  previewDirectoryResolution,
+  executeDirectoryResolution,
 } from '../../api/duplicatesApi';
 import { getAudioStreamUrl } from '../../api/musicApi';
 import { useDuplicateWebSocket } from '../../hooks/useDuplicateWebSocket';
 import HelpModal, { HelpButton } from '../common/HelpModal';
 import { duplicatesHelp } from '../common/helpContent';
+
+type ViewMode = 'similarity' | 'directory';
 
 interface ComparisonDetail {
   file1: MusicFile;
@@ -51,6 +56,15 @@ export default function DuplicateManager() {
 
   // Help modal state
   const [showHelp, setShowHelp] = useState(false);
+
+  // View mode state (Issue #92)
+  const [viewMode, setViewMode] = useState<ViewMode>('similarity');
+  const [directoryConflicts, setDirectoryConflicts] = useState<DirectoryConflict[]>([]);
+  const [selectedConflict, setSelectedConflict] = useState<DirectoryConflict | null>(null);
+  const [preferredDirectory, setPreferredDirectory] = useState<string | null>(null);
+  const [directoryPreview, setDirectoryPreview] = useState<DirectoryResolutionPreview | null>(null);
+  const [directoryLoading, setDirectoryLoading] = useState(false);
+  const [executingDirectoryResolution, setExecutingDirectoryResolution] = useState(false);
 
   // WebSocket for progressive duplicate scanning
   const { status: scanStatus } = useDuplicateWebSocket({
@@ -148,6 +162,80 @@ export default function DuplicateManager() {
       setError(err instanceof Error ? err.message : 'Failed to refresh');
     }
   }, [loadDuplicates]);
+
+  // Directory view handlers (Issue #92)
+  const loadDirectoryConflicts = useCallback(async () => {
+    try {
+      setDirectoryLoading(true);
+      setError(null);
+      const conflicts = await getDirectoryConflicts();
+      setDirectoryConflicts(conflicts);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load directory conflicts');
+    } finally {
+      setDirectoryLoading(false);
+    }
+  }, []);
+
+  const handleSelectConflict = useCallback((conflict: DirectoryConflict) => {
+    setSelectedConflict(conflict);
+    setPreferredDirectory(null);
+    setDirectoryPreview(null);
+  }, []);
+
+  const handleSelectPreferredDirectory = useCallback(async (directory: string) => {
+    if (!selectedConflict) return;
+
+    setPreferredDirectory(directory);
+
+    // Determine which directory to delete from
+    const directoryToDelete = directory === selectedConflict.directoryA
+      ? selectedConflict.directoryB
+      : selectedConflict.directoryA;
+
+    try {
+      const preview = await previewDirectoryResolution(directory, directoryToDelete);
+      setDirectoryPreview(preview);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to preview resolution');
+    }
+  }, [selectedConflict]);
+
+  const handleExecuteDirectoryResolution = useCallback(async () => {
+    if (!selectedConflict || !preferredDirectory || !directoryPreview) return;
+
+    const fileCount = directoryPreview.totalFilesToDelete;
+    if (!confirm(`Delete ${fileCount} files from "${directoryPreview.directoryToDelete}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setExecutingDirectoryResolution(true);
+      const result = await executeDirectoryResolution(
+        directoryPreview.directoryToKeep,
+        directoryPreview.directoryToDelete
+      );
+
+      // Clear selection and reload
+      setSelectedConflict(null);
+      setPreferredDirectory(null);
+      setDirectoryPreview(null);
+      await loadDirectoryConflicts();
+
+      alert(`Deleted ${result.filesDeleted} files from ${result.directoryCleared}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to execute resolution');
+    } finally {
+      setExecutingDirectoryResolution(false);
+    }
+  }, [selectedConflict, preferredDirectory, directoryPreview, loadDirectoryConflicts]);
+
+  // Load directory conflicts when switching to directory view
+  useEffect(() => {
+    if (viewMode === 'directory' && directoryConflicts.length === 0) {
+      loadDirectoryConflicts();
+    }
+  }, [viewMode, directoryConflicts.length, loadDirectoryConflicts]);
 
   const handleSelectGroup = useCallback((group: DuplicateGroup) => {
     setSelectedGroup(group);
@@ -451,6 +539,23 @@ export default function DuplicateManager() {
         </div>
       </div>
 
+      {/* View Mode Toggle */}
+      <div className="view-mode-toggle">
+        <span className="view-mode-label">View:</span>
+        <button
+          className={`view-mode-btn ${viewMode === 'similarity' ? 'active' : ''}`}
+          onClick={() => setViewMode('similarity')}
+        >
+          By Similarity
+        </button>
+        <button
+          className={`view-mode-btn ${viewMode === 'directory' ? 'active' : ''}`}
+          onClick={() => setViewMode('directory')}
+        >
+          By Directory
+        </button>
+      </div>
+
       {scanning && scanStatus && (
         <div className="scan-progress">
           <div className="scan-progress-bar">
@@ -659,120 +764,297 @@ export default function DuplicateManager() {
         </div>
       )}
 
-      {loading ? (
-        <div className="loading-state">
-          <div className="loading-spinner">@</div>
-          <p>Loading duplicate groups...</p>
-        </div>
-      ) : groups.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">$</div>
-          <h3>No duplicates found</h3>
-          <p>Your collection appears to be free of duplicates. Run a scan to check again.</p>
-        </div>
-      ) : (
-        <div className="duplicate-content">
-          <div className="duplicate-list">
-            <div className="list-header">
-              <h3>Duplicate Groups ({groups.length})</h3>
+      {/* Similarity View */}
+      {viewMode === 'similarity' && (
+        <>
+          {loading ? (
+            <div className="loading-state">
+              <div className="loading-spinner">@</div>
+              <p>Loading duplicate groups...</p>
             </div>
-            <div className="group-list">
-              {groups.map(group => (
-                <div
-                  key={group.groupId}
-                  className={`group-item ${selectedGroup?.groupId === group.groupId ? 'selected' : ''}`}
-                  onClick={() => handleSelectGroup(group)}
-                >
-                  <div className="group-info">
-                    <span className="group-title">{group.representativeTitle || 'Unknown Title'}</span>
-                    <span className="group-artist">{group.representativeArtist || 'Unknown Artist'}</span>
-                  </div>
-                  <span className="group-count">{group.fileCount} files</span>
-                </div>
-              ))}
+          ) : groups.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">$</div>
+              <h3>No duplicates found</h3>
+              <p>Your collection appears to be free of duplicates. Run a scan to check again.</p>
             </div>
-          </div>
-
-          <div className="duplicate-detail">
-            {selectedGroup ? (
-              <>
-                <div className="detail-header">
-                  <h3>Files in Group</h3>
-                  <span className="detail-hint">Select a file to see details, delete duplicates you don't want</span>
+          ) : (
+            <div className="duplicate-content">
+              <div className="duplicate-list">
+                <div className="list-header">
+                  <h3>Duplicate Groups ({groups.length})</h3>
                 </div>
-                <div className="file-list">
-                  {selectedGroup.files.map((dupFile, index) => {
-                    const file = dupFile.file;
-                    const isReference = index === 0;
-                    return (
-                      <div
-                        key={file.id}
-                        className={`file-item ${selectedFileId === file.id ? 'selected' : ''} ${isReference ? 'reference' : ''}`}
-                        onClick={() => handleSelectFile(dupFile)}
-                      >
-                        <div className="file-main">
-                          <div className="file-title-row">
-                            <span className="file-title">{file.title || 'Unknown'}</span>
-                            {dupFile.similarity !== null && (
-                              <span className={`similarity-badge ${dupFile.similarity >= 0.95 ? 'high' : dupFile.similarity >= 0.85 ? 'medium' : 'low'}`}>
-                                {(dupFile.similarity * 100).toFixed(0)}% match
-                              </span>
-                            )}
-                            {isReference && <span className="reference-badge">Reference</span>}
-                          </div>
-                          <span className="file-artist">{file.artist || 'Unknown'}</span>
-                          <span className="file-album">{file.album || 'Unknown'}</span>
-                        </div>
-                        <div className="file-meta">
-                          <span className="file-duration">{formatDuration(file.durationSeconds)}</span>
-                          <span className="file-bitrate">{file.bitRate} kbps</span>
-                          <span className="file-size">{formatFileSize(file.fileSizeBytes)}</span>
-                        </div>
-                        <div className="file-path">
-                          {file.filePath}
-                        </div>
-                        <div className="file-actions">
-                          <button
-                            className={`play-button ${playingFile?.id === file.id && isPlaying ? 'playing' : ''}`}
-                            onClick={(e) => playFile(dupFile, e)}
-                            title={playingFile?.id === file.id && isPlaying ? 'Pause' : 'Play'}
-                          >
-                            {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
-                          </button>
-                          <button
-                            className="delete-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteFile(file.id);
-                            }}
-                          >
-                            Delete This File
-                          </button>
-                        </div>
+                <div className="group-list">
+                  {groups.map(group => (
+                    <div
+                      key={group.groupId}
+                      className={`group-item ${selectedGroup?.groupId === group.groupId ? 'selected' : ''}`}
+                      onClick={() => handleSelectGroup(group)}
+                    >
+                      <div className="group-info">
+                        <span className="group-title">{group.representativeTitle || 'Unknown Title'}</span>
+                        <span className="group-artist">{group.representativeArtist || 'Unknown Artist'}</span>
                       </div>
-                    );
-                  })}
-                </div>
-
-                {comparison && (
-                  <div className="comparison-panel">
-                    <h4>Comparison Details</h4>
-                    <div className="comparison-similarity">
-                      <span className="similarity-label">Similarity:</span>
-                      <span className="similarity-value">{(comparison.similarity * 100).toFixed(1)}%</span>
+                      <span className="group-count">{group.fileCount} files</span>
                     </div>
-                    <pre className="comparison-breakdown">{comparison.breakdown}</pre>
+                  ))}
+                </div>
+              </div>
+
+              <div className="duplicate-detail">
+                {selectedGroup ? (
+                  <>
+                    <div className="detail-header">
+                      <h3>Files in Group</h3>
+                      <span className="detail-hint">Select a file to see details, delete duplicates you don't want</span>
+                    </div>
+                    <div className="file-list">
+                      {selectedGroup.files.map((dupFile, index) => {
+                        const file = dupFile.file;
+                        const isReference = index === 0;
+                        return (
+                          <div
+                            key={file.id}
+                            className={`file-item ${selectedFileId === file.id ? 'selected' : ''} ${isReference ? 'reference' : ''}`}
+                            onClick={() => handleSelectFile(dupFile)}
+                          >
+                            <div className="file-main">
+                              <div className="file-title-row">
+                                <span className="file-title">{file.title || 'Unknown'}</span>
+                                {dupFile.similarity !== null && (
+                                  <span className={`similarity-badge ${dupFile.similarity >= 0.95 ? 'high' : dupFile.similarity >= 0.85 ? 'medium' : 'low'}`}>
+                                    {(dupFile.similarity * 100).toFixed(0)}% match
+                                  </span>
+                                )}
+                                {isReference && <span className="reference-badge">Reference</span>}
+                              </div>
+                              <span className="file-artist">{file.artist || 'Unknown'}</span>
+                              <span className="file-album">{file.album || 'Unknown'}</span>
+                            </div>
+                            <div className="file-meta">
+                              <span className="file-duration">{formatDuration(file.durationSeconds)}</span>
+                              <span className="file-bitrate">{file.bitRate} kbps</span>
+                              <span className="file-size">{formatFileSize(file.fileSizeBytes)}</span>
+                            </div>
+                            <div className="file-path">
+                              {file.filePath}
+                            </div>
+                            <div className="file-actions">
+                              <button
+                                className={`play-button ${playingFile?.id === file.id && isPlaying ? 'playing' : ''}`}
+                                onClick={(e) => playFile(dupFile, e)}
+                                title={playingFile?.id === file.id && isPlaying ? 'Pause' : 'Play'}
+                              >
+                                {playingFile?.id === file.id && isPlaying ? '❚❚' : '▶'}
+                              </button>
+                              <button
+                                className="delete-button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteFile(file.id);
+                                }}
+                              >
+                                Delete This File
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {comparison && (
+                      <div className="comparison-panel">
+                        <h4>Comparison Details</h4>
+                        <div className="comparison-similarity">
+                          <span className="similarity-label">Similarity:</span>
+                          <span className="similarity-value">{(comparison.similarity * 100).toFixed(1)}%</span>
+                        </div>
+                        <pre className="comparison-breakdown">{comparison.breakdown}</pre>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="detail-placeholder">
+                    <div className="placeholder-icon">@</div>
+                    <p>Select a duplicate group to see files</p>
                   </div>
                 )}
-              </>
-            ) : (
-              <div className="detail-placeholder">
-                <div className="placeholder-icon">@</div>
-                <p>Select a duplicate group to see files</p>
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Directory View */}
+      {viewMode === 'directory' && (
+        <>
+          {directoryLoading ? (
+            <div className="loading-state">
+              <div className="loading-spinner">@</div>
+              <p>Loading directory conflicts...</p>
+            </div>
+          ) : directoryConflicts.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">$</div>
+              <h3>No directory conflicts found</h3>
+              <p>No duplicate files exist across different directories.</p>
+            </div>
+          ) : (
+            <div className="duplicate-content directory-view">
+              <div className="duplicate-list">
+                <div className="list-header">
+                  <h3>Directory Conflicts ({directoryConflicts.length})</h3>
+                </div>
+                <div className="group-list">
+                  {directoryConflicts.map((conflict, index) => (
+                    <div
+                      key={`${conflict.directoryA}-${conflict.directoryB}-${index}`}
+                      className={`group-item directory-conflict-item ${selectedConflict?.directoryA === conflict.directoryA && selectedConflict?.directoryB === conflict.directoryB ? 'selected' : ''}`}
+                      onClick={() => handleSelectConflict(conflict)}
+                    >
+                      <div className="conflict-dirs">
+                        <span className="conflict-dir" title={conflict.directoryA}>
+                          {conflict.directoryA.split('/').slice(-2).join('/')}
+                        </span>
+                        <span className="conflict-vs">vs</span>
+                        <span className="conflict-dir" title={conflict.directoryB}>
+                          {conflict.directoryB.split('/').slice(-2).join('/')}
+                        </span>
+                      </div>
+                      <div className="conflict-stats">
+                        <span className="conflict-count">{conflict.totalDuplicatePairs} duplicates</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="duplicate-detail">
+                {selectedConflict ? (
+                  <div className="directory-conflict-detail">
+                    <div className="detail-header">
+                      <h3>Choose Directory to Keep</h3>
+                      <span className="detail-hint">Select which directory's files you want to keep</span>
+                    </div>
+
+                    <div className="directory-choice-panel">
+                      <label
+                        className={`directory-option ${preferredDirectory === selectedConflict.directoryA ? 'selected' : ''}`}
+                        onClick={() => handleSelectPreferredDirectory(selectedConflict.directoryA)}
+                      >
+                        <input
+                          type="radio"
+                          name="preferred-directory"
+                          checked={preferredDirectory === selectedConflict.directoryA}
+                          onChange={() => handleSelectPreferredDirectory(selectedConflict.directoryA)}
+                        />
+                        <div className="directory-option-content">
+                          <span className="directory-path" title={selectedConflict.directoryA}>
+                            {selectedConflict.directoryA}
+                          </span>
+                          <span className="directory-file-count">{selectedConflict.filesInA} files</span>
+                        </div>
+                      </label>
+
+                      <label
+                        className={`directory-option ${preferredDirectory === selectedConflict.directoryB ? 'selected' : ''}`}
+                        onClick={() => handleSelectPreferredDirectory(selectedConflict.directoryB)}
+                      >
+                        <input
+                          type="radio"
+                          name="preferred-directory"
+                          checked={preferredDirectory === selectedConflict.directoryB}
+                          onChange={() => handleSelectPreferredDirectory(selectedConflict.directoryB)}
+                        />
+                        <div className="directory-option-content">
+                          <span className="directory-path" title={selectedConflict.directoryB}>
+                            {selectedConflict.directoryB}
+                          </span>
+                          <span className="directory-file-count">{selectedConflict.filesInB} files</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    {directoryPreview && (
+                      <div className="directory-preview">
+                        <div className="preview-summary-row">
+                          <span className="preview-keep">
+                            Keeping {directoryPreview.filesToKeep.length} files from {directoryPreview.directoryToKeep.split('/').slice(-2).join('/')}
+                          </span>
+                          <span className="preview-delete">
+                            Deleting {directoryPreview.totalFilesToDelete} files from {directoryPreview.directoryToDelete.split('/').slice(-2).join('/')}
+                          </span>
+                        </div>
+
+                        <div className="files-to-delete-list">
+                          <h4>Files to be deleted:</h4>
+                          {directoryPreview.filesToDelete.slice(0, 10).map(file => (
+                            <div key={file.id} className="file-to-delete-item">
+                              <span className="file-title">{file.title || 'Unknown'}</span>
+                              <span className="file-artist">{file.artist || 'Unknown'}</span>
+                            </div>
+                          ))}
+                          {directoryPreview.filesToDelete.length > 10 && (
+                            <div className="more-files">
+                              ...and {directoryPreview.filesToDelete.length - 10} more files
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          className="action-button execute directory-execute"
+                          onClick={handleExecuteDirectoryResolution}
+                          disabled={executingDirectoryResolution}
+                        >
+                          {executingDirectoryResolution
+                            ? 'Deleting...'
+                            : `Delete ${directoryPreview.totalFilesToDelete} Files`}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="duplicate-pairs-section">
+                      <h4>Duplicate Pairs ({selectedConflict.totalDuplicatePairs})</h4>
+                      <div className="pairs-list">
+                        {selectedConflict.pairs.slice(0, 20).map((pair, idx) => (
+                          <div key={`${pair.fileA.id}-${pair.fileB.id}-${idx}`} className="pair-item">
+                            <div className="pair-file">
+                              <span className="pair-title">{pair.fileA.title || 'Unknown'}</span>
+                              <span className="pair-path" title={pair.fileA.filePath}>
+                                {pair.fileA.filePath.split('/').slice(-1)[0]}
+                              </span>
+                            </div>
+                            {pair.similarity !== null && (
+                              <span className={`similarity-badge ${pair.similarity >= 0.95 ? 'high' : pair.similarity >= 0.85 ? 'medium' : 'low'}`}>
+                                {(pair.similarity * 100).toFixed(0)}%
+                              </span>
+                            )}
+                            <div className="pair-file">
+                              <span className="pair-title">{pair.fileB.title || 'Unknown'}</span>
+                              <span className="pair-path" title={pair.fileB.filePath}>
+                                {pair.fileB.filePath.split('/').slice(-1)[0]}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {selectedConflict.pairs.length > 20 && (
+                          <div className="more-pairs">
+                            ...and {selectedConflict.pairs.length - 20} more pairs
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="detail-placeholder">
+                    <div className="placeholder-icon">@</div>
+                    <p>Select a directory conflict to see details</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Audio Player */}

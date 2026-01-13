@@ -1,4 +1,4 @@
-import type { DuplicateGroup, DuplicateScanStatus, CompareResult, MusicFile, AutoResolutionResult, AutoResolutionPreview } from '../types/music';
+import type { DuplicateGroup, DuplicateScanStatus, CompareResult, MusicFile, AutoResolutionResult, AutoResolutionPreview, DirectoryConflict, DirectoryResolutionPreview, DirectoryResolutionResult } from '../types/music';
 
 const API_BASE = '/api/v1/duplicates';
 
@@ -171,5 +171,51 @@ export async function openFileFolder(filePath: string): Promise<{ success: boole
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filePath }),
   });
+  return response.json();
+}
+
+// ============================================================
+// Directory-based duplicate grouping (Issue #92)
+// ============================================================
+
+/**
+ * Gets all directory conflicts - pairs of directories containing duplicate files.
+ */
+export async function getDirectoryConflicts(): Promise<DirectoryConflict[]> {
+  const response = await fetch(`${API_BASE}/by-directory`);
+  if (!response.ok) throw new Error('Failed to fetch directory conflicts');
+  return response.json();
+}
+
+/**
+ * Previews what would happen when resolving a directory conflict.
+ */
+export async function previewDirectoryResolution(
+  directoryToKeep: string,
+  directoryToDelete: string
+): Promise<DirectoryResolutionPreview> {
+  const response = await fetch(`${API_BASE}/resolve-directory/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ directoryToKeep, directoryToDelete }),
+  });
+  if (!response.ok) throw new Error('Failed to preview directory resolution');
+  return response.json();
+}
+
+/**
+ * Executes directory-based duplicate resolution.
+ * Deletes all duplicate files from the specified directory.
+ */
+export async function executeDirectoryResolution(
+  directoryToKeep: string,
+  directoryToDelete: string
+): Promise<DirectoryResolutionResult> {
+  const response = await fetch(`${API_BASE}/resolve-directory/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ directoryToKeep, directoryToDelete }),
+  });
+  if (!response.ok) throw new Error('Failed to execute directory resolution');
   return response.json();
 }
