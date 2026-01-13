@@ -1,9 +1,13 @@
 package org.hasting.service;
 
+import org.hasting.dto.AutoResolutionPreviewDTO;
+import org.hasting.dto.AutoResolutionResultDTO;
+import org.hasting.dto.DuplicateFileDTO;
 import org.hasting.dto.DuplicateGroupDTO;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.model.MusicFile;
 import org.hasting.util.DatabaseManager;
+import org.hasting.util.FingerprintMatcher;
 import org.hasting.util.FuzzyMatcher;
 import org.hasting.util.FuzzySearchConfig;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -44,7 +48,8 @@ public class DuplicateService {
 
     /**
      * Gets all duplicate groups from the database.
-     * Uses caching to avoid repeated expensive computations.
+     * Uses fingerprint-based matching for accurate duplicate detection.
+     * Falls back to metadata matching if fingerprints are not available.
      */
     public List<DuplicateGroupDTO> getDuplicateGroups() {
         // Check cache validity
@@ -57,16 +62,41 @@ public class DuplicateService {
         logger.info("Computing duplicate groups...");
 
         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-        FuzzySearchConfig config = new FuzzySearchConfig();
 
-        List<List<MusicFile>> groups = FuzzyMatcher.groupDuplicates(allFiles, config);
+        // Count files with fingerprints
+        long filesWithFingerprints = allFiles.stream().filter(MusicFile::hasFingerprint).count();
+        logger.info("Files with fingerprints: {}/{}", filesWithFingerprints, allFiles.size());
+
+        List<List<MusicFile>> groups;
+
+        if (filesWithFingerprints > allFiles.size() / 2) {
+            // Use fingerprint matching if majority of files have fingerprints
+            logger.info("Using fingerprint-based duplicate detection");
+            groups = FingerprintMatcher.groupDuplicates(allFiles);
+        } else {
+            // Fall back to metadata matching
+            logger.info("Using metadata-based duplicate detection (fingerprints not available for most files)");
+            FuzzySearchConfig config = new FuzzySearchConfig();
+            groups = FuzzyMatcher.groupDuplicates(allFiles, config);
+        }
 
         AtomicInteger groupId = new AtomicInteger(1);
+        final boolean usingFingerprints = filesWithFingerprints > allFiles.size() / 2;
+
         cachedDuplicateGroups = groups.stream()
-            .map(group -> DuplicateGroupDTO.fromFiles(
-                groupId.getAndIncrement(),
-                group.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
-            ))
+            .map(group -> {
+                List<MusicFileDTO> fileDTOs = group.stream()
+                    .map(MusicFileDTO::fromEntity)
+                    .collect(Collectors.toList());
+
+                if (usingFingerprints) {
+                    // Compute similarity scores for fingerprint-based groups
+                    List<Double> similarities = FingerprintMatcher.computeGroupSimilarities(group);
+                    return DuplicateGroupDTO.fromFilesWithSimilarity(groupId.getAndIncrement(), fileDTOs, similarities);
+                } else {
+                    return DuplicateGroupDTO.fromFiles(groupId.getAndIncrement(), fileDTOs);
+                }
+            })
             .collect(Collectors.toList());
 
         cacheTimestamp = System.currentTimeMillis();
@@ -93,6 +123,7 @@ public class DuplicateService {
 
     /**
      * Finds files similar to a specific file.
+     * Uses fingerprint matching when available, falls back to metadata matching.
      */
     public List<MusicFileDTO> findSimilarFiles(long fileId) {
         MusicFile target = DatabaseManager.getMusicFileById(fileId);
@@ -101,8 +132,17 @@ public class DuplicateService {
         }
 
         List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
-        FuzzySearchConfig config = new FuzzySearchConfig();
 
+        // Use fingerprint matching if target has fingerprint
+        if (target.hasFingerprint()) {
+            return FingerprintMatcher.findSimilarFiles(target, allFiles, FingerprintMatcher.DEFAULT_SIMILARITY_THRESHOLD)
+                .stream()
+                .map(sf -> MusicFileDTO.fromEntity(sf.file()))
+                .collect(Collectors.toList());
+        }
+
+        // Fall back to metadata matching
+        FuzzySearchConfig config = new FuzzySearchConfig();
         return allFiles.stream()
             .filter(f -> f.getId() != fileId)
             .filter(f -> FuzzyMatcher.areDuplicates(target, f, config))
@@ -209,7 +249,8 @@ public class DuplicateService {
         DuplicateGroupDTO group = groupOpt.get();
         int deletedCount = 0;
 
-        for (MusicFileDTO file : group.files()) {
+        for (DuplicateFileDTO dupFile : group.files()) {
+            MusicFileDTO file = dupFile.file();
             if (file.id() != keepFileId) {
                 MusicFile musicFile = DatabaseManager.getMusicFileById(file.id());
                 if (musicFile != null && DatabaseManager.deleteMusicFile(musicFile)) {
@@ -226,6 +267,349 @@ public class DuplicateService {
         return deletedCount;
     }
 
+    /**
+     * Automatically resolves duplicates based on these rules (in order):
+     * 1. Keep highest bitrate
+     * 2. If same bitrate, keep file with more complete metadata (fewer empty artist/title/album)
+     * 3. If same metadata completeness, keep file in directory matching artist or album
+     * 4. If no file has matching directory, skip group (add to "hold my hand" list)
+     *
+     * @return AutoResolutionResultDTO with summary and groups needing manual review
+     */
+    public AutoResolutionResultDTO autoResolveDuplicates() {
+        List<DuplicateGroupDTO> allGroups = getDuplicateGroups();
+
+        int filesDeleted = 0;
+        int filesKept = 0;
+        List<DuplicateGroupDTO> holdMyHandGroups = new ArrayList<>();
+
+        for (DuplicateGroupDTO group : allGroups) {
+            if (group.files().size() < 2) continue;
+
+            // Load actual MusicFile entities for comparison
+            List<MusicFile> files = group.files().stream()
+                .map(df -> DatabaseManager.getMusicFileById(df.file().id()))
+                .filter(f -> f != null)
+                .collect(Collectors.toList());
+
+            if (files.size() < 2) continue;
+
+            MusicFile winner = selectWinnerFile(files);
+
+            if (winner == null) {
+                // No clear winner - needs manual review
+                holdMyHandGroups.add(group);
+                logger.info("Group '{}' by '{}' needs manual review - no clear winner",
+                    group.representativeTitle(), group.representativeArtist());
+                continue;
+            }
+
+            // Delete all files except the winner
+            for (MusicFile file : files) {
+                if (!file.getId().equals(winner.getId())) {
+                    if (DatabaseManager.deleteMusicFile(file)) {
+                        filesDeleted++;
+                        logger.debug("Auto-deleted: {} (bitrate: {}, metadata score: {})",
+                            file.getFilePath(), file.getBitRate(), calculateMetadataScore(file));
+                    }
+                }
+            }
+            filesKept++;
+            logger.debug("Auto-kept: {} (bitrate: {}, metadata score: {})",
+                winner.getFilePath(), winner.getBitRate(), calculateMetadataScore(winner));
+        }
+
+        if (filesDeleted > 0) {
+            invalidateCache();
+        }
+
+        logger.info("Auto-resolution complete: {} deleted, {} kept, {} need review",
+            filesDeleted, filesKept, holdMyHandGroups.size());
+
+        return AutoResolutionResultDTO.create(allGroups.size(), filesDeleted, filesKept, holdMyHandGroups);
+    }
+
+    /**
+     * Previews automatic duplicate resolution without deleting any files.
+     * Returns a list of files that would be deleted along with the files that would be kept.
+     *
+     * @return AutoResolutionPreviewDTO with resolution plan
+     */
+    public AutoResolutionPreviewDTO previewAutoResolution() {
+        List<DuplicateGroupDTO> allGroups = getDuplicateGroups();
+
+        List<AutoResolutionPreviewDTO.ResolutionItem> resolutions = new ArrayList<>();
+        List<DuplicateGroupDTO> holdMyHandGroups = new ArrayList<>();
+
+        for (DuplicateGroupDTO group : allGroups) {
+            if (group.files().size() < 2) continue;
+
+            // Load actual MusicFile entities for comparison
+            List<MusicFile> files = group.files().stream()
+                .map(df -> DatabaseManager.getMusicFileById(df.file().id()))
+                .filter(f -> f != null)
+                .collect(Collectors.toList());
+
+            if (files.size() < 2) continue;
+
+            MusicFile winner = selectWinnerFile(files);
+
+            if (winner == null) {
+                // No clear winner - needs manual review
+                holdMyHandGroups.add(group);
+                continue;
+            }
+
+            // Generate reason for this selection
+            String reason = generateSelectionReason(winner, files);
+
+            // Add resolution items for each file to delete
+            MusicFileDTO winnerDTO = MusicFileDTO.fromEntity(winner);
+            for (MusicFile file : files) {
+                if (!file.getId().equals(winner.getId())) {
+                    // Compute fingerprint similarity between the two files
+                    Double similarity = null;
+                    if (winner.hasFingerprint() && file.hasFingerprint()) {
+                        similarity = FingerprintMatcher.calculateSimilarity(
+                            winner.getFingerprint(), file.getFingerprint());
+                    }
+
+                    resolutions.add(new AutoResolutionPreviewDTO.ResolutionItem(
+                        group.groupId(),
+                        MusicFileDTO.fromEntity(file),
+                        winnerDTO,
+                        reason,
+                        similarity
+                    ));
+                }
+            }
+        }
+
+        logger.info("Auto-resolution preview: {} files to delete, {} to keep, {} need review",
+            resolutions.size(),
+            resolutions.stream().map(r -> r.fileToKeep().id()).distinct().count(),
+            holdMyHandGroups.size());
+
+        return AutoResolutionPreviewDTO.create(resolutions, holdMyHandGroups);
+    }
+
+    /**
+     * Executes automatic duplicate resolution, optionally excluding specific files from deletion.
+     *
+     * @param excludeFileIds File IDs to exclude from deletion (user wants to keep them)
+     * @return AutoResolutionResultDTO with summary
+     */
+    public AutoResolutionResultDTO executeAutoResolution(Set<Long> excludeFileIds) {
+        List<DuplicateGroupDTO> allGroups = getDuplicateGroups();
+
+        int filesDeleted = 0;
+        int filesKept = 0;
+        List<DuplicateGroupDTO> holdMyHandGroups = new ArrayList<>();
+
+        for (DuplicateGroupDTO group : allGroups) {
+            if (group.files().size() < 2) continue;
+
+            // Load actual MusicFile entities for comparison
+            List<MusicFile> files = group.files().stream()
+                .map(df -> DatabaseManager.getMusicFileById(df.file().id()))
+                .filter(f -> f != null)
+                .collect(Collectors.toList());
+
+            if (files.size() < 2) continue;
+
+            MusicFile winner = selectWinnerFile(files);
+
+            if (winner == null) {
+                // No clear winner - needs manual review
+                holdMyHandGroups.add(group);
+                continue;
+            }
+
+            // Delete all files except the winner AND excluded files
+            boolean deletedAny = false;
+            for (MusicFile file : files) {
+                if (!file.getId().equals(winner.getId())) {
+                    if (excludeFileIds != null && excludeFileIds.contains(file.getId())) {
+                        logger.info("Skipping excluded file: {}", file.getFilePath());
+                        continue;
+                    }
+                    if (DatabaseManager.deleteMusicFile(file)) {
+                        filesDeleted++;
+                        deletedAny = true;
+                        logger.debug("Auto-deleted: {}", file.getFilePath());
+                    }
+                }
+            }
+            if (deletedAny || files.stream().allMatch(f ->
+                    f.getId().equals(winner.getId()) ||
+                    (excludeFileIds != null && excludeFileIds.contains(f.getId())))) {
+                filesKept++;
+            }
+        }
+
+        if (filesDeleted > 0) {
+            invalidateCache();
+        }
+
+        logger.info("Auto-resolution executed: {} deleted, {} kept, {} need review",
+            filesDeleted, filesKept, holdMyHandGroups.size());
+
+        return AutoResolutionResultDTO.create(allGroups.size(), filesDeleted, filesKept, holdMyHandGroups);
+    }
+
+    /**
+     * Generates a human-readable reason for why a file was selected as winner.
+     */
+    private String generateSelectionReason(MusicFile winner, List<MusicFile> allFiles) {
+        long maxBitrate = allFiles.stream()
+            .mapToLong(f -> f.getBitRate() != null ? f.getBitRate() : 0)
+            .max()
+            .orElse(0);
+
+        List<MusicFile> highBitrateFiles = allFiles.stream()
+            .filter(f -> f.getBitRate() != null && f.getBitRate() == maxBitrate)
+            .collect(Collectors.toList());
+
+        if (highBitrateFiles.size() == 1) {
+            return String.format("Highest bitrate (%d kbps)", winner.getBitRate());
+        }
+
+        int winnerMetadataScore = calculateMetadataScore(winner);
+        int maxMetadataScore = highBitrateFiles.stream()
+            .mapToInt(this::calculateMetadataScore)
+            .max()
+            .orElse(0);
+
+        List<MusicFile> bestMetadataFiles = highBitrateFiles.stream()
+            .filter(f -> calculateMetadataScore(f) == maxMetadataScore)
+            .collect(Collectors.toList());
+
+        if (bestMetadataFiles.size() == 1) {
+            return String.format("Better metadata (%d/3 fields at %d kbps)",
+                winnerMetadataScore, winner.getBitRate());
+        }
+
+        if (hasMatchingDirectory(winner)) {
+            return String.format("Directory matches artist/album (%d kbps, %d/3 metadata)",
+                winner.getBitRate(), winnerMetadataScore);
+        }
+
+        return String.format("Best match (%d kbps, %d/3 metadata)",
+            winner.getBitRate(), winnerMetadataScore);
+    }
+
+    /**
+     * Selects the winner file from a group of duplicates.
+     * Returns null if no clear winner (needs manual review).
+     */
+    private MusicFile selectWinnerFile(List<MusicFile> files) {
+        // Step 1: Find highest bitrate
+        long maxBitrate = files.stream()
+            .mapToLong(f -> f.getBitRate() != null ? f.getBitRate() : 0)
+            .max()
+            .orElse(0);
+
+        List<MusicFile> highBitrateFiles = files.stream()
+            .filter(f -> f.getBitRate() != null && f.getBitRate() == maxBitrate)
+            .collect(Collectors.toList());
+
+        if (highBitrateFiles.size() == 1) {
+            return highBitrateFiles.get(0);
+        }
+
+        // Step 2: Among same bitrate, find best metadata score
+        int maxMetadataScore = highBitrateFiles.stream()
+            .mapToInt(this::calculateMetadataScore)
+            .max()
+            .orElse(0);
+
+        List<MusicFile> bestMetadataFiles = highBitrateFiles.stream()
+            .filter(f -> calculateMetadataScore(f) == maxMetadataScore)
+            .collect(Collectors.toList());
+
+        if (bestMetadataFiles.size() == 1) {
+            return bestMetadataFiles.get(0);
+        }
+
+        // Step 3: Check directory matching
+        List<MusicFile> matchingPathFiles = bestMetadataFiles.stream()
+            .filter(this::hasMatchingDirectory)
+            .collect(Collectors.toList());
+
+        if (matchingPathFiles.size() == 1) {
+            return matchingPathFiles.get(0);
+        }
+
+        // Step 4: If multiple match or none match, no clear winner
+        if (matchingPathFiles.isEmpty()) {
+            // No file has matching directory - needs manual review
+            return null;
+        }
+
+        // Multiple files have matching directories - pick the first one
+        // (could be enhanced with more sophisticated tie-breaking)
+        return matchingPathFiles.get(0);
+    }
+
+    /**
+     * Calculates metadata completeness score (0-3).
+     * One point each for non-empty artist, title, album.
+     */
+    private int calculateMetadataScore(MusicFile file) {
+        int score = 0;
+        if (file.getArtist() != null && !file.getArtist().trim().isEmpty()) score++;
+        if (file.getTitle() != null && !file.getTitle().trim().isEmpty()) score++;
+        if (file.getAlbum() != null && !file.getAlbum().trim().isEmpty()) score++;
+        return score;
+    }
+
+    /**
+     * Checks if the file's directory path contains the artist or album name.
+     */
+    private boolean hasMatchingDirectory(MusicFile file) {
+        String path = file.getFilePath();
+        if (path == null) return false;
+
+        // Get directory part of path
+        String dirPath = path.toLowerCase();
+        int lastSlash = dirPath.lastIndexOf('/');
+        if (lastSlash > 0) {
+            dirPath = dirPath.substring(0, lastSlash);
+        }
+
+        // Normalize for comparison
+        String artist = file.getArtist();
+        String album = file.getAlbum();
+
+        // Check if directory contains artist name
+        if (artist != null && !artist.trim().isEmpty()) {
+            String normalizedArtist = normalizeForPathMatch(artist);
+            if (dirPath.contains(normalizedArtist)) {
+                return true;
+            }
+        }
+
+        // Check if directory contains album name
+        if (album != null && !album.trim().isEmpty()) {
+            String normalizedAlbum = normalizeForPathMatch(album);
+            if (dirPath.contains(normalizedAlbum)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Normalizes a string for path matching comparison.
+     */
+    private String normalizeForPathMatch(String value) {
+        if (value == null) return "";
+        return value.toLowerCase()
+            .replaceAll("[^a-z0-9]", "")  // Remove non-alphanumeric
+            .trim();
+    }
+
     // Private helper methods
 
     private void runDuplicateScan(DuplicateSession session) {
@@ -236,76 +620,109 @@ public class DuplicateService {
             List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
             FuzzySearchConfig config = new FuzzySearchConfig();
 
+            // Determine if we should use fingerprint matching
+            long filesWithFingerprints = allFiles.stream().filter(MusicFile::hasFingerprint).count();
+            boolean useFingerprints = filesWithFingerprints > allFiles.size() / 2;
+
+            logger.info("Duplicate scan: {} files, {} with fingerprints, using {} matching",
+                allFiles.size(), filesWithFingerprints, useFingerprints ? "fingerprint" : "metadata");
+
             session.setTotalFiles(allFiles.size());
-            session.setTotalComparisons((allFiles.size() * (allFiles.size() - 1)) / 2);
             session.setStage("scanning");
             broadcastProgress(session);
 
-            List<List<MusicFile>> duplicateGroups = new ArrayList<>();
-            Set<MusicFile> processed = new HashSet<>();
-            AtomicInteger groupIdCounter = new AtomicInteger(1);
-            int lastBroadcastedGroupCount = 0;
+            List<List<MusicFile>> duplicateGroups;
 
-            for (int i = 0; i < allFiles.size() && !session.isCancelled(); i++) {
-                MusicFile file1 = allFiles.get(i);
-                if (processed.contains(file1)) continue;
+            if (useFingerprints) {
+                // Use fingerprint-based matching (parallel, efficient)
+                duplicateGroups = FingerprintMatcher.groupDuplicates(allFiles);
+                session.setGroupsFound(duplicateGroups.size());
 
-                List<MusicFile> group = new ArrayList<>();
-                group.add(file1);
-                processed.add(file1);
-
-                for (int j = i + 1; j < allFiles.size() && !session.isCancelled(); j++) {
-                    MusicFile file2 = allFiles.get(j);
-                    if (processed.contains(file2)) continue;
-
-                    if (FuzzyMatcher.areDuplicates(file1, file2, config)) {
-                        group.add(file2);
-                        processed.add(file2);
-                    }
-
-                    session.incrementComparisons();
-                }
-
-                if (group.size() > 1) {
-                    duplicateGroups.add(group);
-                    session.setGroupsFound(duplicateGroups.size());
-
-                    // Broadcast new groups in batches of GROUP_BATCH_SIZE
-                    if (duplicateGroups.size() - lastBroadcastedGroupCount >= GROUP_BATCH_SIZE) {
-                        List<DuplicateGroupDTO> newGroups = duplicateGroups
-                            .subList(lastBroadcastedGroupCount, duplicateGroups.size())
-                            .stream()
-                            .map(g -> DuplicateGroupDTO.fromFiles(
-                                groupIdCounter.getAndIncrement(),
-                                g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
-                            ))
+                // Broadcast all groups at once for fingerprint matching, with similarity scores
+                AtomicInteger groupIdCounter = new AtomicInteger(1);
+                List<DuplicateGroupDTO> allGroupDTOs = duplicateGroups.stream()
+                    .map(group -> {
+                        List<MusicFileDTO> fileDTOs = group.stream()
+                            .map(MusicFileDTO::fromEntity)
                             .collect(Collectors.toList());
-
-                        broadcastGroups(session, newGroups);
-                        lastBroadcastedGroupCount = duplicateGroups.size();
-                    }
-                }
-
-                session.setFilesProcessed(i + 1);
-
-                // Broadcast progress every 100 files
-                if (i % 100 == 0) {
-                    broadcastProgress(session);
-                }
-            }
-
-            // Broadcast any remaining groups that weren't in a full batch
-            if (duplicateGroups.size() > lastBroadcastedGroupCount) {
-                List<DuplicateGroupDTO> remainingGroups = duplicateGroups
-                    .subList(lastBroadcastedGroupCount, duplicateGroups.size())
-                    .stream()
-                    .map(g -> DuplicateGroupDTO.fromFiles(
-                        groupIdCounter.getAndIncrement(),
-                        g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
-                    ))
+                        List<Double> similarities = FingerprintMatcher.computeGroupSimilarities(group);
+                        return DuplicateGroupDTO.fromFilesWithSimilarity(groupIdCounter.getAndIncrement(), fileDTOs, similarities);
+                    })
                     .collect(Collectors.toList());
 
-                broadcastGroups(session, remainingGroups);
+                if (!allGroupDTOs.isEmpty()) {
+                    broadcastGroups(session, allGroupDTOs);
+                }
+            } else {
+                // Fall back to metadata-based fuzzy matching
+                duplicateGroups = new ArrayList<>();
+                Set<MusicFile> processed = new HashSet<>();
+                AtomicInteger groupIdCounter = new AtomicInteger(1);
+                int lastBroadcastedGroupCount = 0;
+
+                session.setTotalComparisons((allFiles.size() * (allFiles.size() - 1)) / 2);
+
+                for (int i = 0; i < allFiles.size() && !session.isCancelled(); i++) {
+                    MusicFile file1 = allFiles.get(i);
+                    if (processed.contains(file1)) continue;
+
+                    List<MusicFile> group = new ArrayList<>();
+                    group.add(file1);
+                    processed.add(file1);
+
+                    for (int j = i + 1; j < allFiles.size() && !session.isCancelled(); j++) {
+                        MusicFile file2 = allFiles.get(j);
+                        if (processed.contains(file2)) continue;
+
+                        if (FuzzyMatcher.areDuplicates(file1, file2, config)) {
+                            group.add(file2);
+                            processed.add(file2);
+                        }
+
+                        session.incrementComparisons();
+                    }
+
+                    if (group.size() > 1) {
+                        duplicateGroups.add(group);
+                        session.setGroupsFound(duplicateGroups.size());
+
+                        // Broadcast new groups in batches of GROUP_BATCH_SIZE
+                        if (duplicateGroups.size() - lastBroadcastedGroupCount >= GROUP_BATCH_SIZE) {
+                            List<DuplicateGroupDTO> newGroups = duplicateGroups
+                                .subList(lastBroadcastedGroupCount, duplicateGroups.size())
+                                .stream()
+                                .map(g -> DuplicateGroupDTO.fromFiles(
+                                    groupIdCounter.getAndIncrement(),
+                                    g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
+                                ))
+                                .collect(Collectors.toList());
+
+                            broadcastGroups(session, newGroups);
+                            lastBroadcastedGroupCount = duplicateGroups.size();
+                        }
+                    }
+
+                    session.setFilesProcessed(i + 1);
+
+                    // Broadcast progress every 100 files
+                    if (i % 100 == 0) {
+                        broadcastProgress(session);
+                    }
+                }
+
+                // Broadcast any remaining groups that weren't in a full batch
+                if (duplicateGroups.size() > lastBroadcastedGroupCount) {
+                    List<DuplicateGroupDTO> remainingGroups = duplicateGroups
+                        .subList(lastBroadcastedGroupCount, duplicateGroups.size())
+                        .stream()
+                        .map(g -> DuplicateGroupDTO.fromFiles(
+                            groupIdCounter.getAndIncrement(),
+                            g.stream().map(MusicFileDTO::fromEntity).collect(Collectors.toList())
+                        ))
+                        .collect(Collectors.toList());
+
+                    broadcastGroups(session, remainingGroups);
+                }
             }
 
             if (session.isCancelled()) {

@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   FuzzySearchConfig,
   FileTypes,
   DatabaseProfile,
   DatabaseInfo,
+  FingerprintStatus,
 } from '../../api/configApi';
 import {
   getFuzzySearchConfig,
@@ -17,12 +18,15 @@ import {
   deleteProfile,
   activateProfile,
   getDatabaseInfo,
+  getFingerprintStatus,
+  startFingerprintGeneration,
+  getFingerprintGenerationStatus,
 } from '../../api/configApi';
 
-type ConfigTab = 'fuzzy' | 'filetypes' | 'profiles';
+type ConfigTab = 'matching' | 'filetypes' | 'profiles';
 
 export default function ConfigurationView() {
-  const [activeTab, setActiveTab] = useState<ConfigTab>('fuzzy');
+  const [activeTab, setActiveTab] = useState<ConfigTab>('matching');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -39,6 +43,18 @@ export default function ConfigurationView() {
   const [showNewProfileForm, setShowNewProfileForm] = useState(false);
   const [newProfile, setNewProfile] = useState({ name: '', description: '', databasePath: '' });
 
+  // Fingerprint state
+  const [fingerprintStatus, setFingerprintStatus] = useState<FingerprintStatus | null>(null);
+  const [fingerprintGenerating, setFingerprintGenerating] = useState(false);
+  const [fingerprintProgress, setFingerprintProgress] = useState<{
+    completed: number;
+    total: number;
+    status: string;
+    error?: string;
+  } | null>(null);
+  const [fingerprintThreshold, setFingerprintThreshold] = useState(85);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
@@ -46,17 +62,19 @@ export default function ConfigurationView() {
         setLoading(true);
         setError(null);
 
-        const [fuzzy, types, profileList, dbInfo] = await Promise.all([
+        const [fuzzy, types, profileList, dbInfo, fpStatus] = await Promise.all([
           getFuzzySearchConfig(),
           getFileTypes(),
           getProfiles(),
           getDatabaseInfo(),
+          getFingerprintStatus(),
         ]);
 
         setFuzzyConfig(fuzzy);
         setFileTypes(types);
         setProfiles(profileList);
         setDatabaseInfo(dbInfo);
+        setFingerprintStatus(fpStatus);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load configuration');
       } finally {
@@ -65,6 +83,15 @@ export default function ConfigurationView() {
     };
 
     loadData();
+  }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, []);
 
   // Save fuzzy config with debounce
@@ -164,6 +191,76 @@ export default function ConfigurationView() {
     }
   };
 
+  // Fingerprint generation handler
+  const handleStartFingerprintGeneration = async () => {
+    try {
+      setFingerprintGenerating(true);
+      setFingerprintProgress(null);
+
+      const result = await startFingerprintGeneration();
+
+      if (result.status === 'complete') {
+        // All files already have fingerprints
+        setFingerprintGenerating(false);
+        const status = await getFingerprintStatus();
+        setFingerprintStatus(status);
+        return;
+      }
+
+      if (result.sessionId) {
+        setFingerprintProgress({
+          completed: 0,
+          total: result.filesToProcess || 0,
+          status: 'running',
+        });
+
+        // Poll for progress
+        pollIntervalRef.current = setInterval(async () => {
+          try {
+            const status = await getFingerprintGenerationStatus(result.sessionId!);
+            setFingerprintProgress({
+              completed: status.completed,
+              total: status.totalFiles,
+              status: status.status,
+              error: status.error || undefined,
+            });
+
+            if (status.status === 'completed' || status.status === 'error') {
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
+              setFingerprintGenerating(false);
+
+              // Show error if there was one
+              if (status.status === 'error' && status.error) {
+                setError(`Fingerprint generation failed: ${status.error}`);
+              }
+
+              // Refresh fingerprint status
+              const fpStatus = await getFingerprintStatus();
+              setFingerprintStatus(fpStatus);
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, 1000);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start fingerprint generation');
+      setFingerprintGenerating(false);
+    }
+  };
+
+  const refreshFingerprintStatus = async () => {
+    try {
+      const status = await getFingerprintStatus();
+      setFingerprintStatus(status);
+    } catch {
+      setError('Failed to refresh fingerprint status');
+    }
+  };
+
   if (loading) {
     return (
       <div className="config-view">
@@ -201,10 +298,10 @@ export default function ConfigurationView() {
 
       <div className="config-tabs">
         <button
-          className={`config-tab ${activeTab === 'fuzzy' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fuzzy')}
+          className={`config-tab ${activeTab === 'matching' ? 'active' : ''}`}
+          onClick={() => setActiveTab('matching')}
         >
-          Fuzzy Search
+          Fuzzy Matching
         </button>
         <button
           className={`config-tab ${activeTab === 'filetypes' ? 'active' : ''}`}
@@ -221,10 +318,131 @@ export default function ConfigurationView() {
       </div>
 
       <div className="config-content">
-        {activeTab === 'fuzzy' && fuzzyConfig && (
-          <div className="config-panel fuzzy-panel">
+        {activeTab === 'matching' && fuzzyConfig && (
+          <div className="config-panel matching-panel">
+            {/* Audio Fingerprinting Section */}
             <div className="panel-header">
-              <h3 className="panel-title">Fuzzy Search Settings</h3>
+              <h3 className="panel-title">Audio Fingerprinting</h3>
+              <p className="panel-description">
+                Uses Chromaprint to identify duplicates based on audio content, not just metadata.
+              </p>
+            </div>
+
+            <div className="config-section">
+              <h4 className="section-title">System Status</h4>
+              {fingerprintStatus && (
+                <div className="fingerprint-status">
+                  <div className={`status-indicator ${fingerprintStatus.fpcalcAvailable ? 'available' : 'unavailable'}`}>
+                    <span className="status-icon">{fingerprintStatus.fpcalcAvailable ? '✓' : '✗'}</span>
+                    <span className="status-text">
+                      {fingerprintStatus.fpcalcAvailable ? 'fpcalc Available' : 'fpcalc Not Found'}
+                    </span>
+                  </div>
+                  {!fingerprintStatus.fpcalcAvailable && (
+                    <div className="install-hint">
+                      <p>Install Chromaprint to enable audio fingerprinting:</p>
+                      <code>brew install chromaprint</code>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {fingerprintStatus?.fpcalcAvailable && (
+              <>
+                <div className="config-section">
+                  <h4 className="section-title">Fingerprint Coverage</h4>
+                  <div className="fingerprint-stats">
+                    <div className="stat-item">
+                      <span className="stat-value">{fingerprintStatus.filesWithFingerprints.toLocaleString()}</span>
+                      <span className="stat-label">With fingerprints</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-value">{fingerprintStatus.filesWithoutFingerprints.toLocaleString()}</span>
+                      <span className="stat-label">Without fingerprints</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-value">
+                        {fingerprintStatus.filesWithFingerprints + fingerprintStatus.filesWithoutFingerprints > 0
+                          ? Math.round(
+                              (fingerprintStatus.filesWithFingerprints /
+                                (fingerprintStatus.filesWithFingerprints + fingerprintStatus.filesWithoutFingerprints)) *
+                                100
+                            )
+                          : 0}%
+                      </span>
+                      <span className="stat-label">Coverage</span>
+                    </div>
+                  </div>
+
+                  {fingerprintStatus.filesWithoutFingerprints > 0 && (
+                    <div className="fingerprint-actions">
+                      <button
+                        className="generate-btn"
+                        onClick={handleStartFingerprintGeneration}
+                        disabled={fingerprintGenerating}
+                      >
+                        {fingerprintGenerating ? 'Generating...' : 'Generate Missing Fingerprints'}
+                      </button>
+                      <button className="refresh-btn" onClick={refreshFingerprintStatus} disabled={fingerprintGenerating}>
+                        Refresh
+                      </button>
+                    </div>
+                  )}
+
+                  {fingerprintProgress && (
+                    <div className="fingerprint-progress">
+                      <div className={`progress-bar ${fingerprintProgress.status === 'error' ? 'error' : ''}`}>
+                        <div
+                          className="progress-fill"
+                          style={{
+                            width: `${fingerprintProgress.total > 0 ? (fingerprintProgress.completed / fingerprintProgress.total) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <div className="progress-text">
+                        {fingerprintProgress.completed.toLocaleString()} / {fingerprintProgress.total.toLocaleString()} files
+                        {fingerprintProgress.status === 'completed' && ' — Complete!'}
+                        {fingerprintProgress.status === 'error' && ' — Error'}
+                      </div>
+                      {fingerprintProgress.status === 'error' && fingerprintProgress.error && (
+                        <div className="progress-error">
+                          {fingerprintProgress.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="config-section">
+                  <h4 className="section-title">Fingerprint Similarity Threshold</h4>
+                  <div className="config-field">
+                    <div className="slider-group">
+                      <input
+                        type="range"
+                        min="50"
+                        max="100"
+                        value={fingerprintThreshold}
+                        onChange={(e) => setFingerprintThreshold(Number(e.target.value))}
+                      />
+                      <span className="slider-value">{fingerprintThreshold}%</span>
+                    </div>
+                    <div className="threshold-hints">
+                      <span className="hint-item">70% = Lenient</span>
+                      <span className="hint-item">85% = Recommended</span>
+                      <span className="hint-item">95% = Strict</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Divider */}
+            <div className="section-divider" />
+
+            {/* Fuzzy Search Settings Section */}
+            <div className="panel-header">
+              <h3 className="panel-title">Metadata Fuzzy Matching</h3>
               <div className="panel-actions">
                 <button className="preset-btn" onClick={() => handlePresetApply('strict')}>Strict</button>
                 <button className="preset-btn" onClick={() => handlePresetApply('balanced')}>Balanced</button>
@@ -564,6 +782,7 @@ export default function ConfigurationView() {
             )}
           </div>
         )}
+
       </div>
     </div>
   );

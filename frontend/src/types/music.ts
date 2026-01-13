@@ -58,10 +58,15 @@ export interface BrowseResponse {
 }
 
 // Duplicate detection types for Phase 3
+export interface DuplicateFile {
+  file: MusicFile;
+  similarity: number | null;  // Fingerprint similarity to reference file (0.0-1.0), null if not available
+}
+
 export interface DuplicateGroup {
   groupId: number;
   fileCount: number;
-  files: MusicFile[];
+  files: DuplicateFile[];
   representativeTitle: string;
   representativeArtist: string;
 }
@@ -86,4 +91,28 @@ export interface CompareResult {
   similarity: number;
   areDuplicates: boolean;
   breakdown: string;
+}
+
+export interface AutoResolutionResult {
+  groupsProcessed: number;
+  filesDeleted: number;
+  filesKept: number;
+  holdMyHandGroups: DuplicateGroup[];  // Groups needing manual review
+  summary: string;
+}
+
+export interface ResolutionItem {
+  groupId: number;
+  fileToDelete: MusicFile;
+  fileToKeep: MusicFile;
+  reason: string;
+  similarity: number | null;  // Fingerprint similarity (0.0-1.0), null if not available
+}
+
+export interface AutoResolutionPreview {
+  resolutions: ResolutionItem[];
+  holdMyHandGroups: DuplicateGroup[];
+  totalFilesToDelete: number;
+  totalFilesToKeep: number;
+  totalGroupsNeedingReview: number;
 }

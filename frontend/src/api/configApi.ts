@@ -173,3 +173,59 @@ export async function getDatabaseInfo(): Promise<DatabaseInfo> {
   if (!response.ok) throw new Error('Failed to get database info');
   return response.json();
 }
+
+// ============= Audio Fingerprinting =============
+
+export interface FingerprintStatus {
+  fpcalcAvailable: boolean;
+  filesWithFingerprints: number;
+  filesWithoutFingerprints: number;
+  message: string;
+}
+
+export interface FingerprintGenerationResult {
+  sessionId?: string;
+  status: string;
+  message?: string;
+  filesToProcess?: number;
+  websocket?: string;
+  error?: string;
+}
+
+export interface FingerprintProgress {
+  completed: number;
+  total: number;
+  successful: number;
+  percentComplete: number;
+}
+
+const FINGERPRINT_API = '/api/v1/fingerprints';
+
+export async function getFingerprintStatus(): Promise<FingerprintStatus> {
+  const response = await fetch(`${FINGERPRINT_API}/status`);
+  if (!response.ok) throw new Error('Failed to get fingerprint status');
+  return response.json();
+}
+
+export async function startFingerprintGeneration(): Promise<FingerprintGenerationResult> {
+  const response = await fetch(`${FINGERPRINT_API}/generate`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || 'Failed to start fingerprint generation');
+  }
+  return response.json();
+}
+
+export async function getFingerprintGenerationStatus(sessionId: string): Promise<{
+  sessionId: string;
+  status: string;
+  totalFiles: number;
+  completed: number;
+  error: string;
+}> {
+  const response = await fetch(`${FINGERPRINT_API}/generate/${sessionId}`);
+  if (!response.ok) throw new Error('Failed to get generation status');
+  return response.json();
+}

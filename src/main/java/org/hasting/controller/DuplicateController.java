@@ -1,5 +1,7 @@
 package org.hasting.controller;
 
+import org.hasting.dto.AutoResolutionPreviewDTO;
+import org.hasting.dto.AutoResolutionResultDTO;
 import org.hasting.dto.DuplicateGroupDTO;
 import org.hasting.dto.MusicFileDTO;
 import org.hasting.service.DuplicateService;
@@ -7,8 +9,12 @@ import org.hasting.service.DuplicateService.DuplicateScanStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.awt.Desktop;
+import java.io.File;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * REST controller for duplicate detection operations.
@@ -171,7 +177,7 @@ public class DuplicateController {
     }
 
     /**
-     * Delete a single file from the duplicates.
+     * Delete a single file from the collection.
      */
     @DeleteMapping("/file/{fileId}")
     public ResponseEntity<Map<String, Object>> deleteFile(@PathVariable long fileId) {
@@ -180,13 +186,108 @@ public class DuplicateController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(Map.of(
-            "deleted", true,
-            "fileId", fileId
+            "deletedFileId", fileId,
+            "success", true
         ));
+    }
+
+    /**
+     * Automatically resolve duplicates based on bitrate, metadata completeness, and path matching.
+     * Returns a result with files deleted, files kept, and groups requiring manual review.
+     */
+    @PostMapping("/auto-resolve")
+    public ResponseEntity<AutoResolutionResultDTO> autoResolveDuplicates() {
+        AutoResolutionResultDTO result = duplicateService.autoResolveDuplicates();
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Preview automatic duplicate resolution without deleting any files.
+     * Shows what files would be deleted and which would be kept.
+     */
+    @GetMapping("/auto-resolve/preview")
+    public ResponseEntity<AutoResolutionPreviewDTO> previewAutoResolution() {
+        AutoResolutionPreviewDTO preview = duplicateService.previewAutoResolution();
+        return ResponseEntity.ok(preview);
+    }
+
+    /**
+     * Execute automatic duplicate resolution with optional file exclusions.
+     * Files in the exclude list will be kept even if they would normally be deleted.
+     */
+    @PostMapping("/auto-resolve/execute")
+    public ResponseEntity<AutoResolutionResultDTO> executeAutoResolution(
+            @RequestBody(required = false) ExecuteResolutionRequest request) {
+        Set<Long> excludeIds = request != null && request.excludeFileIds() != null
+            ? new HashSet<>(request.excludeFileIds())
+            : null;
+        AutoResolutionResultDTO result = duplicateService.executeAutoResolution(excludeIds);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Opens the folder containing a file in the OS file manager.
+     */
+    @PostMapping("/open-folder")
+    public ResponseEntity<Map<String, Object>> openFileFolder(@RequestBody OpenFolderRequest request) {
+        try {
+            File file = new File(request.filePath());
+            File folder = file.getParentFile();
+
+            if (folder == null || !folder.exists()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Folder does not exist: " + request.filePath()
+                ));
+            }
+
+            if (Desktop.isDesktopSupported()) {
+                Desktop desktop = Desktop.getDesktop();
+                if (desktop.isSupported(Desktop.Action.OPEN)) {
+                    desktop.open(folder);
+                    return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "folder", folder.getAbsolutePath()
+                    ));
+                }
+            }
+
+            // Fallback for systems without Desktop support
+            String os = System.getProperty("os.name").toLowerCase();
+            ProcessBuilder pb;
+            if (os.contains("mac")) {
+                pb = new ProcessBuilder("open", folder.getAbsolutePath());
+            } else if (os.contains("win")) {
+                pb = new ProcessBuilder("explorer", folder.getAbsolutePath());
+            } else {
+                pb = new ProcessBuilder("xdg-open", folder.getAbsolutePath());
+            }
+            pb.start();
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "folder", folder.getAbsolutePath()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
     }
 
     /**
      * Request body for comparing two files.
      */
     public record CompareRequest(long fileId1, long fileId2) {}
+
+    /**
+     * Request body for executing resolution with exclusions.
+     */
+    public record ExecuteResolutionRequest(List<Long> excludeFileIds) {}
+
+    /**
+     * Request body for opening a file's folder.
+     */
+    public record OpenFolderRequest(String filePath) {}
 }
