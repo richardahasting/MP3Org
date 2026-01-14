@@ -49,6 +49,9 @@ class MusicFileControllerTest {
     @MockBean
     private MusicFileService musicFileService;
 
+    @MockBean
+    private org.hasting.service.FingerprintService fingerprintService;
+
     private MusicFileDTO sampleMusicFile;
     private PageResponse<MusicFileDTO> samplePageResponse;
 
@@ -410,7 +413,8 @@ class MusicFileControllerTest {
                     eq(List.of(1L, 2L, 3L)),
                     eq("New Artist"),
                     eq("New Album"),
-                    eq("New Genre")
+                    eq("New Genre"),
+                    eq(2024)
             )).thenReturn(3);
 
             String requestBody = """
@@ -418,7 +422,8 @@ class MusicFileControllerTest {
                     "ids": [1, 2, 3],
                     "artist": "New Artist",
                     "album": "New Album",
-                    "genre": "New Genre"
+                    "genre": "New Genre",
+                    "year": 2024
                 }
                 """;
 
@@ -432,7 +437,8 @@ class MusicFileControllerTest {
                     eq(List.of(1L, 2L, 3L)),
                     eq("New Artist"),
                     eq("New Album"),
-                    eq("New Genre")
+                    eq("New Genre"),
+                    eq(2024)
             );
         }
 
@@ -442,6 +448,7 @@ class MusicFileControllerTest {
             when(musicFileService.bulkUpdate(
                     eq(List.of(1L, 2L)),
                     eq("New Artist"),
+                    isNull(),
                     isNull(),
                     isNull()
             )).thenReturn(2);
@@ -467,7 +474,8 @@ class MusicFileControllerTest {
                     eq(List.of(999L, 998L)),
                     anyString(),
                     anyString(),
-                    anyString()
+                    anyString(),
+                    any()
             )).thenReturn(0);
 
             String requestBody = """

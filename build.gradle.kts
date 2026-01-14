@@ -74,6 +74,11 @@ dependencies {
     compileOnly("org.openjfx:javafx-graphics:21.0.2:$javafxPlatform")
     compileOnly("org.openjfx:javafx-base:21.0.2:$javafxPlatform")
 
+    // JavaFX for tests (legacy desktop app tests)
+    testRuntimeOnly("org.openjfx:javafx-controls:21.0.2:$javafxPlatform")
+    testRuntimeOnly("org.openjfx:javafx-graphics:21.0.2:$javafxPlatform")
+    testRuntimeOnly("org.openjfx:javafx-base:21.0.2:$javafxPlatform")
+
     // SQLite database (embedded) - replaces Derby for Issue #72
     implementation("org.xerial:sqlite-jdbc:3.45.1.0")
 
