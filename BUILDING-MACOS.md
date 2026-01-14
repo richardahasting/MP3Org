@@ -28,10 +28,12 @@ cd MP3Org
 ## Run
 
 ```bash
-./gradle21 bootRun
+./start
 ```
 
-The application will start on http://localhost:9090
+This starts both backend and frontend, then opens http://localhost:5173 in your browser.
+
+Press `Ctrl+C` to stop.
 
 ## Why `gradle21` instead of `gradlew`?
 
