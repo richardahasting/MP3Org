@@ -102,34 +102,21 @@ jenv local
 
 **macOS / Linux:**
 ```bash
-# Clone the repository
 git clone https://github.com/richardahasting/MP3Org.git
 cd MP3Org
-
-# Start the backend (port 9090)
-./gradle21 bootRun
-
-# In another terminal, start the frontend (port 5173)
-cd frontend
-npm install
-npm run dev
+./start
 ```
 
-**Windows (Command Prompt or PowerShell):**
+**Windows:**
 ```cmd
 git clone https://github.com/richardahasting/MP3Org.git
 cd MP3Org
-
-REM Start the backend
-gradle21.cmd bootRun
-
-REM In another terminal, start the frontend
-cd frontend
-npm install
-npm run dev
+start.cmd
 ```
 
-Then open http://localhost:5173 in your browser.
+This starts both backend and frontend, then opens http://localhost:5173 in your browser.
+
+Press `Ctrl+C` to stop (or any key on Windows).
 
 ### Building from Source
 
