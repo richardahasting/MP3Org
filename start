@@ -13,6 +13,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Detect OS
+detect_os() {
+    case "$(uname -s)" in
+        Darwin*)    echo "macos" ;;
+        Linux*)     echo "linux" ;;
+        MINGW*|CYGWIN*|MSYS*) echo "windows" ;;
+        *)          echo "unknown" ;;
+    esac
+}
+
+OS=$(detect_os)
+
 # Cleanup function to kill both processes on exit
 cleanup() {
     echo ""
@@ -20,8 +32,13 @@ cleanup() {
     [ -n "$BACKEND_PID" ] && kill $BACKEND_PID 2>/dev/null
     [ -n "$FRONTEND_PID" ] && kill $FRONTEND_PID 2>/dev/null
     # Kill any remaining processes on our ports
-    lsof -ti:9090 | xargs kill 2>/dev/null || true
-    lsof -ti:5173 | xargs kill 2>/dev/null || true
+    if [ "$OS" = "linux" ]; then
+        fuser -k 9090/tcp 2>/dev/null || true
+        fuser -k 5173/tcp 2>/dev/null || true
+    else
+        lsof -ti:9090 | xargs kill 2>/dev/null || true
+        lsof -ti:5173 | xargs kill 2>/dev/null || true
+    fi
     exit 0
 }
 
@@ -76,11 +93,19 @@ echo ""
 echo "  Press Ctrl+C to stop"
 echo "=========================================="
 
-# Open browser (macOS)
-if command -v open &> /dev/null; then
-    sleep 2
-    open http://localhost:5173
-fi
+# Open browser
+sleep 2
+case "$OS" in
+    macos)
+        open http://localhost:5173
+        ;;
+    linux)
+        xdg-open http://localhost:5173 2>/dev/null || true
+        ;;
+    windows)
+        start http://localhost:5173 2>/dev/null || true
+        ;;
+esac
 
 # Wait for either process to exit
 wait
