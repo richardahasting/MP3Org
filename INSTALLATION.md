@@ -15,8 +15,8 @@ git clone https://github.com/richardahasting/MP3Org.git
 cd MP3Org
 
 # Start backend (Terminal 1)
-./gradle21 bootRun              # macOS/Linux
-gradle21.cmd bootRun            # Windows
+./gradle21 bootRun              # macOS/Linux/Git Bash
+.\gradle21.cmd bootRun          # Windows PowerShell or Command Prompt
 
 # Start frontend (Terminal 2)
 cd frontend
@@ -173,6 +173,18 @@ sudo pacman -S chromaprint
 
 ### Windows
 
+**Option A: winget (Recommended, Verified)**
+```cmd
+winget install AcoustID.Chromaprint
+```
+Note: Restart your terminal after installation for the PATH to update.
+
+**Option B: Chocolatey**
+```cmd
+choco install chromaprint
+```
+
+**Option C: Manual Download**
 1. Download from https://acoustid.org/chromaprint
 2. Extract the ZIP file
 3. Add the folder containing `fpcalc.exe` to your PATH
@@ -353,9 +365,25 @@ nvm use 18
 
 ### Windows
 
-- Run Command Prompt or PowerShell as Administrator if needed
-- Use `gradle21.cmd` (not `./gradle21`)
-- Path separators use backslash (`\`)
+**Quick Install (winget):**
+```cmd
+winget install EclipseAdoptium.Temurin.21.JDK
+winget install OpenJS.NodeJS.LTS
+```
+
+**Running Build Commands:**
+
+| Environment | Command |
+|-------------|---------|
+| **PowerShell** | `.\gradle21.cmd build` |
+| **Command Prompt** | `.\gradle21.cmd build` |
+| **Git Bash** | `./gradle21 build` |
+
+**Notes:**
+- The `.\` prefix is required in PowerShell and recommended in Command Prompt
+- In Git Bash, use the Unix-style `./gradle21` script
+- Admin privileges are only needed if installing to protected directories
+- The script automatically finds Java 21 from common install locations
 
 ---
 

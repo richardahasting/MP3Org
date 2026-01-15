@@ -3,7 +3,51 @@
 ## Overview
 This developer log tracks the evolution of MP3Org from a basic music organization tool to a sophisticated application with advanced directory management, test infrastructure, and user experience enhancements. The log spans multiple major development sessions between July 2025 and covers critical architectural improvements, database enhancements, and UI/UX refinements.
 
-## Latest Session: Issue #92 - Directory-Based Duplicate Resolution & Bulk Edit Enhancement (January 13, 2026)
+## Latest Session: Issue #99 - Windows Build Improvements (January 14, 2026)
+**Duration**: ~30 minutes | **Status**: ✅ COMPLETED | **Branch**: feature/issue-99-windows-build
+
+### Problem Statement
+The `gradle21.cmd` script failed on Windows when Java was installed in paths containing spaces (e.g., `C:\Program Files\Microsoft\jdk-21...`).
+
+### Root Cause
+The version verification code used a `for /f` command with an embedded pipe that didn't handle quoted paths correctly:
+```batch
+for /f "tokens=3" %%v in ('"%JAVA21_HOME%\bin\java" -version 2^>^&1 ^| findstr /i "version"') do (
+```
+
+### Fix Applied
+Replaced the complex one-liner with a temp file approach that correctly handles paths with spaces:
+```batch
+"%JAVA21_HOME%\bin\java" -version 2>&1 | findstr /i "version" > "%TEMP%\mp3org_java_ver.txt"
+set /p JAVA_VER_LINE=<"%TEMP%\mp3org_java_ver.txt"
+del "%TEMP%\mp3org_java_ver.txt" 2>nul
+for /f "tokens=3" %%v in ("%JAVA_VER_LINE%") do set "JAVA_VER=%%v"
+```
+
+Also fixed `gradlew.bat` reference to use `%~dp0` for script-relative path:
+```batch
+call "%~dp0gradlew.bat" %*
+```
+
+### Testing Verified
+- ✅ PowerShell: `.\gradle21.cmd build`
+- ✅ Command Prompt: `.\gradle21.cmd build`
+- ✅ Git Bash: `./gradle21 build`
+- ✅ Full backend build (1m 29s)
+- ✅ Frontend build (npm install + npm run build)
+
+### Files Modified
+- `gradle21.cmd` - Fixed path handling for spaces
+- `INSTALLATION.md` - Improved Windows instructions with environment-specific commands
+
+### Documentation Updates
+- Added winget quick install commands to Windows section
+- Added table showing correct command syntax for each environment
+- Clarified `.\` prefix requirement
+
+---
+
+## Session: Issue #92 - Directory-Based Duplicate Resolution & Bulk Edit Enhancement (January 13, 2026)
 **Duration**: ~3 hours | **Status**: ✅ COMPLETED | **Commit**: 74c8f89
 
 ### Problem Statement
