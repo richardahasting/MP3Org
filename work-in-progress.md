@@ -11,6 +11,16 @@
 
 ---
 
+## Active Work
+
+### **Issue #99 - Make building on Windows easy** (Ready for PR)
+- ✅ Fixed gradle21.cmd path handling for spaces
+- ✅ Verified builds work in PowerShell, Command Prompt, and Git Bash
+- ✅ Updated INSTALLATION.md with clear Windows instructions
+- Branch: `feature/issue-99-windows-build`
+
+---
+
 ## Recently Completed
 
 ### **PR #93 - Cross-Platform Build Portability** (Merged 2026-01-13)

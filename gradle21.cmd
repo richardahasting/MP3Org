@@ -105,10 +105,11 @@ if not defined JAVA21_HOME (
     exit /b 1
 )
 
-REM Verify it's actually Java 21
-for /f "tokens=3" %%v in ('"%JAVA21_HOME%\bin\java" -version 2^>^&1 ^| findstr /i "version"') do (
-    set "JAVA_VER=%%v"
-)
+REM Verify it's actually Java 21 (use temp file to handle paths with spaces)
+"%JAVA21_HOME%\bin\java" -version 2>&1 | findstr /i "version" > "%TEMP%\mp3org_java_ver.txt"
+set /p JAVA_VER_LINE=<"%TEMP%\mp3org_java_ver.txt"
+del "%TEMP%\mp3org_java_ver.txt" 2>nul
+for /f "tokens=3" %%v in ("%JAVA_VER_LINE%") do set "JAVA_VER=%%v"
 set "JAVA_VER=%JAVA_VER:"=%"
 for /f "tokens=1 delims=." %%m in ("%JAVA_VER%") do set "JAVA_MAJOR=%%m"
 
@@ -121,4 +122,4 @@ echo Using Java 21: %JAVA21_HOME%
 
 REM Set JAVA_HOME and run Gradle
 set "JAVA_HOME=%JAVA21_HOME%"
-call gradlew.bat %*
+call "%~dp0gradlew.bat" %*
