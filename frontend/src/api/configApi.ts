@@ -207,6 +207,14 @@ export async function getFingerprintStatus(): Promise<FingerprintStatus> {
   return response.json();
 }
 
+export async function recheckFpcalc(): Promise<FingerprintStatus> {
+  const response = await fetch(`${FINGERPRINT_API}/recheck`, {
+    method: 'POST',
+  });
+  if (!response.ok) throw new Error('Failed to recheck fpcalc');
+  return response.json();
+}
+
 export async function startFingerprintGeneration(): Promise<FingerprintGenerationResult> {
   const response = await fetch(`${FINGERPRINT_API}/generate`, {
     method: 'POST',

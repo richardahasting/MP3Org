@@ -4045,6 +4045,27 @@ body::before {
   color: var(--accent-primary);
 }
 
+.install-hint .recheck-btn {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+
+.install-hint .recheck-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.install-hint .recheck-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .fingerprint-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
