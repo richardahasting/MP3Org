@@ -15,7 +15,7 @@ import java.util.logging.Logger;
  * <p>This class now uses the new TestHarness infrastructure to provide:</p>
  * <ul>
  * <li><strong>TEST-HARNESS profile</strong> - Standardized test profile shared across all tests</li>
- * <li><strong>Consistent test data</strong> - Pre-loaded data from /Users/richard/mp3s directory</li>
+ * <li><strong>Consistent test data</strong> - Pre-loaded data from classpath resources (test-audio)</li>
  * <li><strong>Automatic cleanup</strong> - Removes temporary profiles and restores user settings</li>
  * <li><strong>Profile isolation</strong> - No interference with user's production profiles</li>
  * </ul>

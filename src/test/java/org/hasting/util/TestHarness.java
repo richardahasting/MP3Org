@@ -3,16 +3,20 @@ package org.hasting.util;
 import org.hasting.model.MusicFile;
 
 import java.io.File;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Test harness utility for managing test database profiles and data.
- * 
+ *
  * <p>This class provides a standardized testing infrastructure that:
  * <ul>
  * <li>Creates a dedicated TEST-HARNESS profile for all tests</li>
- * <li>Imports known test data from /Users/richard/mp3s directory</li>
+ * <li>Imports test data from classpath resources (src/test/resources/test-audio)</li>
+ * <li>Falls back to system property or legacy path for local development</li>
  * <li>Isolates tests from user's production profiles</li>
  * <li>Provides automatic cleanup of test artifacts</li>
  * </ul>
@@ -41,9 +45,56 @@ public class TestHarness {
     
     private static final String TEST_PROFILE_NAME = "TEST-HARNESS";
     private static final String TEST_PROFILE_DESCRIPTION = "Dedicated test profile with standardized test data";
-    private static final String TEST_MP3_DIRECTORY = "/Users/richard/mp3s";
-    
+
+    /** Legacy hardcoded path - used as fallback for local development with large test collection */
+    private static final String LEGACY_TEST_DIRECTORY = "/Users/richard/mp3s";
+
     private static String originalActiveProfileId;
+
+    /**
+     * Finds the test MP3 directory, checking multiple locations in order:
+     * 1. Classpath resources (src/test/resources/test-audio) - for CI/fresh clones
+     * 2. System property mp3org.test.data - for custom test data location
+     * 3. Legacy hardcoded path - for local development with large test collection
+     *
+     * @return The path to the test directory, or null if not found
+     */
+    private static String getTestMp3Directory() {
+        // Method 1: Check classpath resources (for CI and fresh clones)
+        URL resourceUrl = TestHarness.class.getClassLoader().getResource("test-audio");
+        if (resourceUrl != null) {
+            try {
+                String path = Paths.get(resourceUrl.toURI()).toString();
+                File dir = new File(path);
+                if (dir.exists() && dir.isDirectory()) {
+                    System.out.println("Using classpath test-audio directory: " + path);
+                    return path;
+                }
+            } catch (URISyntaxException e) {
+                System.out.println("Failed to parse classpath resource URL: " + e.getMessage());
+            }
+        }
+
+        // Method 2: Check system property for custom test data location
+        String customPath = System.getProperty("mp3org.test.data");
+        if (customPath != null) {
+            File customDir = new File(customPath);
+            if (customDir.exists() && customDir.isDirectory()) {
+                System.out.println("Using custom test data directory from system property: " + customPath);
+                return customPath;
+            }
+        }
+
+        // Method 3: Legacy fallback for local development with large test collection
+        File legacyDir = new File(LEGACY_TEST_DIRECTORY);
+        if (legacyDir.exists() && legacyDir.isDirectory()) {
+            System.out.println("Using legacy test directory: " + LEGACY_TEST_DIRECTORY);
+            return LEGACY_TEST_DIRECTORY;
+        }
+
+        System.out.println("No test data directory found - tests will run with empty database");
+        return null;
+    }
     private static String testProfileId;
     private static final List<String> profilesCreatedDuringTesting = new ArrayList<>();
     
@@ -111,18 +162,24 @@ public class TestHarness {
      */
     private static void importTestData() {
         try {
-            File testDir = new File(TEST_MP3_DIRECTORY);
+            String testDirectory = getTestMp3Directory();
+            if (testDirectory == null) {
+                System.out.println("No test data directory found - continuing with empty test database");
+                return;
+            }
+
+            File testDir = new File(testDirectory);
             if (!testDir.exists() || !testDir.isDirectory()) {
-                System.out.println("Test MP3 directory not found at: " + TEST_MP3_DIRECTORY);
+                System.out.println("Test MP3 directory not accessible: " + testDirectory);
                 System.out.println("Continuing with empty test database");
                 return;
             }
-            
-            System.out.println("Importing test data from: " + TEST_MP3_DIRECTORY);
-            
+
+            System.out.println("Importing test data from: " + testDirectory);
+
             // Use MusicFileScanner to scan and import the test directory
             MusicFileScanner scanner = new MusicFileScanner();
-            List<MusicFile> musicFiles = scanner.findAllMusicFiles(TEST_MP3_DIRECTORY);
+            List<MusicFile> musicFiles = scanner.findAllMusicFiles(testDirectory);
             
             if (!musicFiles.isEmpty()) {
                 // Save all files to the test database
