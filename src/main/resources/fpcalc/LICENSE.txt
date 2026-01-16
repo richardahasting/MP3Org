@@ -1,0 +1,19 @@
+Chromaprint / fpcalc
+====================
+
+These fpcalc binaries are from the Chromaprint project:
+https://acoustid.org/chromaprint
+
+Version: 1.6.0
+Source: https://github.com/acoustid/chromaprint
+
+License: GNU Lesser General Public License version 2.1 (LGPL-2.1)
+
+Full license text available at:
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html
+
+Bundled binaries:
+- fpcalc-darwin-aarch64 (macOS ARM64)
+- fpcalc-darwin-x86_64 (macOS Intel)
+- fpcalc-linux-x86_64 (Linux x86_64)
+- fpcalc-windows-x86_64.exe (Windows x64)
