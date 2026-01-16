@@ -16,21 +16,26 @@ import java.io.IOException;
 
 /**
  * Tests for DatabaseConnectionManager lock detection functionality.
- * 
+ *
  * <p>This test class validates the self-teaching lock detection methods that form
  * the foundation of the database fallback system. Following the development philosophy
  * of clear, self-documenting code, these tests demonstrate how lock detection works
  * and validate the Derby-specific error handling.
- * 
+ *
+ * <p>Note: These tests require exclusive database access and will be skipped
+ * if the MP3Org application is running.
+ *
  * @author MP3Org Development Team
  */
 public class DatabaseConnectionManagerTest {
-    
+
     private static final String TEST_DB_BASE_PATH = "test-connection-manager";
     private Connection lockingConnection;
-    
+
     @BeforeEach
     void setUp() {
+        // Skip tests if app is running - they conflict on database resources
+        BaseTest.assumeAppNotRunning();
         // Clean up any existing test databases
         cleanupTestDatabases();
     }

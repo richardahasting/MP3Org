@@ -1,5 +1,6 @@
 package org.hasting;
 
+import org.hasting.util.BaseTest;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.DatabaseProfileManager;
 import org.hasting.util.DatabaseManager;
@@ -11,17 +12,22 @@ import java.lang.reflect.Method;
 /**
  * Test suite for database error recovery mechanisms in MP3OrgApplication.
  * Tests the progressive fallback strategy for database initialization failures.
- * 
+ *
+ * <p>Note: These tests require exclusive access to the database profile manager
+ * and will be skipped if the MP3Org application is running.
+ *
  * @see MP3OrgApplication#initializeDatabaseWithAutomaticFallback()
  */
 @DisplayName("Database Error Recovery Tests - Issue #59")
 public class DatabaseErrorRecoveryTest {
-    
+
     private MP3OrgApplication application;
     private DatabaseProfileManager profileManager;
-    
+
     @BeforeEach
     void setUp() {
+        // Skip tests if app is running - they conflict on profile manager
+        BaseTest.assumeAppNotRunning();
         application = new MP3OrgApplication();
         profileManager = DatabaseProfileManager.getInstance();
     }

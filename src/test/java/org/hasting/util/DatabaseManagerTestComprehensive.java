@@ -20,6 +20,8 @@ public class DatabaseManagerTestComprehensive extends MP3OrgTestBase {
 
     @BeforeEach
     void setUpTestMusicFiles() {
+        // Skip tests if app is running - they conflict on database
+        BaseTest.assumeAppNotRunning();
         // Create additional test music files for this specific test class
         // The base class already handles database setup and test data population
         testMusicFile1 = createTestMusicFile("Test Song 1", "Test Artist 1", "Test Album 1", 

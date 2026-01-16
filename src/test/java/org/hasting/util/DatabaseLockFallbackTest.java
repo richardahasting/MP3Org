@@ -2,6 +2,7 @@ package org.hasting.util;
 
 import org.hasting.MP3OrgTestBase;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +49,8 @@ public class DatabaseLockFallbackTest extends MP3OrgTestBase {
     
     @BeforeEach
     void setUpFallbackTest() {
+        // Skip tests if app is running - they conflict on profile manager
+        BaseTest.assumeAppNotRunning();
         // Initialize profile manager and capture original state
         profileManager = DatabaseProfileManager.getInstance();
         originalActiveProfileId = profileManager.getActiveProfileId();
