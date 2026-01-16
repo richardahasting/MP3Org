@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 import com.log4rich.core.Logger;
 import com.log4rich.Log4Rich;
 
+import org.hasting.util.FpcalcExtractor;
+
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -28,18 +30,24 @@ public class FingerprintService {
     private final ExecutorService executor;
 
     private volatile boolean fpcalcAvailable = false;
-    private String fpcalcPath = "fpcalc";
+    private String fpcalcPath;
 
     public FingerprintService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
         this.executor = Executors.newFixedThreadPool(DEFAULT_THREAD_COUNT);
+        // Try bundled binary first, fall back to system PATH
+        this.fpcalcPath = FpcalcExtractor.getFpcalcPath();
         checkFpcalcAvailability();
     }
 
     /**
      * Checks if fpcalc is available on the system.
+     * Re-attempts extraction of bundled binary if necessary.
      */
     public void checkFpcalcAvailability() {
+        // Re-fetch path (may re-extract bundled binary on recheck)
+        this.fpcalcPath = FpcalcExtractor.getFpcalcPath();
+
         try {
             ProcessBuilder pb = new ProcessBuilder(fpcalcPath, "-version");
             pb.redirectErrorStream(true);
@@ -51,14 +59,15 @@ public class FingerprintService {
 
             if (exitCode == 0 && line != null) {
                 fpcalcAvailable = true;
-                logger.info("fpcalc is available: " + line);
+                boolean bundled = !fpcalcPath.equals("fpcalc");
+                logger.info("fpcalc is available{}: {}", bundled ? " (bundled)" : "", line);
             } else {
                 fpcalcAvailable = false;
                 logger.warn("fpcalc not found or returned error. Audio fingerprinting will be disabled.");
             }
         } catch (Exception e) {
             fpcalcAvailable = false;
-            logger.warn("fpcalc not available: " + e.getMessage() + ". Install with: brew install chromaprint");
+            logger.warn("fpcalc not available: {}. Check platform compatibility.", e.getMessage());
         }
     }
 
