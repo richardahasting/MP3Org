@@ -126,3 +126,47 @@ tasks.register<Exec>("killPrevious") {
 tasks.named("bootRun") {
     dependsOn("killPrevious")
 }
+
+// ============================================
+// Frontend Build Tasks
+// ============================================
+
+// Build the React frontend using npm
+tasks.register<Exec>("buildFrontend") {
+    description = "Builds the React frontend for production"
+    group = "build"
+    workingDir = file("frontend")
+    commandLine("npm", "run", "build")
+
+    // Only run if frontend source files have changed
+    inputs.dir("frontend/src")
+    inputs.file("frontend/package.json")
+    inputs.file("frontend/vite.config.ts")
+    outputs.dir("frontend/dist")
+}
+
+// Copy built frontend to Spring Boot static resources
+tasks.register<Copy>("copyFrontend") {
+    description = "Copies built frontend to Spring Boot static resources"
+    group = "build"
+    dependsOn("buildFrontend")
+    from("frontend/dist")
+    into("src/main/resources/static")
+}
+
+// Clean the copied frontend files
+tasks.register<Delete>("cleanFrontend") {
+    description = "Removes copied frontend files from static resources"
+    group = "build"
+    delete("src/main/resources/static")
+}
+
+// Make the build depend on copying the frontend
+tasks.named("processResources") {
+    dependsOn("copyFrontend")
+}
+
+// Clean should also clean the frontend
+tasks.named("clean") {
+    dependsOn("cleanFrontend")
+}

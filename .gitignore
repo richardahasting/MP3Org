@@ -40,6 +40,9 @@ mp3org.properties
 mp3org-profiles.properties
 derby.log
 
+# Generated frontend (copied from frontend/dist during build)
+src/main/resources/static/
+
 # Platform-specific native libraries (download via Maven/Gradle instead)
 lib/*.dylib
 lib/*.dll
