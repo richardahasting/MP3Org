@@ -51,6 +51,16 @@ public class FingerprintController {
     }
 
     /**
+     * Re-check fpcalc availability without server restart.
+     * Useful after installing chromaprint while the server is running.
+     */
+    @PostMapping("/recheck")
+    public ResponseEntity<FingerprintStatus> recheckFpcalc() {
+        fingerprintService.checkFpcalcAvailability();
+        return getStatus();
+    }
+
+    /**
      * Start fingerprint generation for all files that don't have fingerprints.
      * Returns a session ID for tracking progress via WebSocket.
      */

@@ -21,6 +21,7 @@ import {
   getFingerprintStatus,
   startFingerprintGeneration,
   getFingerprintGenerationStatus,
+  recheckFpcalc,
 } from '../../api/configApi';
 import HelpModal, { HelpButton } from '../common/HelpModal';
 import { configHelp } from '../common/helpContent';
@@ -48,6 +49,7 @@ export default function ConfigurationView() {
   // Fingerprint state
   const [fingerprintStatus, setFingerprintStatus] = useState<FingerprintStatus | null>(null);
   const [fingerprintGenerating, setFingerprintGenerating] = useState(false);
+  const [recheckingFpcalc, setRecheckingFpcalc] = useState(false);
   const [fingerprintProgress, setFingerprintProgress] = useState<{
     completed: number;
     total: number;
@@ -266,6 +268,18 @@ export default function ConfigurationView() {
     }
   };
 
+  const handleRecheckFpcalc = async () => {
+    try {
+      setRecheckingFpcalc(true);
+      const status = await recheckFpcalc();
+      setFingerprintStatus(status);
+    } catch {
+      setError('Failed to recheck fpcalc availability');
+    } finally {
+      setRecheckingFpcalc(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="config-view">
@@ -350,6 +364,13 @@ export default function ConfigurationView() {
                     <div className="install-hint">
                       <p>Install Chromaprint to enable audio fingerprinting:</p>
                       <code>brew install chromaprint</code>
+                      <button
+                        className="recheck-btn"
+                        onClick={handleRecheckFpcalc}
+                        disabled={recheckingFpcalc}
+                      >
+                        {recheckingFpcalc ? 'Checking...' : 'Re-check Availability'}
+                      </button>
                     </div>
                   )}
                 </div>
