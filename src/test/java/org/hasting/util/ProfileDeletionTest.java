@@ -34,6 +34,8 @@ public class ProfileDeletionTest {
     
     @BeforeEach
     void setUp() {
+        // Skip tests if app is running - they conflict on profile manager
+        BaseTest.assumeAppNotRunning();
         // Initialize profile manager and capture initial state
         profileManager = DatabaseProfileManager.getInstance();
         

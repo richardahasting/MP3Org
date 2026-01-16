@@ -1,5 +1,6 @@
 package org.hasting;
 
+import org.hasting.util.BaseTest;
 import org.hasting.util.DatabaseManager;
 import org.hasting.util.DatabaseProfile;
 import org.hasting.util.DatabaseProfileManager;
@@ -11,16 +12,21 @@ import java.sql.SQLException;
 /**
  * Test suite for database connection recovery mechanisms in DatabaseManager.
  * Tests the ensureConnection() method and null pointer exception prevention.
- * 
+ *
+ * <p>Note: These tests require exclusive access to the database profile manager
+ * and will be skipped if the MP3Org application is running.
+ *
  * @see DatabaseManager#ensureConnection()
  */
 @DisplayName("Database Connection Recovery Tests")
 public class DatabaseConnectionRecoveryTest {
-    
+
     private DatabaseProfileManager profileManager;
-    
+
     @BeforeEach
     void setUp() {
+        // Skip tests if app is running - they conflict on profile manager
+        BaseTest.assumeAppNotRunning();
         profileManager = DatabaseProfileManager.getInstance();
     }
     
