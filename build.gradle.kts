@@ -170,3 +170,183 @@ tasks.named("processResources") {
 tasks.named("clean") {
     dependsOn("cleanFrontend")
 }
+
+// ============================================
+// Native Installer Tasks (jpackage)
+// ============================================
+
+val jreModules = listOf(
+    "java.base",
+    "java.desktop",
+    "java.instrument",
+    "java.logging",
+    "java.management",
+    "java.naming",
+    "java.net.http",
+    "java.prefs",
+    "java.scripting",
+    "java.security.jgss",
+    "java.sql",
+    "jdk.crypto.ec",
+    "jdk.unsupported"
+).joinToString(",")
+
+// jpackage requires version format: 1.2.3 (no -SNAPSHOT or other suffixes)
+val appVersion = "2.0.0"
+val jpackageDir = layout.buildDirectory.dir("jpackage").get().asFile
+
+// Create minimal custom JRE using jlink
+tasks.register<Exec>("jlink") {
+    description = "Creates a minimal custom JRE using jlink"
+    group = "packaging"
+
+    val jreOutput = layout.buildDirectory.dir("custom-jre").get().asFile
+
+    doFirst {
+        delete(jreOutput)
+    }
+
+    commandLine(
+        "jlink",
+        "--add-modules", jreModules,
+        "--strip-debug",
+        "--no-man-pages",
+        "--no-header-files",
+        "--compress=zip-6",
+        "--output", jreOutput.absolutePath
+    )
+
+    outputs.dir(jreOutput)
+}
+
+// macOS DMG installer
+tasks.register<Exec>("packageMac") {
+    description = "Creates macOS .dmg installer"
+    group = "packaging"
+    dependsOn("bootJar", "jlink")
+
+    val customJre = layout.buildDirectory.dir("custom-jre").get().asFile
+    val jarFile = "MP3Org-${version}.jar"
+
+    doFirst {
+        mkdir(jpackageDir)
+    }
+
+    commandLine(
+        "jpackage",
+        "--input", layout.buildDirectory.dir("libs").get().asFile.absolutePath,
+        "--main-jar", jarFile,
+        "--name", "MP3Org",
+        "--app-version", appVersion,
+        "--vendor", "MP3Org",
+        "--description", "Music Collection Manager with Duplicate Detection",
+        "--type", "dmg",
+        "--runtime-image", customJre.absolutePath,
+        "--dest", jpackageDir.absolutePath,
+        "--icon", "packaging/icon.icns",
+        "--mac-package-name", "MP3Org",
+        "--java-options", "-Xmx512m"
+    )
+}
+
+// Windows MSI installer
+tasks.register<Exec>("packageWindows") {
+    description = "Creates Windows .msi installer"
+    group = "packaging"
+    dependsOn("bootJar", "jlink")
+
+    val customJre = layout.buildDirectory.dir("custom-jre").get().asFile
+    val jarFile = "MP3Org-${version}.jar"
+
+    doFirst {
+        mkdir(jpackageDir)
+    }
+
+    commandLine(
+        "jpackage",
+        "--input", layout.buildDirectory.dir("libs").get().asFile.absolutePath,
+        "--main-jar", jarFile,
+        "--name", "MP3Org",
+        "--app-version", appVersion,
+        "--vendor", "MP3Org",
+        "--description", "Music Collection Manager with Duplicate Detection",
+        "--type", "msi",
+        "--runtime-image", customJre.absolutePath,
+        "--dest", jpackageDir.absolutePath,
+        "--icon", "packaging/icon.ico",
+        "--win-menu",
+        "--win-shortcut",
+        "--win-dir-chooser",
+        "--java-options", "-Xmx512m"
+    )
+}
+
+// Linux DEB package
+tasks.register<Exec>("packageLinuxDeb") {
+    description = "Creates Linux .deb package"
+    group = "packaging"
+    dependsOn("bootJar", "jlink")
+
+    val customJre = layout.buildDirectory.dir("custom-jre").get().asFile
+    val jarFile = "MP3Org-${version}.jar"
+
+    doFirst {
+        mkdir(jpackageDir)
+    }
+
+    commandLine(
+        "jpackage",
+        "--input", layout.buildDirectory.dir("libs").get().asFile.absolutePath,
+        "--main-jar", jarFile,
+        "--name", "mp3org",
+        "--app-version", appVersion,
+        "--vendor", "MP3Org",
+        "--description", "Music Collection Manager with Duplicate Detection",
+        "--type", "deb",
+        "--runtime-image", customJre.absolutePath,
+        "--dest", jpackageDir.absolutePath,
+        "--icon", "packaging/icon.png",
+        "--linux-shortcut",
+        "--linux-menu-group", "AudioVideo",
+        "--java-options", "-Xmx512m"
+    )
+}
+
+// Linux RPM package
+tasks.register<Exec>("packageLinuxRpm") {
+    description = "Creates Linux .rpm package"
+    group = "packaging"
+    dependsOn("bootJar", "jlink")
+
+    val customJre = layout.buildDirectory.dir("custom-jre").get().asFile
+    val jarFile = "MP3Org-${version}.jar"
+
+    doFirst {
+        mkdir(jpackageDir)
+    }
+
+    commandLine(
+        "jpackage",
+        "--input", layout.buildDirectory.dir("libs").get().asFile.absolutePath,
+        "--main-jar", jarFile,
+        "--name", "mp3org",
+        "--app-version", appVersion,
+        "--vendor", "MP3Org",
+        "--description", "Music Collection Manager with Duplicate Detection",
+        "--type", "rpm",
+        "--runtime-image", customJre.absolutePath,
+        "--dest", jpackageDir.absolutePath,
+        "--icon", "packaging/icon.png",
+        "--linux-shortcut",
+        "--linux-menu-group", "AudioVideo",
+        "--java-options", "-Xmx512m"
+    )
+}
+
+// Clean jpackage output
+tasks.register<Delete>("cleanPackaging") {
+    description = "Removes jpackage output and custom JRE"
+    group = "packaging"
+    delete(jpackageDir)
+    delete(layout.buildDirectory.dir("custom-jre"))
+}
