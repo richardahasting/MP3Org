@@ -190,20 +190,32 @@ public class ScanningService {
      */
     public List<DirectoryEntry> browseDirectory(String path) {
         List<DirectoryEntry> entries = new ArrayList<>();
+        String userHome = System.getProperty("user.home");
 
         // Determine the starting path
         File dir;
         if (path == null || path.isEmpty()) {
             // Return common root paths
-            String userHome = System.getProperty("user.home");
             entries.add(new DirectoryEntry(userHome, "Home", true, true));
-            entries.add(new DirectoryEntry(userHome + "/Music", "Music", true, true));
-            entries.add(new DirectoryEntry("/Volumes", "Volumes", true, true));
+            if (new File(userHome + "/Music").exists()) {
+                entries.add(new DirectoryEntry(userHome + "/Music", "Music", true, true));
+            }
+            if (new File("/Volumes").exists()) {
+                entries.add(new DirectoryEntry("/Volumes", "Volumes", true, true));
+            }
             return entries;
         }
 
         dir = new File(path);
         if (!dir.exists() || !dir.isDirectory()) {
+            // Path doesn't exist - fall back to root paths
+            entries.add(new DirectoryEntry(userHome, "Home", true, true));
+            if (new File(userHome + "/Music").exists()) {
+                entries.add(new DirectoryEntry(userHome + "/Music", "Music", true, true));
+            }
+            if (new File("/Volumes").exists()) {
+                entries.add(new DirectoryEntry("/Volumes", "Volumes", true, true));
+            }
             return entries;
         }
 
@@ -238,6 +250,42 @@ public class ScanningService {
         }
 
         return entries;
+    }
+
+    /**
+     * Creates a new directory at the specified path.
+     *
+     * @param parentPath The parent directory path
+     * @param name The name of the new directory
+     * @return The full path of the created directory, or null if creation failed
+     */
+    public String createDirectory(String parentPath, String name) {
+        if (parentPath == null || parentPath.isEmpty() || name == null || name.isEmpty()) {
+            return null;
+        }
+
+        // Sanitize the name - remove any path separators or problematic characters
+        String sanitizedName = name.replaceAll("[/\\\\:*?\"<>|]", "_").trim();
+        if (sanitizedName.isEmpty()) {
+            return null;
+        }
+
+        File parent = new File(parentPath);
+        if (!parent.exists() || !parent.isDirectory() || !parent.canWrite()) {
+            return null;
+        }
+
+        File newDir = new File(parent, sanitizedName);
+        if (newDir.exists()) {
+            // Already exists - return the path anyway
+            return newDir.getAbsolutePath();
+        }
+
+        if (newDir.mkdir()) {
+            return newDir.getAbsolutePath();
+        }
+
+        return null;
     }
 
     /**

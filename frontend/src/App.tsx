@@ -4,6 +4,7 @@ import MetadataEditor from './components/metadata/MetadataEditor';
 import ImportView from './components/import/ImportView';
 import DuplicateManager from './components/duplicates/DuplicateManager';
 import OrganizeView from './components/organize/OrganizeView';
+import ShareView from './components/share/ShareView';
 import ConfigurationView from './components/config/ConfigurationView';
 
 const tabs: { id: TabId; label: string; icon: string }[] = [
@@ -11,6 +12,7 @@ const tabs: { id: TabId; label: string; icon: string }[] = [
   { id: 'metadata', label: 'Metadata', icon: '♫' },
   { id: 'import', label: 'Import', icon: '⬇' },
   { id: 'organize', label: 'Organize', icon: '⬡' },
+  { id: 'share', label: 'Share', icon: '↗' },
   { id: 'config', label: 'Config', icon: '⚙' },
 ];
 
@@ -45,6 +47,7 @@ function App() {
         {activeTab === 'duplicates' && <DuplicateManager />}
         {activeTab === 'import' && <ImportView />}
         {activeTab === 'organize' && <OrganizeView />}
+        {activeTab === 'share' && <ShareView />}
         {activeTab === 'config' && <ConfigurationView />}
       </main>
 

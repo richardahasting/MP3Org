@@ -165,11 +165,16 @@ public class DatabaseConnectionManager {
     
     /**
      * Checks if a Derby database is locked by another process.
-     * 
+     *
      * @param databasePath the path to the database to check
      * @return true if the database is locked, false if available
+     * @throws IllegalArgumentException if databasePath is null or empty
      */
     public static boolean isDerbyDatabaseLockedByAnotherProcess(String databasePath) {
+        if (databasePath == null || databasePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("Database path cannot be null or empty");
+        }
+
         Connection testConnection = null;
         try {
             String jdbcUrl = "jdbc:derby:" + databasePath;
@@ -218,7 +223,7 @@ public class DatabaseConnectionManager {
     
     /**
      * Provides user-friendly explanation for database connection failures.
-     * 
+     *
      * @param e the SQLException that occurred
      * @param databasePath the database path that failed
      * @return human-readable explanation of the error
@@ -227,21 +232,23 @@ public class DatabaseConnectionManager {
         if (e == null) {
             return "Unknown database error occurred";
         }
-        
+
         String sqlState = e.getSQLState();
         String message = e.getMessage();
-        
-        // Derby-specific error codes
-        if ("XJ040".equals(sqlState) || "XSDB6".equals(sqlState)) {
-            return "Database is locked by another instance of MP3Org. Please close other instances.";
+
+        // Derby-specific lock error codes
+        if ("XJ040".equals(sqlState) || "XSDB6".equals(sqlState) || "XJ041".equals(sqlState)) {
+            return "Database is locked by another MP3Org instance. " +
+                   "The application will automatically use an alternative database. " +
+                   "Original error: " + message;
         } else if ("XJ004".equals(sqlState)) {
-            return "Database not found at: " + databasePath;
+            return "Database not found at: " + databasePath + ". Original error: " + message;
         } else if ("08001".equals(sqlState)) {
-            return "Unable to connect to database. Check if the path exists: " + databasePath;
+            return "Unable to connect to database at: " + databasePath + ". Original error: " + message;
         }
-        
-        // Generic message
-        return "Database error: " + message;
+
+        // Generic message - include original error
+        return "Database error at " + databasePath + ": " + message;
     }
     
     /**

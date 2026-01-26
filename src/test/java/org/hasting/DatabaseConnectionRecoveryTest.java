@@ -19,7 +19,7 @@ import java.sql.SQLException;
  * @see DatabaseManager#ensureConnection()
  */
 @DisplayName("Database Connection Recovery Tests")
-public class DatabaseConnectionRecoveryTest {
+public class DatabaseConnectionRecoveryTest extends BaseTest {
 
     private DatabaseProfileManager profileManager;
 
@@ -28,15 +28,6 @@ public class DatabaseConnectionRecoveryTest {
         // Skip tests if app is running - they conflict on profile manager
         BaseTest.assumeAppNotRunning();
         profileManager = DatabaseProfileManager.getInstance();
-    }
-    
-    @AfterEach
-    void tearDown() {
-        try {
-            DatabaseManager.shutdown();
-        } catch (Exception e) {
-            // Ignore cleanup errors
-        }
     }
     
     @Test

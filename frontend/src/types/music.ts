@@ -26,7 +26,7 @@ export interface PageResponse<T> {
   totalPages: number;
 }
 
-export type TabId = 'duplicates' | 'metadata' | 'import' | 'organize' | 'config';
+export type TabId = 'duplicates' | 'metadata' | 'import' | 'organize' | 'share' | 'config';
 
 // Scanning types for Phase 2
 export interface ScanProgress {

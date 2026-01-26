@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type {
   OrganizationPreview,
   TextFormat,
+  SearchFilters,
 } from '../../api/organizationApi';
 import {
   previewAllOrganization,
@@ -9,8 +10,11 @@ import {
   getTemplates,
   getAvailableFields,
   getTextFormats,
+  getMatchingIds,
 } from '../../api/organizationApi';
 import HelpModal, { HelpButton } from '../common/HelpModal';
+import DirectoryPicker from '../common/DirectoryPicker';
+import ConfirmModal from '../common/ConfirmModal';
 import { organizeHelp } from '../common/helpContent';
 
 export default function OrganizeView() {
@@ -47,6 +51,24 @@ export default function OrganizeView() {
   // Help modal state
   const [showHelp, setShowHelp] = useState(false);
 
+  // Directory picker state
+  const [showDirectoryPicker, setShowDirectoryPicker] = useState(false);
+
+  // Search filters
+  const [filterTitle, setFilterTitle] = useState('');
+  const [filterArtist, setFilterArtist] = useState('');
+  const [filterAlbum, setFilterAlbum] = useState('');
+  const [filterGenre, setFilterGenre] = useState('');
+  const [selectingAll, setSelectingAll] = useState(false);
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string | React.ReactNode;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
   // Load available options on mount
   useEffect(() => {
     const loadOptions = async () => {
@@ -68,6 +90,15 @@ export default function OrganizeView() {
     loadOptions();
   }, []);
 
+  const getActiveFilters = useCallback((): SearchFilters | undefined => {
+    const filters: SearchFilters = {};
+    if (filterTitle.trim()) filters.filterTitle = filterTitle.trim();
+    if (filterArtist.trim()) filters.filterArtist = filterArtist.trim();
+    if (filterAlbum.trim()) filters.filterAlbum = filterAlbum.trim();
+    if (filterGenre.trim()) filters.filterGenre = filterGenre.trim();
+    return Object.keys(filters).length > 0 ? filters : undefined;
+  }, [filterTitle, filterArtist, filterAlbum, filterGenre]);
+
   const handlePreview = useCallback(async () => {
     if (!basePath.trim()) {
       setPreviewError('Please enter a base path');
@@ -84,7 +115,8 @@ export default function OrganizeView() {
         useSubdirectories,
         subdirectoryLevels,
         previewPage,
-        25
+        25,
+        getActiveFilters()
       );
       setPreviews(result.previews);
       setTotalCount(result.totalCount);
@@ -94,7 +126,7 @@ export default function OrganizeView() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [basePath, template, textFormat, useSubdirectories, subdirectoryLevels, previewPage]);
+  }, [basePath, template, textFormat, useSubdirectories, subdirectoryLevels, previewPage, getActiveFilters]);
 
   const handlePageChange = useCallback((newPage: number) => {
     setPreviewPage(newPage);
@@ -138,16 +170,31 @@ export default function OrganizeView() {
     }
   }, [previews, selectedIds]);
 
-  const handleExecute = useCallback(async () => {
-    if (selectedIds.size === 0) {
-      alert('Please select files to organize');
-      return;
+  const handleSelectAll = useCallback(async () => {
+    try {
+      setSelectingAll(true);
+      const result = await getMatchingIds(getActiveFilters());
+      setSelectedIds(new Set(result.ids));
+    } catch (err) {
+      console.error('Failed to select all:', err);
+    } finally {
+      setSelectingAll(false);
     }
+  }, [getActiveFilters]);
 
-    if (!confirm(`Are you sure you want to organize ${selectedIds.size} files? This will copy them to the new locations.`)) {
-      return;
-    }
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
 
+  const handleClearFilters = useCallback(() => {
+    setFilterTitle('');
+    setFilterArtist('');
+    setFilterAlbum('');
+    setFilterGenre('');
+    setPreviewPage(0);
+  }, []);
+
+  const doExecuteOrganization = useCallback(async () => {
     try {
       setExecuting(true);
       setExecutionResult(null);
@@ -166,11 +213,38 @@ export default function OrganizeView() {
       });
       setSelectedIds(new Set());
     } catch (err) {
-      alert('Execution failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setExecutionResult({
+        success: 0,
+        failed: selectedIds.size,
+        errors: [err instanceof Error ? err.message : 'Unknown error'],
+      });
     } finally {
       setExecuting(false);
     }
   }, [selectedIds, basePath, template, textFormat, useSubdirectories, subdirectoryLevels]);
+
+  const handleExecute = useCallback(() => {
+    if (selectedIds.size === 0) {
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Organize Files',
+      message: (
+        <div>
+          <p>You are about to organize <strong>{selectedIds.size.toLocaleString()}</strong> files.</p>
+          <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
+            This will copy them to the new locations based on your template settings.
+          </p>
+        </div>
+      ),
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        doExecuteOrganization();
+      },
+    });
+  }, [selectedIds.size, doExecuteOrganization]);
 
   const insertField = useCallback((field: string) => {
     const fieldPlaceholder = field === 'track_number' ? `{${field}:02d}` : `{${field}}`;
@@ -196,13 +270,22 @@ export default function OrganizeView() {
 
           <div className="config-field">
             <label className="config-label">Base Output Path</label>
-            <input
-              type="text"
-              className="config-input"
-              value={basePath}
-              onChange={(e) => setBasePath(e.target.value)}
-              placeholder="/path/to/organized/music"
-            />
+            <div className="input-with-browse">
+              <input
+                type="text"
+                className="config-input"
+                value={basePath}
+                onChange={(e) => setBasePath(e.target.value)}
+                placeholder="/path/to/organized/music"
+              />
+              <button
+                type="button"
+                className="browse-btn"
+                onClick={() => setShowDirectoryPicker(true)}
+              >
+                Browse...
+              </button>
+            </div>
           </div>
 
           <div className="config-field">
@@ -295,18 +378,88 @@ export default function OrganizeView() {
         <div className="preview-panel">
           <div className="preview-header">
             <h3 className="panel-title">Preview ({totalCount.toLocaleString()} files)</h3>
-            {selectedIds.size > 0 && (
-              <div className="preview-actions">
-                <span className="selected-info">{selectedIds.size} selected</span>
+            <div className="preview-actions">
+              {selectedIds.size > 0 && (
+                <>
+                  <span className="selected-info">{selectedIds.size.toLocaleString()} selected</span>
+                  <button
+                    className="clear-selection-btn"
+                    onClick={handleClearSelection}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    className="execute-btn"
+                    onClick={handleExecute}
+                    disabled={executing}
+                  >
+                    {executing ? 'Organizing...' : `Organize ${selectedIds.size.toLocaleString()} Files`}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Search Filters */}
+          <div className="search-filters">
+            <div className="filter-row">
+              <input
+                type="text"
+                className="filter-input"
+                placeholder="Title..."
+                value={filterTitle}
+                onChange={(e) => setFilterTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handlePreview()}
+              />
+              <input
+                type="text"
+                className="filter-input"
+                placeholder="Artist..."
+                value={filterArtist}
+                onChange={(e) => setFilterArtist(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handlePreview()}
+              />
+              <input
+                type="text"
+                className="filter-input"
+                placeholder="Album..."
+                value={filterAlbum}
+                onChange={(e) => setFilterAlbum(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handlePreview()}
+              />
+              <input
+                type="text"
+                className="filter-input"
+                placeholder="Genre..."
+                value={filterGenre}
+                onChange={(e) => setFilterGenre(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handlePreview()}
+              />
+            </div>
+            <div className="filter-actions">
+              <button
+                className="filter-btn search"
+                onClick={handlePreview}
+                disabled={previewLoading}
+              >
+                Search
+              </button>
+              {(filterTitle || filterArtist || filterAlbum || filterGenre) && (
                 <button
-                  className="execute-btn"
-                  onClick={handleExecute}
-                  disabled={executing}
+                  className="filter-btn clear"
+                  onClick={handleClearFilters}
                 >
-                  {executing ? 'Organizing...' : `Organize ${selectedIds.size} Files`}
+                  Clear Filters
                 </button>
-              </div>
-            )}
+              )}
+              <button
+                className="filter-btn select-all"
+                onClick={handleSelectAll}
+                disabled={selectingAll || totalCount === 0}
+              >
+                {selectingAll ? 'Selecting...' : `Select All ${totalCount.toLocaleString()}`}
+              </button>
+            </div>
           </div>
 
           {previewError && (
@@ -439,6 +592,27 @@ export default function OrganizeView() {
         onClose={() => setShowHelp(false)}
         title="Organize Help"
         sections={organizeHelp}
+      />
+
+      <DirectoryPicker
+        isOpen={showDirectoryPicker}
+        onSelect={(path) => {
+          setBasePath(path);
+          setShowDirectoryPicker(false);
+        }}
+        onCancel={() => setShowDirectoryPicker(false)}
+        title="Select Output Directory"
+        initialPath={basePath || undefined}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Organize Files"
+        variant="default"
       />
     </div>
   );

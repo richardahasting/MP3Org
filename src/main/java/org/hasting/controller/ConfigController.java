@@ -5,6 +5,10 @@ import org.hasting.service.ConfigService.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -159,6 +163,52 @@ public class ConfigController {
     @GetMapping("/database")
     public DatabaseInfoDTO getDatabaseInfo() {
         return configService.getDatabaseInfo();
+    }
+
+    // ============= Network Info =============
+
+    /**
+     * GET /api/v1/config/network - Get network information for sharing.
+     */
+    @GetMapping("/network")
+    public Map<String, Object> getNetworkInfo() {
+        List<String> addresses = new ArrayList<>();
+        String primaryIp = null;
+
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+                // Skip loopback and inactive interfaces
+                if (iface.isLoopback() || !iface.isUp()) continue;
+
+                Enumeration<InetAddress> addrs = iface.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    InetAddress addr = addrs.nextElement();
+                    // Only include IPv4 addresses
+                    if (addr.getHostAddress().contains(":")) continue; // Skip IPv6
+
+                    String ip = addr.getHostAddress();
+                    addresses.add(ip);
+
+                    // Prefer addresses that look like local network IPs
+                    if (primaryIp == null ||
+                        ip.startsWith("192.168.") ||
+                        ip.startsWith("10.") ||
+                        ip.startsWith("172.")) {
+                        primaryIp = ip;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Fallback to localhost
+        }
+
+        return Map.of(
+            "primaryIp", primaryIp != null ? primaryIp : "localhost",
+            "allAddresses", addresses,
+            "port", 9090
+        );
     }
 
     // ============= Request DTOs =============

@@ -80,3 +80,21 @@ export async function browseDirectory(path?: string): Promise<BrowseResponse> {
 
   return response.json();
 }
+
+/**
+ * Creates a new directory on the server.
+ */
+export async function createDirectory(parentPath: string, name: string): Promise<{ success: boolean; path: string }> {
+  const response = await fetch(`${API_BASE}/create-directory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parentPath, name }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create directory');
+  }
+
+  return response.json();
+}

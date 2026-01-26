@@ -16,6 +16,7 @@ import {
 import { getAudioStreamUrl } from '../../api/musicApi';
 import { useDuplicateWebSocket } from '../../hooks/useDuplicateWebSocket';
 import HelpModal, { HelpButton } from '../common/HelpModal';
+import ConfirmModal from '../common/ConfirmModal';
 import { duplicatesHelp } from '../common/helpContent';
 
 type ViewMode = 'similarity' | 'directory';
@@ -65,6 +66,17 @@ export default function DuplicateManager() {
   const [directoryPreview, setDirectoryPreview] = useState<DirectoryResolutionPreview | null>(null);
   const [directoryLoading, setDirectoryLoading] = useState(false);
   const [executingDirectoryResolution, setExecutingDirectoryResolution] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string | React.ReactNode;
+    onConfirm: () => void;
+    confirmText?: string;
+    variant?: 'danger' | 'warning' | 'default';
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   // WebSocket for progressive duplicate scanning
   const { status: scanStatus } = useDuplicateWebSocket({
@@ -201,13 +213,8 @@ export default function DuplicateManager() {
     }
   }, [selectedConflict]);
 
-  const handleExecuteDirectoryResolution = useCallback(async () => {
-    if (!selectedConflict || !preferredDirectory || !directoryPreview) return;
-
-    const fileCount = directoryPreview.totalFilesToDelete;
-    if (!confirm(`Delete ${fileCount} files from "${directoryPreview.directoryToDelete}"? This cannot be undone.`)) {
-      return;
-    }
+  const doExecuteDirectoryResolution = useCallback(async () => {
+    if (!directoryPreview) return;
 
     try {
       setExecutingDirectoryResolution(true);
@@ -222,13 +229,40 @@ export default function DuplicateManager() {
       setDirectoryPreview(null);
       await loadDirectoryConflicts();
 
-      alert(`Deleted ${result.filesDeleted} files from ${result.directoryCleared}`);
+      setSuccessMessage(`Deleted ${result.filesDeleted} files from ${result.directoryCleared}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to execute resolution');
     } finally {
       setExecutingDirectoryResolution(false);
     }
-  }, [selectedConflict, preferredDirectory, directoryPreview, loadDirectoryConflicts]);
+  }, [directoryPreview, loadDirectoryConflicts]);
+
+  const handleExecuteDirectoryResolution = useCallback(() => {
+    if (!selectedConflict || !preferredDirectory || !directoryPreview) return;
+
+    const fileCount = directoryPreview.totalFilesToDelete;
+    const dirName = directoryPreview.directoryToDelete.split('/').slice(-2).join('/');
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Files',
+      message: (
+        <>
+          <p>Delete <strong>{fileCount} files</strong> from:</p>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+            {dirName}
+          </p>
+          <p style={{ marginTop: '1rem', color: 'var(--error)' }}>This cannot be undone.</p>
+        </>
+      ),
+      confirmText: `Delete ${fileCount} Files`,
+      variant: 'danger',
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        doExecuteDirectoryResolution();
+      }
+    });
+  }, [selectedConflict, preferredDirectory, directoryPreview, doExecuteDirectoryResolution]);
 
   // Load directory conflicts when switching to directory view
   useEffect(() => {
@@ -266,15 +300,8 @@ export default function DuplicateManager() {
     }
   }, [selectedGroup]);
 
-  const handleDeleteFile = useCallback(async (fileId: number) => {
+  const doDeleteFile = useCallback(async (fileId: number) => {
     if (!selectedGroup) return;
-
-    const fileToDelete = selectedGroup.files.find(f => f.file.id === fileId);
-    const fileName = fileToDelete?.file.title || 'this file';
-
-    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) {
-      return;
-    }
 
     try {
       await deleteFile(fileId);
@@ -302,6 +329,30 @@ export default function DuplicateManager() {
       setError(err instanceof Error ? err.message : 'Failed to delete file');
     }
   }, [selectedGroup, loadDuplicates]);
+
+  const handleDeleteFile = useCallback((fileId: number) => {
+    if (!selectedGroup) return;
+
+    const fileToDelete = selectedGroup.files.find(f => f.file.id === fileId);
+    const fileName = fileToDelete?.file.title || 'this file';
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete File',
+      message: (
+        <>
+          <p>Delete "<strong>{fileName}</strong>"?</p>
+          <p style={{ marginTop: '1rem', color: 'var(--error)' }}>This cannot be undone.</p>
+        </>
+      ),
+      confirmText: 'Delete',
+      variant: 'danger',
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        doDeleteFile(fileId);
+      }
+    });
+  }, [selectedGroup, doDeleteFile]);
 
   // Opens preview mode - shows what files will be deleted
   const handleAutoResolve = useCallback(async () => {
@@ -353,20 +404,8 @@ export default function DuplicateManager() {
   }, [swappedItems]);
 
   // Execute the resolution (actually delete files)
-  const handleExecuteResolution = useCallback(async () => {
+  const doExecuteResolution = useCallback(async () => {
     if (!preview) return;
-
-    // Calculate effective deletes accounting for exclusions (swaps still result in one deletion)
-    const effectiveDeletes = preview.resolutions.filter(r => {
-      return !excludedFileIds.has(r.fileToDelete.id);
-    }).length;
-
-    if (!confirm(
-      `This will permanently delete ${effectiveDeletes} file(s).\n\n` +
-      'This cannot be undone. Continue?'
-    )) {
-      return;
-    }
 
     try {
       setAutoResolving(true);
@@ -414,6 +453,32 @@ export default function DuplicateManager() {
       setAutoResolving(false);
     }
   }, [preview, excludedFileIds, swappedItems, loadDuplicates]);
+
+  const handleExecuteResolution = useCallback(() => {
+    if (!preview) return;
+
+    // Calculate effective deletes accounting for exclusions (swaps still result in one deletion)
+    const effectiveDeletes = preview.resolutions.filter(r => {
+      return !excludedFileIds.has(r.fileToDelete.id);
+    }).length;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Auto-Resolve Duplicates',
+      message: (
+        <>
+          <p>This will permanently delete <strong>{effectiveDeletes} file(s)</strong>.</p>
+          <p style={{ marginTop: '1rem', color: 'var(--error)' }}>This cannot be undone.</p>
+        </>
+      ),
+      confirmText: `Delete ${effectiveDeletes} Files`,
+      variant: 'danger',
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        doExecuteResolution();
+      }
+    });
+  }, [preview, excludedFileIds, doExecuteResolution]);
 
   // Cancel preview mode
   const handleCancelPreview = useCallback(() => {
@@ -769,6 +834,14 @@ export default function DuplicateManager() {
         </div>
       )}
 
+      {successMessage && (
+        <div className="success-message">
+          <span className="success-icon">✓</span>
+          {successMessage}
+          <button className="dismiss-message" onClick={() => setSuccessMessage(null)}>×</button>
+        </div>
+      )}
+
       {error && (
         <div className="error-message">
           <span className="error-icon">!</span>
@@ -1004,6 +1077,10 @@ export default function DuplicateManager() {
                             <div key={file.id} className="file-to-delete-item">
                               <span className="file-title">{file.title || 'Unknown'}</span>
                               <span className="file-artist">{file.artist || 'Unknown'}</span>
+                              <span className="file-meta-inline">
+                                <span>{file.bitRate} kbps</span>
+                                <span>{formatFileSize(file.fileSizeBytes)}</span>
+                              </span>
                             </div>
                           ))}
                           {directoryPreview.filesToDelete.length > 10 && (
@@ -1032,6 +1109,9 @@ export default function DuplicateManager() {
                           <div key={`${pair.fileA.id}-${pair.fileB.id}-${idx}`} className="pair-item">
                             <div className="pair-file">
                               <span className="pair-title">{pair.fileA.title || 'Unknown'}</span>
+                              <span className="pair-meta">
+                                {pair.fileA.bitRate} kbps · {formatFileSize(pair.fileA.fileSizeBytes)}
+                              </span>
                               <span className="pair-path" title={pair.fileA.filePath}>
                                 {pair.fileA.filePath.split('/').slice(-1)[0]}
                               </span>
@@ -1043,6 +1123,9 @@ export default function DuplicateManager() {
                             )}
                             <div className="pair-file">
                               <span className="pair-title">{pair.fileB.title || 'Unknown'}</span>
+                              <span className="pair-meta">
+                                {pair.fileB.bitRate} kbps · {formatFileSize(pair.fileB.fileSizeBytes)}
+                              </span>
                               <span className="pair-path" title={pair.fileB.filePath}>
                                 {pair.fileB.filePath.split('/').slice(-1)[0]}
                               </span>
@@ -1097,6 +1180,16 @@ export default function DuplicateManager() {
         onClose={() => setShowHelp(false)}
         title="Duplicate Manager Help"
         sections={duplicatesHelp}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
       />
     </div>
   );

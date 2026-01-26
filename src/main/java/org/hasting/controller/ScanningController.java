@@ -118,9 +118,47 @@ public class ScanningController {
     }
 
     /**
+     * Creates a new directory.
+     *
+     * POST /api/v1/scanning/create-directory
+     * Body: { "parentPath": "/some/path", "name": "NewFolder" }
+     */
+    @PostMapping("/create-directory")
+    public ResponseEntity<Map<String, Object>> createDirectory(@RequestBody CreateDirectoryRequest request) {
+        if (request.parentPath() == null || request.parentPath().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Parent path is required"
+            ));
+        }
+        if (request.name() == null || request.name().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Directory name is required"
+            ));
+        }
+
+        String createdPath = scanningService.createDirectory(request.parentPath(), request.name());
+
+        if (createdPath != null) {
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "path", createdPath
+            ));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Failed to create directory. Check that the parent exists and is writable."
+            ));
+        }
+    }
+
+    /**
      * Request body for starting a scan.
      */
     public record ScanRequest(List<String> directories) {}
+
+    /**
+     * Request body for creating a directory.
+     */
+    public record CreateDirectoryRequest(String parentPath, String name) {}
 
     /**
      * Response for directory browsing.

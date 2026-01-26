@@ -1845,7 +1845,7 @@ public class DatabaseManager {
             throw new IllegalArgumentException("At least one search parameter must be provided");
         }
 
-        sql.append(String.join(" AND ", conditions) + getFileTypeFilterClause() + 
+        sql.append(String.join(" AND ", conditions) + getFileTypeFilterClause() +
                 " ORDER BY lower(artist), lower(album), lower(title) ASC, " +
                 "bit_rate, duration_seconds DESC");
 
@@ -1865,6 +1865,172 @@ public class DatabaseManager {
         }
 
         return musicFiles;
+    }
+
+    /**
+     * Searches music files with optional filters on title, artist, album, and genre.
+     * Returns all files if no filters are provided.
+     *
+     * @param title Optional title filter (partial match)
+     * @param artist Optional artist filter (partial match)
+     * @param album Optional album filter (partial match)
+     * @param genre Optional genre filter (partial match)
+     * @param page Page number (0-indexed)
+     * @param pageSize Number of results per page
+     * @return List of matching music files for the requested page
+     */
+    public static synchronized List<MusicFile> searchMusicFilesWithFilters(
+            String title, String artist, String album, String genre,
+            int page, int pageSize) {
+        List<MusicFile> musicFiles = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("SELECT * FROM music_files WHERE 1=1");
+        List<String> parameters = new ArrayList<>();
+
+        if (title != null && !title.isEmpty()) {
+            sql.append(" AND LOWER(title) LIKE ?");
+            parameters.add("%" + title.toLowerCase() + "%");
+        }
+        if (artist != null && !artist.isEmpty()) {
+            sql.append(" AND LOWER(artist) LIKE ?");
+            parameters.add("%" + artist.toLowerCase() + "%");
+        }
+        if (album != null && !album.isEmpty()) {
+            sql.append(" AND LOWER(album) LIKE ?");
+            parameters.add("%" + album.toLowerCase() + "%");
+        }
+        if (genre != null && !genre.isEmpty()) {
+            sql.append(" AND LOWER(genre) LIKE ?");
+            parameters.add("%" + genre.toLowerCase() + "%");
+        }
+
+        sql.append(getFileTypeFilterClause());
+        sql.append(" ORDER BY lower(artist), lower(album), lower(title) ASC, bit_rate, duration_seconds DESC");
+        sql.append(" LIMIT ? OFFSET ?");
+
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql.toString())) {
+            int paramIndex = 1;
+            for (String param : parameters) {
+                pstmt.setString(paramIndex++, param);
+            }
+            pstmt.setInt(paramIndex++, pageSize);
+            pstmt.setInt(paramIndex, page * pageSize);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    musicFiles.add(extractMusicFileFromResultSet(rs));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to search music files with filters", e);
+            throw new RuntimeException("Failed to search music files", e);
+        }
+
+        return musicFiles;
+    }
+
+    /**
+     * Counts music files matching optional filters.
+     *
+     * @param title Optional title filter
+     * @param artist Optional artist filter
+     * @param album Optional album filter
+     * @param genre Optional genre filter
+     * @return Count of matching files
+     */
+    public static synchronized int countMusicFilesWithFilters(
+            String title, String artist, String album, String genre) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM music_files WHERE 1=1");
+        List<String> parameters = new ArrayList<>();
+
+        if (title != null && !title.isEmpty()) {
+            sql.append(" AND LOWER(title) LIKE ?");
+            parameters.add("%" + title.toLowerCase() + "%");
+        }
+        if (artist != null && !artist.isEmpty()) {
+            sql.append(" AND LOWER(artist) LIKE ?");
+            parameters.add("%" + artist.toLowerCase() + "%");
+        }
+        if (album != null && !album.isEmpty()) {
+            sql.append(" AND LOWER(album) LIKE ?");
+            parameters.add("%" + album.toLowerCase() + "%");
+        }
+        if (genre != null && !genre.isEmpty()) {
+            sql.append(" AND LOWER(genre) LIKE ?");
+            parameters.add("%" + genre.toLowerCase() + "%");
+        }
+
+        sql.append(getFileTypeFilterClause());
+
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql.toString())) {
+            int paramIndex = 1;
+            for (String param : parameters) {
+                pstmt.setString(paramIndex++, param);
+            }
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to count music files with filters", e);
+        }
+        return 0;
+    }
+
+    /**
+     * Gets all file IDs matching optional filters.
+     * Used for "Select All" functionality.
+     *
+     * @param title Optional title filter
+     * @param artist Optional artist filter
+     * @param album Optional album filter
+     * @param genre Optional genre filter
+     * @return List of matching file IDs
+     */
+    public static synchronized List<Long> getMatchingFileIds(
+            String title, String artist, String album, String genre) {
+        List<Long> ids = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("SELECT id FROM music_files WHERE 1=1");
+        List<String> parameters = new ArrayList<>();
+
+        if (title != null && !title.isEmpty()) {
+            sql.append(" AND LOWER(title) LIKE ?");
+            parameters.add("%" + title.toLowerCase() + "%");
+        }
+        if (artist != null && !artist.isEmpty()) {
+            sql.append(" AND LOWER(artist) LIKE ?");
+            parameters.add("%" + artist.toLowerCase() + "%");
+        }
+        if (album != null && !album.isEmpty()) {
+            sql.append(" AND LOWER(album) LIKE ?");
+            parameters.add("%" + album.toLowerCase() + "%");
+        }
+        if (genre != null && !genre.isEmpty()) {
+            sql.append(" AND LOWER(genre) LIKE ?");
+            parameters.add("%" + genre.toLowerCase() + "%");
+        }
+
+        sql.append(getFileTypeFilterClause());
+        sql.append(" ORDER BY lower(artist), lower(album), lower(title) ASC");
+
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql.toString())) {
+            int paramIndex = 1;
+            for (String param : parameters) {
+                pstmt.setString(paramIndex++, param);
+            }
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getLong("id"));
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Failed to get matching file IDs", e);
+            throw new RuntimeException("Failed to get matching file IDs", e);
+        }
+
+        return ids;
     }
 
     /**

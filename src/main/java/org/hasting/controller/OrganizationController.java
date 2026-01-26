@@ -47,29 +47,62 @@ public class OrganizationController {
     /**
      * POST /api/v1/organization/preview-all - Preview organization paths for all files.
      *
-     * @param request Preview request with template settings
+     * @param request Preview request with template settings and optional filters
      * @return Paginated list of preview results
      */
     @PostMapping("/preview-all")
     public PreviewAllResponse previewAllOrganization(@RequestBody PreviewAllRequest request) {
+        int page = request.page() != null ? request.page() : 0;
+        int size = request.size() != null ? request.size() : 50;
+
         List<OrganizationPreviewDTO> previews = organizationService.previewAllOrganization(
                 request.basePath(),
                 request.template(),
                 request.textFormat(),
                 request.useSubdirectories(),
                 request.subdirectoryLevels(),
-                request.page() != null ? request.page() : 0,
-                request.size() != null ? request.size() : 50
+                page,
+                size,
+                request.filterTitle(),
+                request.filterArtist(),
+                request.filterAlbum(),
+                request.filterGenre()
         );
 
-        long totalCount = organizationService.getTotalFileCount();
+        long totalCount = organizationService.getFilteredFileCount(
+                request.filterTitle(),
+                request.filterArtist(),
+                request.filterAlbum(),
+                request.filterGenre()
+        );
 
         return new PreviewAllResponse(
                 previews,
                 totalCount,
-                request.page() != null ? request.page() : 0,
-                (int) Math.ceil((double) totalCount / (request.size() != null ? request.size() : 50))
+                page,
+                (int) Math.ceil((double) totalCount / size)
         );
+    }
+
+    /**
+     * POST /api/v1/organization/matching-ids - Get all file IDs matching filters.
+     * Used for "Select All" functionality.
+     *
+     * @param request Filter parameters
+     * @return List of matching file IDs
+     */
+    @PostMapping("/matching-ids")
+    public ResponseEntity<Map<String, Object>> getMatchingIds(@RequestBody FilterRequest request) {
+        List<Long> ids = organizationService.getMatchingFileIds(
+                request.filterTitle(),
+                request.filterArtist(),
+                request.filterAlbum(),
+                request.filterGenre()
+        );
+        return ResponseEntity.ok(Map.of(
+                "ids", ids,
+                "count", ids.size()
+        ));
     }
 
     /**
@@ -145,7 +178,21 @@ public class OrganizationController {
             Boolean useSubdirectories,
             Integer subdirectoryLevels,
             Integer page,
-            Integer size
+            Integer size,
+            String filterTitle,
+            String filterArtist,
+            String filterAlbum,
+            String filterGenre
+    ) {}
+
+    /**
+     * Request body for filter operations.
+     */
+    public record FilterRequest(
+            String filterTitle,
+            String filterArtist,
+            String filterAlbum,
+            String filterGenre
     ) {}
 
     /**

@@ -99,15 +99,45 @@ public class OrganizationService {
             int page,
             int size
     ) {
-        List<MusicFile> allFiles = DatabaseManager.getAllMusicFiles();
+        return previewAllOrganization(basePath, template, textFormat, useSubdirectories,
+                subdirectoryLevels, page, size, null, null, null, null);
+    }
+
+    /**
+     * Previews organization paths for files matching optional filters.
+     *
+     * @param basePath Base path for organization
+     * @param template Path template (null for default)
+     * @param textFormat Text formatting style
+     * @param useSubdirectories Whether to use alphabetical subdirectory grouping
+     * @param subdirectoryLevels Number of subdirectory groups
+     * @param page Page number (0-indexed)
+     * @param size Page size
+     * @param filterTitle Optional title filter
+     * @param filterArtist Optional artist filter
+     * @param filterAlbum Optional album filter
+     * @param filterGenre Optional genre filter
+     * @return List of preview results for the requested page
+     */
+    public List<OrganizationPreviewDTO> previewAllOrganization(
+            String basePath,
+            String template,
+            String textFormat,
+            Boolean useSubdirectories,
+            Integer subdirectoryLevels,
+            int page,
+            int size,
+            String filterTitle,
+            String filterArtist,
+            String filterAlbum,
+            String filterGenre
+    ) {
+        List<MusicFile> files = DatabaseManager.searchMusicFilesWithFilters(
+                filterTitle, filterArtist, filterAlbum, filterGenre, page, size);
         PathTemplate pathTemplate = createPathTemplate(template, textFormat, useSubdirectories, subdirectoryLevels);
         List<OrganizationPreviewDTO> previews = new ArrayList<>();
 
-        int start = page * size;
-        int end = Math.min(start + size, allFiles.size());
-
-        for (int i = start; i < end; i++) {
-            MusicFile musicFile = allFiles.get(i);
+        for (MusicFile musicFile : files) {
             String newPath = FileOrganizer.generateFilePath(musicFile, basePath, pathTemplate);
             previews.add(new OrganizationPreviewDTO(
                     musicFile.getId(),
@@ -131,6 +161,33 @@ public class OrganizationService {
      */
     public long getTotalFileCount() {
         return DatabaseManager.getMusicFileCount();
+    }
+
+    /**
+     * Gets the count of files matching optional filters.
+     *
+     * @param filterTitle Optional title filter
+     * @param filterArtist Optional artist filter
+     * @param filterAlbum Optional album filter
+     * @param filterGenre Optional genre filter
+     * @return Count of matching files
+     */
+    public int getFilteredFileCount(String filterTitle, String filterArtist, String filterAlbum, String filterGenre) {
+        return DatabaseManager.countMusicFilesWithFilters(filterTitle, filterArtist, filterAlbum, filterGenre);
+    }
+
+    /**
+     * Gets all file IDs matching optional filters.
+     * Used for "Select All" functionality.
+     *
+     * @param filterTitle Optional title filter
+     * @param filterArtist Optional artist filter
+     * @param filterAlbum Optional album filter
+     * @param filterGenre Optional genre filter
+     * @return List of matching file IDs
+     */
+    public List<Long> getMatchingFileIds(String filterTitle, String filterArtist, String filterAlbum, String filterGenre) {
+        return DatabaseManager.getMatchingFileIds(filterTitle, filterArtist, filterAlbum, filterGenre);
     }
 
     /**

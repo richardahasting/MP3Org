@@ -86,11 +86,12 @@ public class IntegrationTestSuite extends IntegrationTestBase {
     @Test
     @DisplayName("02. Metadata Extraction + Format Support Integration")
     void testMetadataExtractionFormatIntegration() {
-        // Given: Files of different formats from our test data
+        // Given: Clean database and files of different formats from our test data
+        DatabaseManager.deleteAllMusicFiles();
         File testFormatsDir = validateTestDirectory(FORMATS_DIR, 3);
-        
+
         PerformanceTimer timer = new PerformanceTimer("Format Support Integration");
-        
+
         // When: Extract metadata from each format
         MusicFileScanner scanner = new MusicFileScanner();
         List<String> directories = List.of(testFormatsDir.getAbsolutePath());
@@ -278,17 +279,18 @@ public class IntegrationTestSuite extends IntegrationTestBase {
     @Test
     @DisplayName("06. Performance Integration Testing")
     void testPerformanceIntegration() {
-        // Given: Performance test directory with larger files
+        // Given: Clean database and performance test directory with larger files
+        DatabaseManager.deleteAllMusicFiles();
         File perfDir = validateTestDirectory(PERFORMANCE_DIR, 1);
-        
+
         MemoryMonitor memory = new MemoryMonitor("Performance Integration");
         PerformanceTimer timer = new PerformanceTimer("Performance Integration");
-        
+
         // When: Process performance test files
         MusicFileScanner scanner = new MusicFileScanner();
         List<String> directories = List.of(perfDir.getAbsolutePath());
         List<MusicFile> perfFiles = scanner.scanMusicFiles(directories);
-        
+
         // Verify larger files are processed efficiently
         assertFalse(perfFiles.isEmpty(), "Should find performance test files");
         

@@ -58,6 +58,13 @@ export async function previewOrganization(
   return response.json();
 }
 
+export interface SearchFilters {
+  filterTitle?: string;
+  filterArtist?: string;
+  filterAlbum?: string;
+  filterGenre?: string;
+}
+
 export async function previewAllOrganization(
   basePath: string,
   template?: string,
@@ -65,7 +72,8 @@ export async function previewAllOrganization(
   useSubdirectories?: boolean,
   subdirectoryLevels?: number,
   page: number = 0,
-  size: number = 50
+  size: number = 50,
+  filters?: SearchFilters
 ): Promise<PreviewAllResponse> {
   const response = await fetch(`${API_BASE}/preview-all`, {
     method: 'POST',
@@ -78,9 +86,20 @@ export async function previewAllOrganization(
       subdirectoryLevels,
       page,
       size,
+      ...filters,
     }),
   });
   if (!response.ok) throw new Error('Preview all failed');
+  return response.json();
+}
+
+export async function getMatchingIds(filters?: SearchFilters): Promise<{ ids: number[]; count: number }> {
+  const response = await fetch(`${API_BASE}/matching-ids`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(filters || {}),
+  });
+  if (!response.ok) throw new Error('Failed to get matching IDs');
   return response.json();
 }
 
